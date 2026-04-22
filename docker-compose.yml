@@ -1,7 +1,3 @@
-# SonicAI docker-compose for 1Panel
-# 复用已有的 emby-postgres / emby-redis 容器
-# 需确保 musicrec 数据库已创建（见 deploy/init-db.sql）
-
 version: '3'
 
 services:
@@ -12,19 +8,21 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - TZ=Asia/Shanghai
-      - DATABASE_URL=postgresql+psycopg://postgres:postgres@emby-postgres:5432/musicrec
-      - REDIS_URL=redis://emby-redis:6379/3
-      - REDIS_KEY_PREFIX=sonicai:
-      - INIT_ADMIN_USERNAME=admin
-      - INIT_ADMIN_PASSWORD=change_me_after_deploy
-      - INIT_ADMIN_EMAIL=admin@sonicai.local
-      - JWT_SECRET_KEY=sonicai-access-change-in-production
-      - JWT_REFRESH_SECRET_KEY=sonicai-refresh-change-in-production
-      - APP_TIMEZONE=Asia/Shanghai
+      TZ: Asia/Shanghai
+      DATABASE_URL: "postgresql+psycopg://postgres:postgres@emby-postgres:5432/musicrec"
+      REDIS_URL: "redis://emby-redis:6379/3"
+      REDIS_KEY_PREFIX: sonicai
+      INIT_ADMIN_USERNAME: admin
+      INIT_ADMIN_PASSWORD: change_me_after_deploy
+      INIT_ADMIN_EMAIL: admin@sonicai.local
+      JWT_SECRET_KEY: sonicai-access-change-in-production
+      JWT_REFRESH_SECRET_KEY: sonicai-refresh-change-in-production
+      APP_TIMEZONE: Asia/Shanghai
     networks:
       - console_default
-    command: ["python", "run.py"]
+    command:
+      - python
+      - run.py
 
 networks:
   console_default:
