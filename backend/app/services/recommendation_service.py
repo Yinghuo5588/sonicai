@@ -33,27 +33,32 @@ async def run_full_recommendation():
         run = RecommendationRun(run_type="manual", status="running")
         db.add(run)
         await db.flush()
+        run_id = run.id
 
     try:
-        # Load settings snapshot
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(SystemSettings))
             settings = result.scalar_one()
 
-        await _generate_similar_tracks(db, run, settings)
-        await _generate_similar_artists(db, run, settings)
-        await _cleanup_old_playlists(settings)
+        async with AsyncSessionLocal() as db:
+            await _generate_similar_tracks(db, run_id, settings)
+        async with AsyncSessionLocal() as db:
+            await _generate_similar_artists(db, run_id, settings)
+        async with AsyncSessionLocal() as db:
+            await _cleanup_old_playlists(settings)
 
-        run.status = "success"
-        run.finished_at = datetime.now(timezone.utc)
+        async with AsyncSessionLocal() as db:
+            run_row = await db.get(RecommendationRun, run_id)
+            run_row.status = "success"
+            run_row.finished_at = datetime.now(timezone.utc)
+            await db.commit()
     except Exception as e:
         logger.exception("Recommendation run failed")
-        run.status = "failed"
-        run.error_message = str(e)
-        run.finished_at = datetime.now(timezone.utc)
-    finally:
         async with AsyncSessionLocal() as db:
-            db.add(run)
+            run_row = await db.get(RecommendationRun, run_id)
+            run_row.status = "failed"
+            run_row.error_message = str(e)
+            run_row.finished_at = datetime.now(timezone.utc)
             await db.commit()
 
 
@@ -62,21 +67,26 @@ async def run_similar_tracks_only():
         run = RecommendationRun(run_type="manual", status="running")
         db.add(run)
         await db.flush()
+        run_id = run.id
+
     try:
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(SystemSettings))
             settings = result.scalar_one()
-        await _generate_similar_tracks(db, run, settings)
-        run.status = "success"
-        run.finished_at = datetime.now(timezone.utc)
+        async with AsyncSessionLocal() as db:
+            await _generate_similar_tracks(db, run_id, settings)
+        async with AsyncSessionLocal() as db:
+            run_row = await db.get(RecommendationRun, run_id)
+            run_row.status = "success"
+            run_row.finished_at = datetime.now(timezone.utc)
+            await db.commit()
     except Exception as e:
         logger.exception("Similar tracks run failed")
-        run.status = "failed"
-        run.error_message = str(e)
-        run.finished_at = datetime.now(timezone.utc)
-    finally:
         async with AsyncSessionLocal() as db:
-            db.add(run)
+            run_row = await db.get(RecommendationRun, run_id)
+            run_row.status = "failed"
+            run_row.error_message = str(e)
+            run_row.finished_at = datetime.now(timezone.utc)
             await db.commit()
 
 
@@ -85,21 +95,26 @@ async def run_similar_artists_only():
         run = RecommendationRun(run_type="manual", status="running")
         db.add(run)
         await db.flush()
+        run_id = run.id
+
     try:
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(SystemSettings))
             settings = result.scalar_one()
-        await _generate_similar_artists(db, run, settings)
-        run.status = "success"
-        run.finished_at = datetime.now(timezone.utc)
+        async with AsyncSessionLocal() as db:
+            await _generate_similar_artists(db, run_id, settings)
+        async with AsyncSessionLocal() as db:
+            run_row = await db.get(RecommendationRun, run_id)
+            run_row.status = "success"
+            run_row.finished_at = datetime.now(timezone.utc)
+            await db.commit()
     except Exception as e:
         logger.exception("Similar artists run failed")
-        run.status = "failed"
-        run.error_message = str(e)
-        run.finished_at = datetime.now(timezone.utc)
-    finally:
         async with AsyncSessionLocal() as db:
-            db.add(run)
+            run_row = await db.get(RecommendationRun, run_id)
+            run_row.status = "failed"
+            run_row.error_message = str(e)
+            run_row.finished_at = datetime.now(timezone.utc)
             await db.commit()
 
 
@@ -107,12 +122,12 @@ async def run_similar_artists_only():
 # Similar Tracks pipeline
 # ─────────────────────────────────────────────
 
-async def _generate_similar_tracks(db: AsyncSession, run: RecommendationRun, settings):
+async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     playlist_name = f"LastFM - 相似曲目 - {today}"
 
     playlist = GeneratedPlaylist(
-        run_id=run.id,
+        run_id=run_id,
         playlist_type="similar_tracks",
         playlist_name=playlist_name,
         playlist_date=today,
@@ -234,12 +249,12 @@ async def _generate_similar_tracks(db: AsyncSession, run: RecommendationRun, set
 # Similar Artists pipeline
 # ─────────────────────────────────────────────
 
-async def _generate_similar_artists(db: AsyncSession, run: RecommendationRun, settings):
+async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     playlist_name = f"LastFM - 相邻艺术家 - {today}"
 
     playlist = GeneratedPlaylist(
-        run_id=run.id,
+        run_id=run_id,
         playlist_type="similar_artists",
         playlist_name=playlist_name,
         playlist_date=today,
@@ -259,7 +274,7 @@ async def _generate_similar_artists(db: AsyncSession, run: RecommendationRun, se
     # to enforce inter-playlist dedup
     existing_keys_result = await db.execute(
         select(RecommendationItem.dedup_key).join(GeneratedPlaylist)
-        .where(GeneratedPlaylist.run_id == run.id)
+        .where(GeneratedPlaylist.run_id == run_id)
         .where(GeneratedPlaylist.playlist_type == "similar_tracks")
     )
     for row in existing_keys_result:
@@ -429,7 +444,7 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
 async def _create_webhook_batch(db: AsyncSession, run, playlist, missing_items: list[dict]):
     """Create a webhook batch for missing items."""
     batch = WebhookBatch(
-        run_id=run.id,
+        run_id=run_id,
         playlist_type=playlist.playlist_type,
         status="pending",
         max_retry_count=3,
