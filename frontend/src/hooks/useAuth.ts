@@ -10,7 +10,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>(set => ({
   token: localStorage.getItem('sonicai_access_token'),
   refreshToken: localStorage.getItem('sonicai_refresh_token'),
-  setTokens: (token, refresh) => {
+  setTokens: (token: string, refresh: string) => {
     localStorage.setItem('sonicai_access_token', token)
     localStorage.setItem('sonicai_refresh_token', refresh)
     set({ token, refreshToken: refresh })

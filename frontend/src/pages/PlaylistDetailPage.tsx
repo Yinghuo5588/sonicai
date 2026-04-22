@@ -1,24 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
 
-interface PlaylistItem {
-  id: number
-  rank_index: number
-  title: string
-  artist: string
-  album: string | null
-  score: number | null
-  source_type: string
-  source_seed_name: string | null
-  source_seed_artist: string | null
-  matched: boolean
-  selected_title: string | null
-  selected_artist: string | null
-  selected_album: string | null
-  confidence_score: number | null
-  search_query: string | null
-}
-
 async function fetchPlaylistItems(playlistId: number, offset = 0) {
   const token = localStorage.getItem('sonicai_access_token')
   const res = await fetch(`/api/runs/playlists/${playlistId}/items?limit=50&offset=${offset}`, {
@@ -108,7 +90,7 @@ export default function PlaylistDetailPage() {
             {items.length === 0 && (
               <tr><td colSpan={7} className="p-6 text-slate-400 text-center">暂无数据</td></tr>
             )}
-            {items.map(item => (
+            {items.map((item: Record<string, unknown>) => (
               <tr key={item.id} className="border-t border-slate-100 hover:bg-slate-50">
                 <td className="p-3 text-slate-400 text-xs">{item.rank_index}</td>
                 <td className="p-3">

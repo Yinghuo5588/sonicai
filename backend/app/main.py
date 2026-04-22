@@ -1,10 +1,12 @@
 """FastAPI application entry point."""
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.scheduler import start_scheduler, shutdown_scheduler
@@ -12,6 +14,11 @@ from app.core.logging import *  # noqa: F401,F403
 from app.api.routes import router as api_router
 
 logger = logging.getLogger(__name__)
+
+# Resolve frontend dist directory relative to backend/
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)  # sonicai/
+_FRONTEND_DIST = os.path.join(_PROJECT_ROOT, "frontend", "dist")
 
 
 @asynccontextmanager
@@ -41,8 +48,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routes
+# API routes
 app.include_router(api_router, prefix="/api")
+
+
+# Serve frontend static files at root
+if os.path.isdir(_FRONTEND_DIST):
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")
+    logger.info(f"Serving frontend from: {_FRONTEND_DIST}")
+else:
+    logger.warning(f"Frontend dist not found at {_FRONTEND_DIST} — frontend will not be served")
 
 
 @app.get("/api/health")
