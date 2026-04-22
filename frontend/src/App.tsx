@@ -6,6 +6,7 @@ import SettingsPage from '@/pages/SettingsPage'
 import JobsPage from '@/pages/JobsPage'
 import HistoryPage from '@/pages/HistoryPage'
 import WebhooksPage from '@/pages/WebhooksPage'
+import PlaylistDetailPage from '@/pages/PlaylistDetailPage'
 import Layout from '@/layouts/Layout'
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="jobs" element={<JobsPage />} />
         <Route path="history" element={<HistoryPage />} />
+        <Route path="history/playlist/:playlist_id" element={<PlaylistDetailPage />} />
         <Route path="webhooks" element={<WebhooksPage />} />
       </Route>
     </Routes>
