@@ -58,6 +58,7 @@ async def load_cron_schedule(db: AsyncSession):
 
 
 def start_scheduler():
+    global _scheduler
     if not _scheduler or not _scheduler.running:
         _scheduler = get_scheduler()
         _scheduler.start()
