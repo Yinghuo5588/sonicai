@@ -89,8 +89,7 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
     for key, value in body.model_dump(exclude_unset=True).items():
         if value is not None:
             if key == "navidrome_password":
-                from app.core.security import hash_password
-                setattr(s, "navidrome_password_encrypted", hash_password(value))
+                setattr(s, "navidrome_password_encrypted", value)
             elif key == "webhook_headers_json":
                 try:
                     json.loads(value)
