@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: sonicai-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - shared_net
+    depends_on:
+      - nginx
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nginx:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    container_name: sonicai-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-5173}:80"
+    networks:
+      - shared_net
+
+networks:
+  shared_net:
+    external: true
