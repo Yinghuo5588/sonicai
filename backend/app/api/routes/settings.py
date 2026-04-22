@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 import json
+import httpx
 
 from app.db.session import get_db, AsyncSessionLocal
 from app.db.models import SystemSettings
@@ -129,4 +130,29 @@ async def test_webhook(current_user: CurrentUser, db: AsyncSessionLocal = Depend
     s = await get_settings_session(db)
     if not s.webhook_url:
         raise HTTPException(status_code=400, detail="Webhook URL not configured")
-    return {"status": "ok", "message": "Webhook test OK"}
+
+    headers = {}
+    if s.webhook_headers_json:
+        try:
+            headers = json.loads(s.webhook_headers_json)
+        except Exception:
+            raise HTTPException(status_code=400, detail="webhook_headers_json 格式错误，需为合法 JSON")
+
+    test_payload = {"event": "test", "message": "SonicAI connectivity test"}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                s.webhook_url,
+                json=test_payload,
+                headers={**headers, "Content-Type": "application/json"},
+            )
+        if response.status_code < 400:
+            return {"status": "ok", "message": f"Webhook 连通成功 (HTTP {response.status_code})"}
+        raise HTTPException(
+            status_code=400,
+            detail=f"Webhook 返回错误 (HTTP {response.status_code}): {response.text[:200]}"
+        )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=400, detail="Webhook 连接超时（10秒）")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Webhook 连接失败: {str(e)}")
