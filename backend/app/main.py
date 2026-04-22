@@ -27,7 +27,7 @@ def _run_alembic_upgrade():
     try:
         result = subprocess.run(
             ["alembic", "upgrade", "head"],
-            cwd=os.path.join(_PROJECT_ROOT, "backend"),
+            cwd="/app",
             capture_output=True,
             text=True,
             timeout=30,
