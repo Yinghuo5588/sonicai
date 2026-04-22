@@ -6,7 +6,7 @@ services:
     container_name: sonicai-backend
     restart: always
     ports:
-      - "8000:8000"
+      - "8768:8000"
     environment:
       TZ: Asia/Shanghai
       DATABASE_URL: "postgresql+psycopg://postgres:postgres@emby-postgres:5432/musicrec"
