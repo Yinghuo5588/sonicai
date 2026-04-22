@@ -6,7 +6,7 @@ const navItems = [
   { to: '/jobs', label: '任务执行', icon: '▶️' },
   { to: '/history', label: '推荐历史', icon: '📜' },
   { to: '/webhooks', label: 'Webhook', icon: '🔗' },
-  { to: '/settings', label: '系统配置', icon: '⚙️' },
+  { to: '/settings', label: '配置', icon: '⚙️' },
 ]
 
 export default function Layout() {
@@ -19,13 +19,13 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-slate-200 flex flex-col">
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Desktop sidebar — hidden on mobile */}
+      <aside className="hidden md:flex w-48 bg-white border-r border-slate-200 flex-col fixed left-0 top-0 bottom-0 z-40">
         <div className="p-4 border-b border-slate-100">
           <h1 className="text-lg font-bold text-slate-800">SonicAI</h1>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map(item => (
             <NavLink
               key={item.to}
@@ -55,9 +55,30 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 bg-slate-50 min-h-screen">
+      <main className="flex-1 bg-slate-50 min-h-screen pb-20 md:pb-0 md:ml-48">
         <Outlet />
       </main>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="mobile-nav md:hidden">
+        {navItems.map(item => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === '/'}
+            className={({ isActive }) =>
+              `mobile-nav-item${isActive ? ' active' : ''}`
+            }
+          >
+            <span className="text-lg">{item.icon}</span>
+            {item.label}
+          </NavLink>
+        ))}
+        <button onClick={handleLogout} className="mobile-nav-item">
+          <span className="text-lg">🚪</span>
+          退出
+        </button>
+      </nav>
     </div>
   )
 }

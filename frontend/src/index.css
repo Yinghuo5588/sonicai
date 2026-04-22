@@ -33,3 +33,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile nav bar */
+.mobile-nav {
+  @apply fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 flex;
+  @apply md:hidden;
+}
+
+.mobile-nav-item {
+  @apply flex-1 flex flex-col items-center gap-0.5 py-2 text-xs text-slate-500;
+  @apply hover:text-blue-600 transition-colors;
+}
+
+.mobile-nav-item.active {
+  @apply text-blue-600;
+}
