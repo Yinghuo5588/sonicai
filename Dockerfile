@@ -23,4 +23,4 @@ COPY --from=builder /app/dist ./frontend/dist
 
 EXPOSE 8000
 
-CMD ["python", "run.py"]
+CMD ["sh", "-c", "alembic upgrade head && python run.py"]
