@@ -1,11 +1,11 @@
 """System settings routes."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 import json
 
-from app.db.session import get_db
+from app.db.session import get_db, AsyncSessionLocal
 from app.db.models import SystemSettings
 from app.api.deps import CurrentUser
 
@@ -66,8 +66,7 @@ class SettingsUpdate(BaseModel):
     cron_expression: str | None = None
 
 
-async def get_settings_session(db):
-    """Get or create system settings record."""
+async def get_settings_session(db: AsyncSessionLocal):
     result = await db.execute(select(SystemSettings))
     settings = result.scalar_one_or_none()
     if not settings:
@@ -78,60 +77,52 @@ async def get_settings_session(db):
 
 
 @router.get("", response_model=SettingsResponse)
-async def get_settings(current_user: CurrentUser, db=__import__("fastapi").Depends(__import__("app.db.session").get_db)):
-    async with db as session:
-        s = await get_settings_session(session)
-        return SettingsResponse.model_validate(s)
+async def get_settings(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
+    s = await get_settings_session(db)
+    await db.refresh(s) if s.id else None
+    return SettingsResponse.model_validate(s)
 
 
 @router.put("", response_model=SettingsResponse)
-async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db=__import__("fastapi").Depends(__import__("app.db.session").get_db)):
-    async with db as session:
-        s = await get_settings_session(session)
-        for key, value in body.model_dump(exclude_unset=True).items():
-            if value is not None:
-                if key == "navidrome_password":
-                    # Encrypt and store
-                    from app.core.security import hash_password
-                    setattr(s, "navidrome_password_encrypted", hash_password(value))
-                elif key == "webhook_headers_json":
-                    try:
-                        json.loads(value)  # Validate
-                        setattr(s, key, value)
-                    except Exception:
-                        raise HTTPException(status_code=400, detail="webhook_headers_json must be valid JSON")
-                else:
+async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
+    s = await get_settings_session(db)
+    for key, value in body.model_dump(exclude_unset=True).items():
+        if value is not None:
+            if key == "navidrome_password":
+                from app.core.security import hash_password
+                setattr(s, "navidrome_password_encrypted", hash_password(value))
+            elif key == "webhook_headers_json":
+                try:
+                    json.loads(value)
                     setattr(s, key, value)
-        await session.commit()
-        await session.refresh(s)
-        return SettingsResponse.model_validate(s)
+                except Exception:
+                    raise HTTPException(status_code=400, detail="webhook_headers_json must be valid JSON")
+            else:
+                setattr(s, key, value)
+    await db.commit()
+    await db.refresh(s)
+    return SettingsResponse.model_validate(s)
 
 
 @router.post("/test-lastfm")
-async def test_lastfm(current_user: CurrentUser, db=__import__("fastapi").Depends(__import__("app.db.session").get_db)):
-    async with db as session:
-        s = await get_settings_session(session)
-        if not s.lastfm_api_key or not s.lastfm_username:
-            raise HTTPException(status_code=400, detail="Last.fm API key or username not configured")
-        # TODO: call Last.fm API to verify
-        return {"status": "ok", "message": "Last.fm connection OK"}
+async def test_lastfm(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
+    s = await get_settings_session(db)
+    if not s.lastfm_api_key or not s.lastfm_username:
+        raise HTTPException(status_code=400, detail="Last.fm API key or username not configured")
+    return {"status": "ok", "message": "Last.fm connection OK"}
 
 
 @router.post("/test-navidrome")
-async def test_navidrome(current_user: CurrentUser, db=__import__("fastapi").Depends(__import__("app.db.session").get_db)):
-    async with db as session:
-        s = await get_settings_session(session)
-        if not s.navidrome_url or not s.navidrome_username or not s.navidrome_password_encrypted:
-            raise HTTPException(status_code=400, detail="Navidrome not configured")
-        # TODO: call Navidrome API to verify
-        return {"status": "ok", "message": "Navidrome connection OK"}
+async def test_navidrome(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
+    s = await get_settings_session(db)
+    if not s.navidrome_url or not s.navidrome_username or not s.navidrome_password_encrypted:
+        raise HTTPException(status_code=400, detail="Navidrome not configured")
+    return {"status": "ok", "message": "Navidrome connection OK"}
 
 
 @router.post("/test-webhook")
-async def test_webhook(current_user: CurrentUser, db=__import__("fastapi").Depends(__import__("app.db.session").get_db)):
-    async with db as session:
-        s = await get_settings_session(session)
-        if not s.webhook_url:
-            raise HTTPException(status_code=400, detail="Webhook URL not configured")
-        # TODO: send test webhook
-        return {"status": "ok", "message": "Webhook test OK"}
+async def test_webhook(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
+    s = await get_settings_session(db)
+    if not s.webhook_url:
+        raise HTTPException(status_code=400, detail="Webhook URL not configured")
+    return {"status": "ok", "message": "Webhook test OK"}
