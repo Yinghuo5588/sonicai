@@ -2,6 +2,7 @@
 
 import logging
 import os
+import subprocess
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -21,9 +22,29 @@ _PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)  # sonicai/
 _FRONTEND_DIST = os.path.join(_PROJECT_ROOT, "frontend", "dist")
 
 
+def _run_alembic_upgrade():
+    """Run alembic migrations if needed."""
+    try:
+        result = subprocess.run(
+            ["alembic", "upgrade", "head"],
+            cwd=os.path.join(_PROJECT_ROOT, "backend"),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            logger.info("Alembic migration completed successfully")
+        else:
+            logger.warning(f"Alembic migration output: {result.stdout} {result.stderr}")
+    except Exception as e:
+        logger.warning(f"Alembic migration failed (non-fatal): {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting SonicAI backend...")
+    # Run alembic migrations
+    _run_alembic_upgrade()
     # Create initial admin if no users exist
     await _ensure_initial_admin()
     # Start scheduler
