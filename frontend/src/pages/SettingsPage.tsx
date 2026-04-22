@@ -32,6 +32,17 @@ async function testNavidrome() {
   return data
 }
 
+async function testWebhook() {
+  const token = localStorage.getItem('sonicai_access_token')
+  const res = await fetch('/api/settings/test-webhook', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail || 'Connection failed')
+  return data
+}
+
 export default function SettingsPage() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['settings'], queryFn: fetchSettings })
@@ -39,6 +50,8 @@ export default function SettingsPage() {
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [navidromeResult, setNavidromeResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [navidromeLoading, setNavidromeLoading] = useState(false)
+  const [webhookResult, setWebhookResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [webhookLoading, setWebhookLoading] = useState(false)
 
   if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
 
@@ -66,6 +79,19 @@ export default function SettingsPage() {
       setNavidromeResult({ ok: false, msg: err.message })
     } finally {
       setNavidromeLoading(false)
+    }
+  }
+
+  const handleTestWebhook = async () => {
+    setWebhookLoading(true)
+    setWebhookResult(null)
+    try {
+      const result = await testWebhook()
+      setWebhookResult({ ok: true, msg: result.message || '连接成功' })
+    } catch (err: any) {
+      setWebhookResult({ ok: false, msg: err.message })
+    } finally {
+      setWebhookLoading(false)
     }
   }
 
@@ -104,7 +130,21 @@ export default function SettingsPage() {
 
       {/* Webhook */}
       <section className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
-        <h2 className="font-medium text-slate-700 text-sm">Webhook</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-medium text-slate-700 text-sm">Webhook</h2>
+          <button
+            onClick={handleTestWebhook}
+            disabled={webhookLoading || !s.webhook_url}
+            className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg disabled:opacity-50 transition-colors"
+          >
+            {webhookLoading ? '检测中...' : '检测连通性'}
+          </button>
+        </div>
+        {webhookResult && (
+          <p className={`text-xs px-3 py-2 rounded-lg ${webhookResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {webhookResult.ok ? '✅ ' : '❌ '}{webhookResult.msg}
+          </p>
+        )}
         {field('webhook_url', 'Webhook URL')}
         {field('webhook_headers_json', 'Headers (JSON)')}
         {field('webhook_retry_count', '重试次数', 'number')}
