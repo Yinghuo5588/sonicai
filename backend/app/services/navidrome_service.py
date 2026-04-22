@@ -1,26 +1,42 @@
-"""Navidrome API service."""
+"""Navidrome API service — Subsonic protocol."""
 
-import base64
-from datetime import datetime, timezone
-from typing import Any
+import hashlib
 import httpx
-
-from sqlalchemy import select
-from app.db.session import AsyncSessionLocal
-from app.db.models import SystemSettings
+from typing import Any
 
 
-def _get_navidrome_credentials() -> tuple[str, str] | None:
-    # Returns (url, auth_header) or None
-    # Note: navidrome_password_encrypted is hashed with argon2, we store it but use
-    # a separate approach - for now just use basic auth with decrypted password.
-    # Since we hash with argon2 (one-way), we need to store password differently.
-    # TODO: store navidrome password using a reversible encryption (e.g.Fernet)
-    # For now, we'll store it as plain in a separate field or use env variable approach.
-    return None
+# ── Auth helpers ───────────────────────────────────────────────────────────────
+
+def _md5(text: str) -> str:
+    return hashlib.md5(text.encode()).hexdigest()
 
 
-async def _get_navidrome_config() -> dict | None:
+def _subsonic_params(username: str, password: str, extra: dict[str, Any] | None = None) -> dict[str, str]:
+    """Build Subsonic auth params: t=token, s=salt, plus fixed version params."""
+    import secrets
+    salt = secrets.token_hex(8)
+    token = _md5(password + salt)
+    params = {
+        "u": username,
+        "t": token,
+        "s": salt,
+        "v": "1.16.1",
+        "c": "sonicai",
+        "f": "json",
+    }
+    if extra:
+        params.update(extra)
+    return params
+
+
+# ── Config helper ───────────────────────────────────────────────────────────────
+
+async def _navidrome_config() -> dict | None:
+    """Load Navidrome config from system_settings."""
+    from sqlalchemy import select
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import SystemSettings
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
         settings = result.scalar_one_or_none()
@@ -29,103 +45,122 @@ async def _get_navidrome_config() -> dict | None:
     return {
         "url": settings.navidrome_url.rstrip("/"),
         "username": settings.navidrome_username or "",
-        # Password stored in navidrome_password_encrypted (plain text for now - TODO: use Fernet)
+        # Stored as argon2 hash — we need plain password.
+        # TODO: store navidrome password with Fernet encryption (not argon2).
+        # For now, treat navidrome_password_encrypted as the plain password.
         "password": settings.navidrome_password_encrypted or "",
     }
 
 
-def _auth_header(username: str, password: str) -> str:
-    credentials = f"{username}:{password}"
-    return "Basic " + base64.b64encode(credentials.encode()).decode()
+# ── Core request ────────────────────────────────────────────────────────────────
 
-
-async def navidrome_get(endpoint: str) -> dict | None:
-    config = await _get_navidrome_config()
+async def _nd_get(endpoint: str, params: dict[str, Any] | None = None) -> dict | None:
+    """Make an authenticated Subsonic API request."""
+    config = await _navidrome_config()
     if not config:
         return None
-    url = f"{config['url']}{endpoint}"
-    headers = {"Authorization": _auth_header(config["username"], config["password"])}
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        try:
-            response = await client.get(url, headers=headers)
-            if response.status_code == 200:
-                return response.json()
-        except Exception:
-            pass
-    return None
+
+    username = config["username"]
+    password = config["password"]
+    if not username or not password:
+        return None
+
+    auth_params = _subsonic_params(username, password, params)
+    url = f"{config['url']}/rest/{endpoint}"
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(url, params=auth_params)
+            if response.status_code != 200:
+                return None
+            data = response.json()
+            # Subsonic always returns { "subsonic-response": { ... } }
+            resp = data.get("subsonic-response", data)
+            if resp.get("status") == "failed":
+                return None
+            return resp
+    except Exception:
+        return None
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+async def navidrome_ping() -> bool:
+    """Test connectivity — returns True if Navidrome responds OK."""
+    result = await _nd_get("ping.view")
+    return result is not None
 
 
 async def navidrome_search(query: str, limit: int = 10) -> list[dict]:
-    config = await _get_navidrome_config()
-    if not config:
+    """Search songs by query. Returns list of song dicts."""
+    result = await _nd_get("search3.view", {"q": query, "limit": limit})
+    if not result:
         return []
-    url = f"{config['url']}/api/session/search"
-    headers = {"Authorization": _auth_header(config["username"], config["password"])}
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        try:
-            response = await client.post(url, headers=headers, json={"query": query, "limit": limit})
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("artists", []) + data.get("songs", [])
-        except Exception:
-            pass
-    return []
 
-
-async def navidrome_create_playlist(name: str) -> str | None:
-    config = await _get_navidrome_config()
-    if not config:
-        return None
-    url = f"{config['url']}/api/playlist"
-    headers = {
-        "Authorization": _auth_header(config["username"], config["password"]),
-        "Content-Type": "application/json",
-    }
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        try:
-            response = await client.post(url, headers=headers, json={"name": name})
-            if response.status_code in (200, 201):
-                return response.json().get("id")
-        except Exception:
-            pass
-    return None
-
-
-async def navidrome_add_to_playlist(playlist_id: str, song_ids: list[str]):
-    config = await _get_navidrome_config()
-    if not config:
-        return False
-    url = f"{config['url']}/api/playlist/{playlist_id}"
-    headers = {
-        "Authorization": _auth_header(config["username"], config["password"]),
-        "Content-Type": "application/json",
-    }
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            response = await client.post(url, headers=headers, json={"songIds": song_ids})
-            return response.status_code in (200, 201)
-        except Exception:
-            return False
-
-
-async def navidrome_delete_playlist(playlist_id: str) -> bool:
-    config = await _get_navidrome_config()
-    if not config:
-        return False
-    url = f"{config['url']}/api/playlist/{playlist_id}"
-    headers = {"Authorization": _auth_header(config["username"], config["password"])}
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        try:
-            response = await client.delete(url, headers=headers)
-            return response.status_code == 204
-        except Exception:
-            return False
+    # search3 returns { searchResult3: { song: [...] } }
+    search_result = result.get("searchResult3", {})
+    songs = search_result.get("song", [])
+    if isinstance(songs, dict):
+        songs = [songs]
+    return [
+        {
+            "id": s.get("id"),
+            "title": s.get("title"),
+            "artist": s.get("artist"),
+            "album": s.get("album"),
+            "duration": s.get("duration"),
+        }
+        for s in songs
+        if s.get("id")
+    ]
 
 
 async def navidrome_list_playlists() -> list[dict]:
-    data = await navidrome_get("/api/playlist")
-    if isinstance(data, dict) and "playlists" in data:
-        return data["playlists"]
-    if isinstance(data, list):
-        return data
-    return []
+    """List all playlists. Returns list of playlist dicts."""
+    result = await _nd_get("getPlaylists.view")
+    if not result:
+        return []
+    playlists = result.get("playlists", {}).get("playlist", [])
+    if isinstance(playlists, dict):
+        playlists = [playlists]
+    return [
+        {
+            "id": p.get("id"),
+            "name": p.get("name"),
+            "comment": p.get("comment"),
+            "owner": p.get("owner"),
+            "public": p.get("public"),
+            "songCount": p.get("songCount"),
+            "created": p.get("created"),
+            "changed": p.get("changed"),
+        }
+        for p in playlists
+        if p.get("id")
+    ]
+
+
+async def navidrome_create_playlist(name: str) -> str | None:
+    """Create a new playlist. Returns the new playlist ID or None."""
+    # Subsonic createPlaylist requires name param, returns the new playlist id
+    result = await _nd_get("createPlaylist.view", {"name": name})
+    if not result:
+        return None
+    playlist = result.get("playlist", {})
+    return str(playlist.get("id", "")) or None
+
+
+async def navidrome_add_to_playlist(playlist_id: str, song_ids: list[str]) -> bool:
+    """Add songs to a playlist by ID."""
+    if not song_ids:
+        return True
+    result = await _nd_get(
+        "updatePlaylist.view",
+        {"playlistId": playlist_id, "songIdToAdd": song_ids},
+    )
+    return result is not None
+
+
+async def navidrome_delete_playlist(playlist_id: str) -> bool:
+    """Delete a playlist by ID."""
+    result = await _nd_get("deletePlaylist.view", {"id": playlist_id})
+    return result is not None

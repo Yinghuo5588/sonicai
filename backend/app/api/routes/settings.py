@@ -116,8 +116,13 @@ async def test_lastfm(current_user: CurrentUser, db: AsyncSessionLocal = Depends
 async def test_navidrome(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
     s = await get_settings_session(db)
     if not s.navidrome_url or not s.navidrome_username or not s.navidrome_password_encrypted:
-        raise HTTPException(status_code=400, detail="Navidrome not configured")
-    return {"status": "ok", "message": "Navidrome connection OK"}
+        raise HTTPException(status_code=400, detail="Navidrome 未完整配置")
+
+    from app.services.navidrome_service import navidrome_ping
+    ok = await navidrome_ping()
+    if not ok:
+        raise HTTPException(status_code=400, detail="Navidrome 连接失败 — 检查地址/用户名/密码")
+    return {"status": "ok", "message": "Navidrome 连接成功"}
 
 
 @router.post("/test-webhook")
