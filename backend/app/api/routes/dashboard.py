@@ -12,22 +12,32 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 @router.get("/summary")
 async def get_summary(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
-    total_runs = (await db.execute(select(func.count(RecommendationRun.id))).scalar() or 0
+    total_runs = await db.execute(select(func.count(RecommendationRun.id))
+    total_runs = total_runs.scalar() or 0
 
-    last_run_row = await db.execute(
+    last_run_result = await db.execute(
         select(RecommendationRun).order_by(RecommendationRun.created_at.desc()).limit(1)
     )
-    last_run = last_run_row.scalar_one_or_none()
+    last_run = last_run_result.scalar_one_or_none()
 
-    total_playlists = (await db.execute(select(func.count(GeneratedPlaylist.id))).scalar() or 0
-    total_matched = (await db.execute(select(func.sum(GeneratedPlaylist.matched_count))).scalar() or 0
-    total_missing = (await db.execute(select(func.sum(GeneratedPlaylist.missing_count))).scalar() or 0
-    wh_success = (await db.execute(
+    total_playlists = await db.execute(select(func.count(GeneratedPlaylist.id))
+    total_playlists = total_playlists.scalar() or 0
+
+    matched_result = await db.execute(select(func.sum(GeneratedPlaylist.matched_count))
+    total_matched = matched_result.scalar() or 0
+
+    missing_result = await db.execute(select(func.sum(GeneratedPlaylist.missing_count))
+    total_missing = missing_result.scalar() or 0
+
+    wh_success_result = await db.execute(
         select(func.count(WebhookBatch.id)).where(WebhookBatch.status == "success")
-    )).scalar() or 0
-    wh_failed = (await db.execute(
+    )
+    wh_success = wh_success_result.scalar() or 0
+
+    wh_failed_result = await db.execute(
         select(func.count(WebhookBatch.id)).where(WebhookBatch.status.in_(["failed", "retrying"])
-    )).scalar() or 0
+    )
+    wh_failed = wh_failed_result.scalar() or 0
 
     return {
         "total_runs": total_runs,
