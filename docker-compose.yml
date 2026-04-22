@@ -2,7 +2,7 @@ version: '3'
 
 services:
   sonicai-backend:
-    image: yinghuo5588/sonicai-backend:latest
+    image: <你的DockerHub用户名>/sonicai-backend:latest
     container_name: sonicai-backend
     restart: always
     ports:
