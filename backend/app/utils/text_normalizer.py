@@ -2,33 +2,40 @@
 
 import re
 import unicodedata
-from typing import Optional
 
 
-# ── Layer 1: Traditional → Simplified (Taiwan → Mainland CN) ─────────────────
+# ── Traditional → Simplified (OpenCC preferred, fallback dict) ─────────────────
 
-_TW_SIMPLIFIED_MAP: dict[str, str] = {
-    # Taiwan-specific terms
-    "軟體": "软件", "硬碟": "硬盘", "記憶體": "内存", "作業系統": "操作系统",
-    "工程師": "工程师", "資訊": "资讯", "使用者": "用户",
-    "音樂": "音乐", "歌曲": "歌曲", "專輯": "专辑", "藝術家": "艺术家",
-    "播放": "播放", "歌單": "歌单", "相似的曲目": "相似曲目",
-    # Common TW chars
-    "開": "开", "始": "始", "懂": "懂", "了": "了",
-    "孫": "孙", "燕": "燕", "姿": "姿",
-    "會": "会", "發": "发", "現": "现", "時": "时",
-    "說": "说", "對": "对", "於": "于", "來": "来",
-    "為": "为", "們": "们", "過": "过", "關": "关", "見": "见",
-    "與": "与", "國": "国", "學": "学", "樣": "样", "機": "机", "東": "东",
-    "這": "这", "個": "个", "電話": "电话",
-    "網": "网", "站": "站",
+_TW_FALLBACK_MAP = {
+    "開": "开", "會": "会", "說": "说", "對": "对", "於": "于",
+    "來": "来", "為": "为", "們": "们", "過": "过", "關": "关",
+    "見": "见", "與": "与", "國": "国", "學": "学", "樣": "样",
+    "機": "机", "東": "东", "這": "这", "個": "个", "網": "网",
+    "孫": "孙", "電話": "电话", "開始": "开始",
 }
-_TW_PATTERN = re.compile("|".join(re.escape(k) for k in _TW_SIMPLIFIED_MAP.keys()))
+_TW_PATTERN = re.compile("|".join(re.escape(k) for k in _TW_FALLBACK_MAP.keys())) if _TW_FALLBACK_MAP else None
+
+_oc = None
+
+def _get_opencc():
+    global _oc
+    if _oc is None:
+        try:
+            from opencc import OpenCC
+            _oc = OpenCC("t2s")
+        except Exception:
+            _oc = False
+    return _oc
 
 
 def to_simplified(text: str) -> str:
-    """Convert Taiwan Traditional Chinese to Mainland Simplified Chinese."""
-    return _TW_PATTERN.sub(lambda m: _TW_SIMPLIFIED_MAP[m.group(0)], text)
+    """Convert Traditional Chinese (incl. Taiwan variant) to Simplified Chinese."""
+    cc = _get_opencc()
+    if cc:
+        return cc.convert(text)
+    if not text:
+        return text
+    return _TW_PATTERN.sub(lambda m: _TW_FALLBACK_MAP[m.group(0)], text) if _TW_PATTERN else text
 
 
 # ── Layer 2: Unicode NFKC normalization ─────────────────────────────────────────
@@ -52,7 +59,7 @@ _FULLWIDTH_MAP = {
     "ｓ": "s", "ｔ": "t", "ｕ": "u", "ｖ": "v", "ｗ": "w", "ｘ": "x",
     "ｙ": "y", "ｚ": "z",
     "０": "0", "１": "1", "２": "2", "３": "3", "４": "4",
-    "５": "5", "６": "6", "٧": "7", "８": "8", "９": "9",
+    "５": "5", "６": "6", "７": "7", "８": "8", "９": "9",
     "（": "(", "）": ")", "【": "[", "】": "]", "－": "-", "—": "-",
     "　": " ", "．": ".", "，": ",", "：": ":", "；": ";",
     "！": "!", "？": "?", "＋": "+", "＝": "=",
@@ -79,7 +86,6 @@ _FEAT_PATTERNS = [
 
 
 def strip_version_suffix(text: str) -> str:
-    """Remove edition suffixes like (Live), - Remastered, etc."""
     t = text.strip()
     for p in _VERSION_PATTERNS:
         t = p.sub("", t)
@@ -89,7 +95,6 @@ def strip_version_suffix(text: str) -> str:
 
 
 def strip_feat(text: str) -> str:
-    """Remove feat./ft. trailing artists."""
     t = text.strip()
     for p in _FEAT_PATTERNS:
         t = p.sub("", t)
@@ -102,7 +107,6 @@ _MULTI_SPACE = re.compile(r"\s+")
 _PUNCTUATION = [
     ("（", "("), ("）", ")"), ("【", "["), ("】", "]"),
     ("——", "-"), ("–", "-"), ("—", "-"),
-    ("''", "\""), ('""', "\""), ("‘", "'"), ("’", "'"),
 ]
 
 
@@ -119,7 +123,6 @@ def normalize_whitespace(text: str) -> str:
 # ── Core normalization pipeline ───────────────────────────────────────────────
 
 def normalize_base(text: str) -> str:
-    """Layer 2-5: NFKC → fullwidth → lower → strip feat → strip version → punct → whitespace."""
     if not text:
         return ""
     t = nfkc(text)
@@ -135,28 +138,20 @@ def normalize_base(text: str) -> str:
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 def normalize_title(title: str) -> str:
-    """Normalize track title: NFKC + fullwidth + lower + strip version + feat."""
     return normalize_base(title)
 
 
 def normalize_artist(artist: str) -> str:
-    """Normalize artist name: NFKC + fullwidth + lower + strip feat."""
     return normalize_base(artist)
 
 
 def dedup_key(title: str, artist: str) -> str:
-    """Generate deduplication key from title + artist."""
     return f"{normalize_title(title)}|{normalize_artist(artist)}"
 
 
-# ── Multi-version query generation ──────────────────────────────────────────
+# ── Multi-query generation + scoring ─────────────────────────────────────────
 
 def make_search_queries(title: str, artist: str) -> list[dict]:
-    """
-    Generate prioritized search queries with 8 strategies.
-    Returns list of {query, label} dicts.
-    """
-    # Core versions
     title_norm = normalize_title(title)
     artist_norm = normalize_artist(artist)
     title_s2 = to_simplified(title_norm)
@@ -170,64 +165,47 @@ def make_search_queries(title: str, artist: str) -> list[dict]:
         if q:
             queries.append({"query": q, "label": label})
 
-    # Priority 1: raw core title + raw core artist
     if title_core and artist_core:
-        add(f"{title_core} {artist_core}", "raw_title_raw_artist")
-    # Priority 2: simplified core title + simplified core artist
+        add(f"{title_core} {artist_core}", "raw_artist_title")
     if title_s2 and artist_s2:
         add(f"{title_s2} {artist_s2}", "s2_title_s2_artist")
-    # Priority 3: raw title + simplified artist
     if title_core and artist_s2:
         add(f"{title_core} {artist_s2}", "raw_title_s2_artist")
-    # Priority 4: simplified title + raw artist
     if title_s2 and artist_core:
         add(f"{title_s2} {artist_core}", "s2_title_raw_artist")
-    # Priority 5: raw title only
     if title_core:
         add(title_core, "raw_title_only")
-    # Priority 6: simplified title only
     if title_s2:
         add(title_s2, "s2_title_only")
-    # Priority 7: reversed (artist + title)
     if artist_core and title_core:
-        add(f"{artist_core} {title_core}", "raw_artist_raw_title")
+        add(f"{artist_core} {title_core}", "raw_artist_reversed")
     if artist_s2 and title_s2:
-        add(f"{artist_s2} {title_s2}", "s2_artist_s2_title")
+        add(f"{artist_s2} {title_s2}", "s2_artist_reversed")
 
     return queries
 
 
 def score_candidate(lastfm_title: str, lastfm_artist: str, nav_title: str, nav_artist: str) -> dict:
-    """
-    Score a Navidrome result against a Last.fm track.
-    Returns dict with score (0~1), title_score, artist_score.
-    Uses both raw and simplified comparison, takes max.
-    """
     from rapidfuzz import fuzz
 
-    # Build normalized versions of Last.fm
     lf_title_norm = normalize_title(lastfm_title)
     lf_artist_norm = normalize_artist(lastfm_artist)
     lf_title_s2 = to_simplified(lf_title_norm)
     lf_artist_s2 = to_simplified(lf_artist_norm)
 
-    # Normalize Navidrome result
     nav_title_norm = normalize_title(nav_title)
     nav_artist_norm = normalize_artist(nav_artist)
     nav_title_s2 = to_simplified(nav_title_norm)
     nav_artist_s2 = to_simplified(nav_artist_norm)
 
-    # Title: compare raw vs raw, simplified vs simplified, take max
     t_score_raw = fuzz.token_sort_ratio(lf_title_norm, nav_title_norm) / 100
     t_score_s2 = fuzz.token_sort_ratio(lf_title_s2, nav_title_s2) / 100
     title_score = max(t_score_raw, t_score_s2)
 
-    # Artist: compare raw vs raw, simplified vs simplified, take max
     a_score_raw = fuzz.token_set_ratio(lf_artist_norm, nav_artist_norm) / 100
     a_score_s2 = fuzz.token_set_ratio(lf_artist_s2, nav_artist_s2) / 100
     artist_score = max(a_score_raw, a_score_s2)
 
-    # Combined: title 65% + artist 35%
     combined = title_score * 0.65 + artist_score * 0.35
 
     return {
