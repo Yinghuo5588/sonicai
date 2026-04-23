@@ -34,6 +34,7 @@ async def run_full_recommendation():
         db.add(run)
         await db.flush()
         run_id = run.id
+        await db.commit()  # 确保 run 写入 DB，后续 session 才能查到
 
     try:
         async with AsyncSessionLocal() as db:
@@ -68,6 +69,7 @@ async def run_similar_tracks_only():
         db.add(run)
         await db.flush()
         run_id = run.id
+        await db.commit()  # 确保 run 写入 DB，后续 session 才能查到
 
     try:
         async with AsyncSessionLocal() as db:
@@ -96,6 +98,7 @@ async def run_similar_artists_only():
         db.add(run)
         await db.flush()
         run_id = run.id
+        await db.commit()  # 确保 run 写入 DB，后续 session 才能查到
 
     try:
         async with AsyncSessionLocal() as db:
