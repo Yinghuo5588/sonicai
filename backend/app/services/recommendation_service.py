@@ -238,19 +238,6 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
                 search_query=match.get("search_query") if match else None,
             )
             missing_items.append(item_data)
-            # Save missing items to DB for visibility in history
-            missing_item_db = RecommendationItem(
-                generated_playlist_id=playlist.id,
-                title=item_data["title"],
-                artist=item_data["artist"],
-                album=item_data.get("album"),
-                score=item_data.get("score"),
-                source_type=item_data.get("source_type"),
-                source_seed_name=item_data.get("source_seed_name"),
-                source_seed_artist=item_data.get("source_seed_artist"),
-                dedup_key=item_data.get("dedup_key"),
-            )
-            db.add(missing_item_db)
 
         db.add(nm)
 
@@ -403,18 +390,6 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
                 search_query=match.get("search_query") if match else None,
             )
             missing_items.append(item_data)
-            missing_item_db = RecommendationItem(
-                generated_playlist_id=playlist.id,
-                title=item_data["title"],
-                artist=item_data["artist"],
-                album=item_data.get("album"),
-                score=item_data.get("score"),
-                source_type=item_data.get("source_type"),
-                source_seed_name=item_data.get("source_seed_name"),
-                source_seed_artist=item_data.get("source_seed_artist"),
-                dedup_key=item_data.get("dedup_key"),
-            )
-            db.add(missing_item_db)
 
         db.add(nm)
 
