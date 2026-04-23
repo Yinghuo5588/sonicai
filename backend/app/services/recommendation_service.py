@@ -447,45 +447,66 @@ async def _filter_recent(db: AsyncSession, candidates: list[dict], avoid_days: i
 
 
 async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
-    """Search Navidrome for a track and return best match."""
+    """Search Navidrome with 8-strategy multi-query, score all results, return best."""
+    from app.utils.text_normalizer import score_candidate, make_search_queries, to_simplified
+
     logger = logging.getLogger(__name__)
-    from app.utils.text_normalizer import normalize_title, normalize_artist
-    query_raw = f"{item_data['title']} {item_data['artist']}"
-    query_norm = f"{normalize_title(item_data['title'])} {normalize_artist(item_data['artist'])}"
-    results = await navidrome_search(query_norm, limit=10)  # normalized first for better recall
-    if not results:
-        logger.warning(f"[match] no search results for query: {query}")
+    title = item_data["title"]
+    artist = item_data["artist"]
+
+    queries = make_search_queries(title, artist)
+    seen_ids: set[str] = set()
+    all_results: list[dict] = []
+
+    for q_info in queries:
+        q = q_info["query"]
+        label = q_info["label"]
+        results = await navidrome_search(q, limit=10)
+        logger.debug(f"[match] query='{q}' label={label} hits={len(results)}")
+        for r in results:
+            rid = r.get("id")
+            if rid and rid not in seen_ids:
+                seen_ids.add(rid)
+                r["_query_label"] = label
+                all_results.append(r)
+        # Early stop: first query returned ≥5 results → enough candidates
+        if len(all_results) >= 5 and label == queries[0]["label"]:
+            break
+
+    if not all_results:
+        logger.warning(f"[match] no results for title={title} artist={artist}")
         return None
 
-    # Score each result by title + artist similarity
-    from rapidfuzz import fuzz
+    # Score all candidates
     best = None
     best_score = 0
-    norm_title = normalize_title(item_data["title"])
-    norm_artist = normalize_artist(item_data["artist"])
-    for r in results:
-        r_title = r.get("title") or ""
-        r_artist = r.get("artist") or ""
-        # token_sort_ratio is better for titles with word order variations
-        title_score = fuzz.token_sort_ratio(norm_title, normalize_title(r_title))
-        artist_score = fuzz.token_set_ratio(norm_artist, normalize_artist(r_artist))
-        combined = (title_score * 0.6 + artist_score * 0.4) / 100
-        if combined > best_score:
-            best_score = combined
+    for r in all_results:
+        scores = score_candidate(title, artist, r.get("title") or "", r.get("artist") or "")
+        r["_title_score"] = scores["title_score"]
+        r["_artist_score"] = scores["artist_score"]
+        r["_combined_score"] = scores["score"]
+        if scores["score"] > best_score:
+            best_score = scores["score"]
             best = r
-    logger.info(f"[match] raw_query={query_raw} norm_query={query_norm} results={len(results)} best_score={best_score:.3f} best_title={best.get('title') if best else None}")
+
+    first_query_label = all_results[0].get("_query_label", "?") if all_results else "?"
+    logger.info(f"[match] title={title} artist={artist} queries={len(queries)} candidates={len(all_results)} best_score={best_score:.3f} first_query={first_query_label} best_title={best.get('title') if best else None}")
 
     if best and best_score > 0.15:
         return {
-            "selected_song_id": best.get("id") or best.get("songId"),
+            "selected_song_id": best.get("id"),
             "selected_title": best.get("title"),
             "selected_artist": best.get("artist"),
             "selected_album": best.get("album"),
             "confidence_score": best_score,
-            "search_query": query_norm,
+            "title_score": best.get("_title_score"),
+            "artist_score": best.get("_artist_score"),
+            "search_query": f"{title} {artist}",
             "raw_response": best,
         }
-    return {"search_query": query_norm}
+    # Log failure with best score for debugging
+    logger.info(f"[match] REJECTED title={title} artist={artist} best_score={best_score:.3f} best_nav={best.get('title') if best else None}")
+    return None
 
 
 async def _create_webhook_batch(db: AsyncSession, run_id: int, playlist, missing_items: list[dict]):
