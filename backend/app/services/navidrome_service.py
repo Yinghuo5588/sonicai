@@ -95,7 +95,7 @@ async def navidrome_search(query: str, limit: int = 10) -> list[dict]:
     Search songs by raw query string.
     Returns list of song dicts with id, title, artist, album, duration.
     """
-    result = await _nd_get("search3.view", {"q": query, "limit": limit})
+    result = await _nd_get("search3.view", {"query": query, "songCount": limit, "artistCount": 0, "albumCount": 0})
     if not result:
         return []
 
