@@ -255,11 +255,14 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     playlist.missing_count = len(missing_items)
     playlist.status = "success"
 
-    # 6. Create Navidrome playlist
-    navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
-    if navidrome_playlist_id and matched_song_ids:
-        await navidrome_add_to_playlist(navidrome_playlist_id, matched_song_ids)
-        playlist.navidrome_playlist_id = str(navidrome_playlist_id)
+    # 6. Create Navidrome playlist — only if we have matched songs
+    if matched_song_ids:
+        navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
+        if navidrome_playlist_id:
+            await navidrome_add_to_playlist(str(navidrome_playlist_id), matched_song_ids)
+            playlist.navidrome_playlist_id = str(navidrome_playlist_id)
+    else:
+        logger.warning(f"[playlist] no matched songs for '{playlist_name}', skipping Navidrome playlist creation")
 
     # 7. Webhook for missing items (if mode allows)
     if settings.library_mode_default == "allow_missing" and missing_items:
@@ -558,4 +561,10 @@ async def _cleanup_old_playlists(settings: SystemSettings):
             continue
         if playlist_date < keep_date:
             logger.info(f"Deleting old playlist: {name}")
-            await navidrome_delete_playlist(pl.get("id"))
+            await navidrome_delete_playlist(pl.get("id"))    if matched_song_ids:
+        navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
+        if navidrome_playlist_id:
+            await navidrome_add_to_playlist(str(navidrome_playlist_id), matched_song_ids)
+            playlist.navidrome_playlist_id = str(navidrome_playlist_id)
+    else:
+        logger.warning(f"[playlist] no matched songs for '{playlist_name}', skipping Navidrome playlist creation")
