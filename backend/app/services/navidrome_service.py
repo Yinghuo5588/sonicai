@@ -93,7 +93,7 @@ async def navidrome_ping() -> bool:
 
 async def navidrome_search(query: str, limit: int = 10) -> list[dict]:
     """Search songs by query. Returns list of song dicts."""
-    result = await _nd_get("search3.view", {"q": query, "limit": limit})
+    result = await _nd_get("search3.view", {"q": to_simplified(query), "limit": limit})
     if not result:
         return []
 
