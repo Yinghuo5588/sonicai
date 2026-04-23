@@ -154,10 +154,28 @@ export default function SettingsPage() {
       <section className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
         <h2 className="font-medium text-slate-700 text-sm">推荐参数</h2>
         <div className="grid grid-cols-2 gap-3">
+          {field('top_track_seed_limit', '种子曲目数', 'number')}
+          {field('top_artist_seed_limit', '种子艺术家数', 'number')}
+          {field('similar_track_limit', '每曲相似曲目数', 'number')}
+          {field('similar_artist_limit', '每艺术家相似艺术家数', 'number')}
+          {field('artist_top_track_limit', '每相似艺术家热门歌曲', 'number')}
           {field('similar_playlist_size', '相似曲目歌单数量', 'number')}
           {field('artist_playlist_size', '相邻艺术家歌单数量', 'number')}
           {field('duplicate_avoid_days', '去重天数', 'number')}
-          {field('recommendation_balance', '推荐平衡 (0-100)', 'number')}
+        </div>
+        {/* 推荐平衡滑杆 */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-500">更稳</span>
+            <span className="font-medium text-slate-700">推荐平衡：{form.recommendation_balance ?? 50}</span>
+            <span className="text-slate-500">更探索</span>
+          </div>
+          <input
+            type="range" min="0" max="100"
+            value={form.recommendation_balance ?? 50}
+            onChange={e => setForm({ ...form, recommendation_balance: Number(e.target.value) })}
+            className="w-full accent-orange-500"
+          />
         </div>
       </section>
 
