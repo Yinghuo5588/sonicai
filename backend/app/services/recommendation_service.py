@@ -482,10 +482,10 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
             "selected_artist": best.get("artist"),
             "selected_album": best.get("album"),
             "confidence_score": best_score,
-            "search_query": query,
+            "search_query": query_norm,
             "raw_response": best,
         }
-    return {"search_query": query}
+    return {"search_query": query_norm}
 
 
 async def _create_webhook_batch(db: AsyncSession, run_id: int, playlist, missing_items: list[dict]):
