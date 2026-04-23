@@ -146,9 +146,10 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     candidates = []
     seen_keys = set()
 
-    # balance: 0=conservative (strict threshold), 100=exploratory (lenient)
+    # balance: 0=conservative (fewer candidates), 100=exploratory (more candidates)
     balance = float(settings.recommendation_balance or 50) / 100.0
-    similar_track_min_match = 0.7 - balance * 0.4  # range: 0.3 (exploratory) ~ 0.7 (conservative)
+    # candidate pool multiplier: conservative=2x playlist_size, exploratory=10x
+    candidate_pool_size = int(settings.similar_playlist_size * (2 + balance * 8))
 
     # 2. Fetch similar tracks for each seed (with deduplication across seeds)
     for seed in seeds[:settings.top_track_seed_limit]:
@@ -165,9 +166,6 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
                 continue
 
             score = float(track.get("match", 0))
-            # Apply balance-based threshold: exploratory accepts lower match scores
-            if score < similar_track_min_match:
-                continue
 
             key = dedup_key(title, artist)
             if key in seen_keys:
@@ -186,9 +184,10 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
                 "raw_payload_json": json.dumps(track),
             })
 
-    # 3. Score aggregation — keep top N
+    # 3. Score aggregation — keep top N candidates before Navidrome matching
     candidates.sort(key=lambda x: x["score"], reverse=True)
-    candidates = candidates[:settings.similar_playlist_size]
+    # Conservative: fewer candidates (lower score cutoff); Exploratory: more candidates
+    candidates = candidates[:candidate_pool_size]
 
     # 4. Remove tracks recommended in the last `duplicate_avoid_days` days
     candidates = await _filter_recent(db, candidates, settings.duplicate_avoid_days)
@@ -307,10 +306,6 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
 
             # artist.getSimilar 返回 match 字段（0~1），用作权重
             artist_match = float(artist.get("match", 0.0))
-            # Apply balance-based threshold for artist similarity
-            similar_artist_min_match = 0.3 - (balance - 0.5) * 0.2  # 0.2 (conservative) ~ 0.4 (exploratory) at balance extremes, centered at 0.3 for balance=50
-            if artist_match < max(0.1, similar_artist_min_match):
-                continue
 
             tracks = await get_artist_top_tracks(artist_name, limit=settings.artist_top_track_limit)
             for track in tracks:
