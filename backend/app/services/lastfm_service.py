@@ -105,7 +105,11 @@ async def get_similar_artists(artist_name: str, limit: int = 50) -> list[dict]:
     data = await lastfm_get("artist.getSimilar", {"artist": artist_name, "limit": limit})
     if not data or "similarartists" not in data:
         return []
-    return data["similarartists"].get("artist", [])
+    raw = data["similarartists"].get("artist", [])
+    # Last.fm 单个结果时返回 dict 而非 list，统一转为 list
+    if isinstance(raw, dict):
+        raw = [raw]
+    return raw
 
 
 async def get_artist_top_tracks(artist_name: str, limit: int = 10) -> list[dict]:
