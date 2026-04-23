@@ -294,6 +294,9 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
             if not artist_name:
                 continue
 
+            # artist.getSimilar 返回 match 字段（0~1），用作权重
+            artist_match = float(artist.get("match", 0.0))
+
             tracks = await get_artist_top_tracks(artist_name, limit=settings.artist_top_track_limit)
             for track in tracks:
                 title = track.get("name", "")
@@ -309,11 +312,12 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
                     continue
                 seen_keys.add(key)
 
+                # score = artist_match 权重 * track 基础分
                 candidates.append({
                     "title": title,
                     "artist": track_artist,
                     "album": album,
-                    "score": 1.0,  # weight by position later
+                    "score": artist_match,
                     "source_type": "artist_similarity",
                     "source_seed_name": seed_name,
                     "source_seed_artist": artist_name,
