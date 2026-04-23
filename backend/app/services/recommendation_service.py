@@ -561,7 +561,9 @@ async def _cleanup_old_playlists(settings: SystemSettings):
             continue
         if playlist_date < keep_date:
             logger.info(f"Deleting old playlist: {name}")
-            await navidrome_delete_playlist(pl.get("id"))    if matched_song_ids:
+            await navidrome_delete_playlist(pl.get("id"))
+
+    if matched_song_ids:
         navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
         if navidrome_playlist_id:
             await navidrome_add_to_playlist(str(navidrome_playlist_id), matched_song_ids)
