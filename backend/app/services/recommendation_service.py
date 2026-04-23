@@ -416,26 +416,27 @@ async def _filter_recent(db: AsyncSession, candidates: list[dict], avoid_days: i
 
 async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
     """Search Navidrome for a track and return best match."""
+    logger = logging.getLogger(__name__)
     query = f"{item_data['title']} {item_data['artist']}"
     results = await navidrome_search(query, limit=5)
     if not results:
+        logger.warning(f"[match] no search results for query: {query}")
         return None
 
     # Score each result by title + artist similarity
     from rapidfuzz import fuzz
     best = None
     best_score = 0
-
     for r in results:
         title_score = fuzz.ratio(item_data["title"].lower(), (r.get("title") or "").lower())
         artist_score = fuzz.ratio(item_data["artist"].lower(), (r.get("artist") or "").lower())
         combined = (title_score * 0.5 + artist_score * 0.5) / 100
-
         if combined > best_score:
             best_score = combined
             best = r
+    logger.info(f"[match] query={query} results={len(results)} best_score={best_score:.3f} best_title={best.get('title') if best else None}")
 
-    if best and best_score > 0.4:
+    if best and best_score > 0.25:
         return {
             "selected_song_id": best.get("id") or best.get("songId"),
             "selected_title": best.get("title"),
