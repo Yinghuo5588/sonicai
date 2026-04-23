@@ -4,38 +4,21 @@ import re
 import unicodedata
 
 
-# ── Traditional → Simplified (OpenCC preferred, fallback dict) ─────────────────
-
-_TW_FALLBACK_MAP = {
-    "開": "开", "會": "会", "說": "说", "對": "对", "於": "于",
-    "來": "来", "為": "为", "們": "们", "過": "过", "關": "关",
-    "見": "见", "與": "与", "國": "国", "學": "学", "樣": "样",
-    "機": "机", "東": "东", "這": "这", "個": "个", "網": "网",
-    "孫": "孙", "電話": "电话", "開始": "开始",
-}
-_TW_PATTERN = re.compile("|".join(re.escape(k) for k in _TW_FALLBACK_MAP.keys())) if _TW_FALLBACK_MAP else None
+# ── Traditional → Simplified (OpenCC) ─────────────────────────────────────────────
 
 _oc = None
 
 def _get_opencc():
     global _oc
     if _oc is None:
-        try:
-            from opencc import OpenCC
-            _oc = OpenCC("t2s")
-        except Exception:
-            _oc = False
+        from opencc import OpenCC
+        _oc = OpenCC("t2s")
     return _oc
 
 
 def to_simplified(text: str) -> str:
-    """Convert Traditional Chinese (incl. Taiwan variant) to Simplified Chinese."""
-    cc = _get_opencc()
-    if cc:
-        return cc.convert(text)
-    if not text:
-        return text
-    return _TW_PATTERN.sub(lambda m: _TW_FALLBACK_MAP[m.group(0)], text) if _TW_PATTERN else text
+    """Convert Traditional Chinese to Simplified Chinese via OpenCC t2s."""
+    return _get_opencc().convert(text)
 
 
 # ── Layer 2: Unicode NFKC normalization ─────────────────────────────────────────
