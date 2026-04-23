@@ -188,16 +188,20 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     candidates.sort(key=lambda x: x["score"], reverse=True)
     # Conservative: fewer candidates (lower score cutoff); Exploratory: more candidates
     candidates = candidates[:candidate_pool_size]
+    logger.info(f"[similar_tracks] candidates after pool cutoff: {len(candidates)}, pool_size={candidate_pool_size}")
 
     # 4. Remove tracks recommended in the last `duplicate_avoid_days` days
     candidates = await _filter_recent(db, candidates, settings.duplicate_avoid_days)
+    logger.info(f"[similar_tracks] candidates after recent filter: {len(candidates)}")
 
     # 5. Navidrome matching
     matched_song_ids = []
     missing_items = []
+    logger.info(f"[similar_tracks] starting Navidrome matching for {len(candidates)} candidates")
 
     for idx, item_data in enumerate(candidates):
         match = await _match_to_navidrome(db, item_data)
+        logger.info(f"[similar_tracks] item {idx+1}/{len(candidates)}: title={item_data['title'][:20]} matched={'YES' if match and match.get('selected_song_id') else 'NO'}")
         item = RecommendationItem(
             generated_playlist_id=playlist.id,
             title=item_data["title"],
@@ -562,11 +566,3 @@ async def _cleanup_old_playlists(settings: SystemSettings):
         if playlist_date < keep_date:
             logger.info(f"Deleting old playlist: {name}")
             await navidrome_delete_playlist(pl.get("id"))
-
-    if matched_song_ids:
-        navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
-        if navidrome_playlist_id:
-            await navidrome_add_to_playlist(str(navidrome_playlist_id), matched_song_ids)
-            playlist.navidrome_playlist_id = str(navidrome_playlist_id)
-    else:
-        logger.warning(f"[playlist] no matched songs for '{playlist_name}', skipping Navidrome playlist creation")
