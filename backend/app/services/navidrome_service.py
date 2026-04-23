@@ -2,7 +2,10 @@
 
 import hashlib
 import httpx
+import logging
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 # ── Auth helpers ───────────────────────────────────────────────────────────────
@@ -45,9 +48,6 @@ async def _navidrome_config() -> dict | None:
     return {
         "url": settings.navidrome_url.rstrip("/"),
         "username": settings.navidrome_username or "",
-        # Stored as argon2 hash — we need plain password.
-        # TODO: store navidrome password with Fernet encryption (not argon2).
-        # For now, treat navidrome_password_encrypted as the plain password.
         "password": settings.navidrome_password_encrypted or "",
     }
 
@@ -74,7 +74,6 @@ async def _nd_get(endpoint: str, params: dict[str, Any] | None = None) -> dict |
             if response.status_code != 200:
                 return None
             data = response.json()
-            # Subsonic always returns { "subsonic-response": { ... } }
             resp = data.get("subsonic-response", data)
             if resp.get("status") == "failed":
                 return None
@@ -92,12 +91,14 @@ async def navidrome_ping() -> bool:
 
 
 async def navidrome_search(query: str, limit: int = 10) -> list[dict]:
-    """Search songs by query. Returns list of song dicts."""
-    result = await _nd_get("search3.view", {"q": to_simplified(query), "limit": limit})
+    """
+    Search songs by raw query string.
+    Returns list of song dicts with id, title, artist, album, duration.
+    """
+    result = await _nd_get("search3.view", {"q": query, "limit": limit})
     if not result:
         return []
 
-    # search3 returns { searchResult3: { song: [...] } }
     search_result = result.get("searchResult3", {})
     songs = search_result.get("song", [])
     if isinstance(songs, dict):
@@ -115,8 +116,39 @@ async def navidrome_search(query: str, limit: int = 10) -> list[dict]:
     ]
 
 
+async def navidrome_multi_search(title: str, artist: str) -> list[dict]:
+    """
+    Multi-strategy search: try 8 query variants with priority.
+    Returns all unique results collected across attempts (for scoring).
+    Deduplicates by song id.
+    """
+    from app.utils.text_normalizer import make_search_queries
+
+    queries = make_search_queries(title, artist)
+    seen_ids: set[str] = set()
+    all_results: list[dict] = []
+
+    for q_info in queries:
+        q = q_info["query"]
+        label = q_info["label"]
+        logger.debug(f"[navidrome] trying query '{q}' ({label})")
+        results = await navidrome_search(q, limit=10)
+        for r in results:
+            rid = r.get("id")
+            if rid and rid not in seen_ids:
+                seen_ids.add(rid)
+                r["_query_label"] = label
+                all_results.append(r)
+        # Stop if we already have good results (≥3 songs from first query)
+        if len(all_results) >= 3 and label == queries[0]["label"]:
+            break
+
+    logger.info(f"[navidrome] multi_search title={title} artist={artist} queries_tried={len(queries)} results_total={len(all_results)}")
+    return all_results
+
+
 async def navidrome_list_playlists() -> list[dict]:
-    """List all playlists. Returns list of playlist dicts."""
+    """List all playlists."""
     result = await _nd_get("getPlaylists.view")
     if not result:
         return []
@@ -141,7 +173,6 @@ async def navidrome_list_playlists() -> list[dict]:
 
 async def navidrome_create_playlist(name: str) -> str | None:
     """Create a new playlist. Returns the new playlist ID or None."""
-    # Subsonic createPlaylist requires name param, returns the new playlist id
     result = await _nd_get("createPlaylist.view", {"name": name})
     if not result:
         return None
@@ -153,10 +184,11 @@ async def navidrome_add_to_playlist(playlist_id: str, song_ids: list[str]) -> bo
     """Add songs to a playlist by ID."""
     if not song_ids:
         return True
-    result = await _nd_get(
-        "updatePlaylist.view",
-        {"playlistId": playlist_id, "songIdToAdd": song_ids},
-    )
+    # Build songIdToAdd as multiple params
+    params = {"playlistId": playlist_id}
+    for sid in song_ids:
+        params.setdefault("songIdToAdd", []).append(sid)
+    result = await _nd_get("updatePlaylist.view", params)
     return result is not None
 
 
