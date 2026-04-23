@@ -234,6 +234,19 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
                 search_query=match.get("search_query") if match else None,
             )
             missing_items.append(item_data)
+            # Save missing items to DB for visibility in history
+            missing_item_db = RecommendationItem(
+                generated_playlist_id=playlist.id,
+                title=item_data["title"],
+                artist=item_data["artist"],
+                album=item_data.get("album"),
+                score=item_data.get("score"),
+                source_type=item_data.get("source_type"),
+                source_seed_name=item_data.get("source_seed_name"),
+                source_seed_artist=item_data.get("source_seed_artist"),
+                dedup_key=item_data.get("dedup_key"),
+            )
+            db.add(missing_item_db)
 
         db.add(nm)
 
@@ -250,7 +263,7 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
 
     # 7. Webhook for missing items (if mode allows)
     if settings.library_mode_default == "allow_missing" and missing_items:
-        await _create_webhook_batch(db, run, playlist, missing_items)
+        await _create_webhook_batch(db, run_id, playlist, missing_items)
 
     await db.commit()
 
@@ -383,6 +396,18 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
                 search_query=match.get("search_query") if match else None,
             )
             missing_items.append(item_data)
+            missing_item_db = RecommendationItem(
+                generated_playlist_id=playlist.id,
+                title=item_data["title"],
+                artist=item_data["artist"],
+                album=item_data.get("album"),
+                score=item_data.get("score"),
+                source_type=item_data.get("source_type"),
+                source_seed_name=item_data.get("source_seed_name"),
+                source_seed_artist=item_data.get("source_seed_artist"),
+                dedup_key=item_data.get("dedup_key"),
+            )
+            db.add(missing_item_db)
 
         db.add(nm)
 
@@ -397,7 +422,7 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
         playlist.navidrome_playlist_id = str(navidrome_playlist_id)
 
     if settings.library_mode_default == "allow_missing" and missing_items:
-        await _create_webhook_batch(db, run, playlist, missing_items)
+        await _create_webhook_batch(db, run_id, playlist, missing_items)
 
     await db.commit()
 
@@ -424,8 +449,10 @@ async def _filter_recent(db: AsyncSession, candidates: list[dict], avoid_days: i
 async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
     """Search Navidrome for a track and return best match."""
     logger = logging.getLogger(__name__)
-    query = f"{item_data['title']} {item_data['artist']}"
-    results = await navidrome_search(query, limit=5)
+    from app.utils.text_normalizer import normalize_title, normalize_artist
+    query_raw = f"{item_data['title']} {item_data['artist']}"
+    query_norm = f"{normalize_title(item_data['title'])} {normalize_artist(item_data['artist'])}"
+    results = await navidrome_search(query_norm, limit=10)  # normalized first for better recall
     if not results:
         logger.warning(f"[match] no search results for query: {query}")
         return None
@@ -434,16 +461,21 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
     from rapidfuzz import fuzz
     best = None
     best_score = 0
+    norm_title = normalize_title(item_data["title"])
+    norm_artist = normalize_artist(item_data["artist"])
     for r in results:
-        title_score = fuzz.ratio(item_data["title"].lower(), (r.get("title") or "").lower())
-        artist_score = fuzz.ratio(item_data["artist"].lower(), (r.get("artist") or "").lower())
-        combined = (title_score * 0.5 + artist_score * 0.5) / 100
+        r_title = r.get("title") or ""
+        r_artist = r.get("artist") or ""
+        # token_sort_ratio is better for titles with word order variations
+        title_score = fuzz.token_sort_ratio(norm_title, normalize_title(r_title))
+        artist_score = fuzz.token_set_ratio(norm_artist, normalize_artist(r_artist))
+        combined = (title_score * 0.6 + artist_score * 0.4) / 100
         if combined > best_score:
             best_score = combined
             best = r
-    logger.info(f"[match] query={query} results={len(results)} best_score={best_score:.3f} best_title={best.get('title') if best else None}")
+    logger.info(f"[match] raw_query={query_raw} norm_query={query_norm} results={len(results)} best_score={best_score:.3f} best_title={best.get('title') if best else None}")
 
-    if best and best_score > 0.25:
+    if best and best_score > 0.15:
         return {
             "selected_song_id": best.get("id") or best.get("songId"),
             "selected_title": best.get("title"),
@@ -456,7 +488,7 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
     return {"search_query": query}
 
 
-async def _create_webhook_batch(db: AsyncSession, run, playlist, missing_items: list[dict]):
+async def _create_webhook_batch(db: AsyncSession, run_id: int, playlist, missing_items: list[dict]):
     """Create a webhook batch for missing items."""
     batch = WebhookBatch(
         run_id=run_id,
