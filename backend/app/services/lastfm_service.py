@@ -13,6 +13,8 @@ from app.db.models import LastfmCache
 LASTFM_BASE = "https://ws.audioscrobbler.com/2.0/"
 
 
+from sqlalchemy import select
+
 async def _get_cached(cache_key: str) -> dict | None:
     async with AsyncSessionLocal() as db:
         result = await db.execute(
