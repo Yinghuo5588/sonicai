@@ -17,6 +17,7 @@ WORKDIR /app
 
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir opencc-python-reimplemented
 
 COPY backend/ .
 COPY --from=builder /app/dist ./frontend/dist
