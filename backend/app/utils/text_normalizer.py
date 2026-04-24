@@ -109,6 +109,7 @@ def normalize_base(text: str) -> str:
     if not text:
         return ""
     t = nfkc(text)
+    t = to_simplified(t)
     t = fullwidth_to_halfwidth(t)
     t = t.lower()
     t = strip_feat(t)

@@ -27,14 +27,15 @@ logger = logging.getLogger(__name__)
 # Entry points (called by tasks / routes)
 # ─────────────────────────────────────────────
 
-async def run_full_recommendation():
+async def run_full_recommendation(trigger_type: str = "manual"):
     """Run both playlist types as part of a single recommendation run."""
+    logger.info(f"[run] start run_type=full trigger_type={trigger_type}")
     async with AsyncSessionLocal() as db:
-        run = RecommendationRun(run_type="manual", status="running")
+        run = RecommendationRun(run_type="full", status="running")
         db.add(run)
         await db.flush()
         run_id = run.id
-        await db.commit()  # 确保 run 写入 DB，后续 session 才能查到
+        await db.commit()
 
     try:
         async with AsyncSessionLocal() as db:
@@ -63,13 +64,14 @@ async def run_full_recommendation():
             await db.commit()
 
 
-async def run_similar_tracks_only():
+async def run_similar_tracks_only(trigger_type: str = "manual"):
+    logger.info(f"[run] start run_type=similar_tracks trigger_type={trigger_type}")
     async with AsyncSessionLocal() as db:
-        run = RecommendationRun(run_type="manual", status="running")
+        run = RecommendationRun(run_type="similar_tracks", status="running")
         db.add(run)
         await db.flush()
         run_id = run.id
-        await db.commit()  # 确保 run 写入 DB，后续 session 才能查到
+        await db.commit()
 
     try:
         async with AsyncSessionLocal() as db:
@@ -92,13 +94,14 @@ async def run_similar_tracks_only():
             await db.commit()
 
 
-async def run_similar_artists_only():
+async def run_similar_artists_only(trigger_type: str = "manual"):
+    logger.info(f"[run] start run_type=similar_artists trigger_type={trigger_type}")
     async with AsyncSessionLocal() as db:
-        run = RecommendationRun(run_type="manual", status="running")
+        run = RecommendationRun(run_type="similar_artists", status="running")
         db.add(run)
         await db.flush()
         run_id = run.id
-        await db.commit()  # 确保 run 写入 DB，后续 session 才能查到
+        await db.commit()
 
     try:
         async with AsyncSessionLocal() as db:
@@ -524,7 +527,7 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
         f"best_nav_title={best.get('title')} best_nav_artist={best.get('artist')}"
     )
 
-    if best and best_score > 0.15:
+    if best and best_score >= 0.65:
         logger.info(f"[match-accepted] title={title} artist={artist} best_query_label={best.get('_query_label')} confidence={best_score:.3f}")
         return {
             "selected_song_id": best.get("id"),

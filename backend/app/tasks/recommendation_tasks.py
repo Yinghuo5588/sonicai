@@ -5,31 +5,29 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def run_recommendation_job(run_type: str = "full"):
-    """Synchronous wrapper for the async recommendation service.
-    APScheduler uses sync functions, so we use run_sync from asyncio."""
-    import asyncio
+async def run_recommendation_job(run_type: str = "full"):
+    """Async entry for APScheduler — runs the recommendation service."""
     from app.services.recommendation_service import (
         run_full_recommendation,
         run_similar_tracks_only,
         run_similar_artists_only,
     )
 
-    async def _dispatch():
-        if run_type == "full":
-            await run_full_recommendation()
-        elif run_type == "similar_tracks":
-            await run_similar_tracks_only()
-        elif run_type == "similar_artists":
-            await run_similar_artists_only()
+    logger.info(f"[scheduler] dispatch recommendation job run_type={run_type}")
 
-    asyncio.run(_dispatch())
+    if run_type == "full":
+        await run_full_recommendation(trigger_type="scheduled")
+    elif run_type == "similar_tracks":
+        await run_similar_tracks_only(trigger_type="scheduled")
+    elif run_type == "similar_artists":
+        await run_similar_artists_only(trigger_type="scheduled")
+    else:
+        logger.warning(f"[scheduler] unknown run_type={run_type}")
 
 
 def cleanup_old_playlists():
     """Cleanup task."""
     import asyncio
-    from datetime import datetime, timezone
     from sqlalchemy import select
     from app.db.session import AsyncSessionLocal
     from app.db.models import SystemSettings

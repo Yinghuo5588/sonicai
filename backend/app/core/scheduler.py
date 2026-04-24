@@ -39,6 +39,7 @@ async def load_cron_schedule(db: AsyncSession):
         try:
             parts = config.cron_expression.split()
             if len(parts) >= 5:
+                tz = config.timezone if config and config.timezone else settings.app_timezone
                 sched.add_job(
                     run_recommendation_job,
                     CronTrigger(
@@ -47,6 +48,7 @@ async def load_cron_schedule(db: AsyncSession):
                         day=parts[2],
                         month=parts[3],
                         day_of_week=parts[4],
+                        timezone=tz,
                     ),
                     id="recommendation_cron",
                     replace_existing=True,
