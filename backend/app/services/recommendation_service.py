@@ -197,12 +197,6 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     candidates = await _filter_recent(db, candidates, settings.duplicate_avoid_days)
     logger.info(f"[similar_tracks] candidates after recent filter: {len(candidates)}")
 
-    logger.info(
-        f"[playlist] ready type=similar_tracks "
-        f"matched={len(matched_song_ids)} missing={len(missing_items)} "
-        f"total_candidates={len(candidates)} name={playlist_name}"
-    )
-
     # 5. Navidrome matching
     matched_song_ids = []
     missing_items = []
@@ -252,6 +246,11 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
 
         db.add(nm)
 
+    logger.info(
+        f"[playlist] ready type=similar_tracks "
+        f"matched={len(matched_song_ids)} missing={len(missing_items)} "
+        f"total_candidates={len(candidates)} name={playlist_name}"
+    )
     playlist.total_candidates = len(candidates)
     playlist.matched_count = len(matched_song_ids)
     playlist.missing_count = len(missing_items)
