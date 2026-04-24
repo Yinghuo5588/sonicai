@@ -27,7 +27,7 @@ def _run_alembic_upgrade():
     try:
         result = subprocess.run(
             ["alembic", "upgrade", "head"],
-            cwd="/app",
+            cwd="/app/backend",
             capture_output=True,
             text=True,
             timeout=30,
@@ -43,6 +43,10 @@ def _run_alembic_upgrade():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting SonicAI backend...")
+    # Run database migrations
+    import asyncio
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _run_alembic_upgrade)
     # Create initial admin if no users exist
     await _ensure_initial_admin()
     # Start scheduler
