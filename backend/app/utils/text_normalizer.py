@@ -7,18 +7,25 @@ import unicodedata
 # ── Traditional → Simplified (OpenCC) ─────────────────────────────────────────────
 
 _oc = None
+_opencc_failed = False
 
 def _get_opencc():
-    global _oc
-    if _oc is None:
-        from opencc import OpenCC
-        _oc = OpenCC("t2s")
+    global _oc, _opencc_failed
+    if _oc is None and not _opencc_failed:
+        try:
+            from opencc import OpenCC
+            _oc = OpenCC("t2s")
+        except Exception:
+            _opencc_failed = True
     return _oc
 
 
 def to_simplified(text: str) -> str:
     """Convert Traditional Chinese to Simplified Chinese via OpenCC t2s."""
-    return _get_opencc().convert(text)
+    oc = _get_opencc()
+    if oc is None:
+        return text  # fallback: return as-is
+    return oc.convert(text)
 
 
 # ── Layer 2: Unicode NFKC normalization ─────────────────────────────────────────
@@ -61,7 +68,7 @@ _VERSION_PATTERNS = [
     re.compile(r"\s*[-‐‑–—·・]\s*(remaster|live|version|edit|demo)$", re.IGNORECASE),
 ]
 _VERSION_END_PATTERNS = [
-    re.compile(r"\s*[\(\[].*?[\)\]]$"),
+    re.compile(r"\s*[\(\[].*?(remaster|remastered|live|version|edit|demo|mono|stereo|explicit|deluxe|instrumental|bonus\s*track|现场版|演唱会版|重制版|伴奏|特别版|限定版).*?[\)\]]", re.IGNORECASE),
 ]
 _FEAT_PATTERNS = [
     re.compile(r"\s+(feat\.?|ft\.?|featuring|with)\s+.*$", re.IGNORECASE),
@@ -87,6 +94,7 @@ def strip_feat(text: str) -> str:
 # ── Layer 5: Punctuation & whitespace normalization ───────────────────────────
 
 _MULTI_SPACE = re.compile(r"\s+")
+_ARTIST_SEP = re.compile(r"\s*[/&,;；和]\s*")
 _PUNCTUATION = [
     ("（", "("), ("）", ")"), ("【", "["), ("】", "]"),
     ("——", "-"), ("–", "-"), ("—", "-"),
@@ -106,6 +114,21 @@ def normalize_whitespace(text: str) -> str:
 # ── Core normalization pipeline ───────────────────────────────────────────────
 
 def normalize_base(text: str) -> str:
+    """Base normalization without Traditional→Simplified (for query diversity)."""
+    if not text:
+        return ""
+    t = nfkc(text)
+    t = fullwidth_to_halfwidth(t)
+    t = t.lower()
+    t = strip_feat(t)
+    t = strip_version_suffix(t)
+    t = normalize_punctuation(t)
+    t = normalize_whitespace(t)
+    return t
+
+
+def normalize_for_compare(text: str) -> str:
+    """Full normalization including Traditional→Simplified (for matching/comparison)."""
     if not text:
         return ""
     t = nfkc(text)
@@ -126,7 +149,17 @@ def normalize_title(title: str) -> str:
 
 
 def normalize_artist(artist: str) -> str:
-    return normalize_base(artist)
+    if not artist:
+        return ""
+    t = nfkc(artist)
+    t = fullwidth_to_halfwidth(t)
+    t = t.lower()
+    t = strip_feat(t)
+    t = strip_version_suffix(t)
+    t = normalize_punctuation(t)
+    t = _ARTIST_SEP.sub(" ", t)  # normalize multi-artist separators
+    t = normalize_whitespace(t)
+    return t
 
 
 def dedup_key(title: str, artist: str) -> str:
@@ -136,35 +169,38 @@ def dedup_key(title: str, artist: str) -> str:
 # ── Multi-query generation + scoring ─────────────────────────────────────────
 
 def make_search_queries(title: str, artist: str) -> list[dict]:
-    title_norm = normalize_title(title)
-    artist_norm = normalize_artist(artist)
-    title_s2 = to_simplified(title_norm)
-    artist_s2 = to_simplified(artist_norm)
-    title_core = strip_version_suffix(strip_feat(title_norm))
-    artist_core = strip_version_suffix(strip_feat(artist_norm))
+    title_raw = normalize_base(title)
+    artist_raw = normalize_base(artist)
+    title_s2 = to_simplified(title_raw) if title_raw else ""
+    artist_s2 = to_simplified(artist_raw) if artist_raw else ""
+    title_core = strip_version_suffix(strip_feat(title_raw))
+    artist_core = strip_version_suffix(strip_feat(artist_raw))
+    artist_core_s2 = to_simplified(artist_core) if artist_core else ""
 
     queries = []
+    seen = set()
 
     def add(q, label):
-        if q:
+        if q and q not in seen:
+            seen.add(q)
             queries.append({"query": q, "label": label})
 
     if title_core and artist_core:
-        add(f"{title_core} {artist_core}", "raw_artist_title")
-    if title_s2 and artist_s2:
-        add(f"{title_s2} {artist_s2}", "s2_title_s2_artist")
-    if title_core and artist_s2:
+        add(f"{title_core} {artist_core}", "raw_title_artist")
+    if title_s2 and artist_s2 and (title_s2 != title_core or artist_s2 != artist_core):
+        add(f"{title_s2} {artist_s2}", "s2_title_artist")
+    if title_core and artist_s2 and artist_s2 != artist_core:
         add(f"{title_core} {artist_s2}", "raw_title_s2_artist")
-    if title_s2 and artist_core:
+    if title_s2 and artist_core and title_s2 != title_core:
         add(f"{title_s2} {artist_core}", "s2_title_raw_artist")
     if title_core:
-        add(title_core, "raw_title_only")
-    if title_s2:
+        add(title_core, "title_only")
+    if title_s2 and title_s2 != title_core:
         add(title_s2, "s2_title_only")
     if artist_core and title_core:
-        add(f"{artist_core} {title_core}", "raw_artist_reversed")
-    if artist_s2 and title_s2:
-        add(f"{artist_s2} {title_s2}", "s2_artist_reversed")
+        add(f"{artist_core} {title_core}", "artist_reversed")
+    if artist_core_s2 and title_s2 and (artist_core_s2 != artist_core or title_s2 != title_core):
+        add(f"{artist_core_s2} {title_s2}", "s2_artist_reversed")
 
     return queries
 
@@ -172,28 +208,38 @@ def make_search_queries(title: str, artist: str) -> list[dict]:
 def score_candidate(lastfm_title: str, lastfm_artist: str, nav_title: str, nav_artist: str) -> dict:
     from rapidfuzz import fuzz
 
-    lf_title_norm = normalize_title(lastfm_title)
-    lf_artist_norm = normalize_artist(lastfm_artist)
-    lf_title_s2 = to_simplified(lf_title_norm)
-    lf_artist_s2 = to_simplified(lf_artist_norm)
+    lf_title_raw = normalize_base(lastfm_title)
+    lf_artist_raw = normalize_base(lastfm_artist)
+    lf_title_s2 = to_simplified(lf_title_raw)
+    lf_artist_s2 = to_simplified(lf_artist_raw)
 
-    nav_title_norm = normalize_title(nav_title)
-    nav_artist_norm = normalize_artist(nav_artist)
-    nav_title_s2 = to_simplified(nav_title_norm)
-    nav_artist_s2 = to_simplified(nav_artist_norm)
+    nav_title_raw = normalize_base(nav_title)
+    nav_artist_raw = normalize_base(nav_artist)
+    nav_title_s2 = to_simplified(nav_title_raw)
+    nav_artist_s2 = to_simplified(nav_artist_raw)
 
-    t_score_raw = fuzz.token_sort_ratio(lf_title_norm, nav_title_norm) / 100
-    t_score_s2 = fuzz.token_sort_ratio(lf_title_s2, nav_title_s2) / 100
-    title_score = max(t_score_raw, t_score_s2)
+    # For short Chinese titles, try multiple ratios and pick the best meaningful one
+    def title_score(la, lb):
+        r1 = fuzz.ratio(la, lb) / 100.0
+        r2 = fuzz.token_sort_ratio(la, lb) / 100.0
+        r3 = fuzz.partial_ratio(la, lb) / 100.0
+        # Prefer token_sort for normal titles, partial_ratio for short titles
+        if len(la) <= 6 or len(lb) <= 6:
+            return max(r1, r2, r3)
+        return max(r1, r2)
 
-    a_score_raw = fuzz.token_set_ratio(lf_artist_norm, nav_artist_norm) / 100
-    a_score_s2 = fuzz.token_set_ratio(lf_artist_s2, nav_artist_s2) / 100
-    artist_score = max(a_score_raw, a_score_s2)
+    t_s_raw = title_score(lf_title_raw, nav_title_raw)
+    t_s_s2 = title_score(lf_title_s2, nav_title_s2)
+    title_score_val = max(t_s_raw, t_s_s2)
 
-    combined = title_score * 0.65 + artist_score * 0.35
+    a_s_raw = fuzz.token_set_ratio(lf_artist_raw, nav_artist_raw) / 100.0
+    a_s_s2 = fuzz.token_set_ratio(lf_artist_s2, nav_artist_s2) / 100.0
+    artist_score_val = max(a_s_raw, a_s_s2)
+
+    combined = title_score_val * 0.65 + artist_score_val * 0.35
 
     return {
         "score": round(combined, 4),
-        "title_score": round(title_score, 4),
-        "artist_score": round(artist_score, 4),
+        "title_score": round(title_score_val, 4),
+        "artist_score": round(artist_score_val, 4),
     }

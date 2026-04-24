@@ -14,7 +14,7 @@ from app.db.models import (
     RecommendationItem, NavidromeMatch, WebhookBatch, WebhookBatchItem,
 )
 from app.services.lastfm_service import (
-    get_user_top_tracks, get_user_top_artists,
+    get_user_top_tracks, get_user_top_artists, get_user_recent_tracks,
     get_similar_tracks, get_similar_artists, get_artist_top_tracks,
 )
 from app.services.navidrome_service import navidrome_search, navidrome_create_playlist, navidrome_add_to_playlist, navidrome_delete_playlist
@@ -143,8 +143,41 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     await db.flush()
 
     # 1. Get user top tracks as seeds
-    seeds = await get_user_top_tracks(settings.lastfm_username, limit=settings.top_track_seed_limit)
-    logger.info(f"[similar_tracks] Got {len(seeds)} seed tracks from Last.fm")
+    # 1. Recent tracks first — recent + top mixed for better variety
+    recent_limit = min(100, (settings.top_track_seed_limit or 30) * 2)
+    recent_tracks = await get_user_recent_tracks(settings.lastfm_username, limit=recent_limit)
+
+    # Aggregate recent tracks by (title, artist) to get frequency-weighted seeds
+    recent_counter: dict[tuple, int] = {}
+    for t in recent_tracks:
+        title = t.get("name", "")
+        artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else (t.get("artist", {}) or "")
+        if title and artist:
+            key = (title.lower(), artist.lower())
+            recent_counter[key] = recent_counter.get(key, 0) + 1
+
+    # Sort by frequency and take top N recent seeds
+    sorted_recent = sorted(recent_counter.items(), key=lambda x: x[1], reverse=True)
+    recent_seeds = [
+        {"name": k[0], "artist": {"name": k[1]}, "play_count": v}
+        for k, v in sorted_recent[:settings.top_track_seed_limit]
+    ]
+
+    # 2. Fill remaining slots with top tracks of last month
+    if len(recent_seeds) < settings.top_track_seed_limit:
+        top_tracks = await get_user_top_tracks(settings.lastfm_username, limit=settings.top_track_seed_limit, period="1month")
+        existing_keys = {(s["name"].lower(), s["artist"]["name"].lower()) for s in recent_seeds}
+        for t in top_tracks:
+            title = t.get("name", "")
+            artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else ""
+            if title and artist and (title.lower(), artist.lower()) not in existing_keys:
+                recent_seeds.append(t)
+                existing_keys.add((title.lower(), artist.lower()))
+            if len(recent_seeds) >= settings.top_track_seed_limit:
+                break
+
+    seeds = recent_seeds
+    logger.info(f"[similar_tracks] seeds: {len(seeds)} total, {sum(1 for s in seeds if 'play_count' in s)} from recent")
 
     candidates = []
     seen_keys = set()
@@ -299,9 +332,31 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
     db.add(playlist)
     await db.flush()
 
-    # 1. Get user top artists as seeds
-    seed_artists = await get_user_top_artists(settings.lastfm_username, limit=settings.top_artist_seed_limit)
-    logger.info(f"[similar_artists] Got {len(seed_artists)} seed artists from Last.fm")
+    # 1. Recent tracks → aggregate by artist
+    recent_tracks = await get_user_recent_tracks(settings.lastfm_username, limit=100)
+    artist_counter: dict[str, int] = {}
+    for t in recent_tracks:
+        artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else (t.get("artist", {}) or "")
+        if artist:
+            artist_counter[artist.lower()] = artist_counter.get(artist.lower(), 0) + 1
+
+    sorted_recent_artists = sorted(artist_counter.items(), key=lambda x: x[1], reverse=True)
+    recent_seed_artists = [{"name": a[0].title(), "play_count": a[1]} for a in sorted_recent_artists[:settings.top_artist_seed_limit]]
+
+    # 2. Fill remaining with top artists of last month
+    if len(recent_seed_artists) < settings.top_artist_seed_limit:
+        top_artists = await get_user_top_artists(settings.lastfm_username, limit=settings.top_artist_seed_limit, period="1month")
+        existing = {a["name"].lower() for a in recent_seed_artists}
+        for a in top_artists:
+            name = a.get("name", "")
+            if name and name.lower() not in existing:
+                recent_seed_artists.append(a)
+                existing.add(name.lower())
+            if len(recent_seed_artists) >= settings.top_artist_seed_limit:
+                break
+
+    seed_artists = recent_seed_artists
+    logger.info(f"[similar_artists] seeds: {len(seed_artists)} total, {sum(1 for a in seed_artists if 'play_count' in a)} from recent")
 
     # dedup_key set across both playlists (for inter-playlist dedup)
     seen_keys = set()
@@ -426,6 +481,7 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
         f"total_candidates={len(candidates)} name={playlist_name}"
     )
 
+    navidrome_playlist_id = None
     if matched_song_ids:
         navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
     if navidrome_playlist_id and matched_song_ids:
@@ -461,8 +517,19 @@ async def _filter_recent(db: AsyncSession, candidates: list[dict], avoid_days: i
         .where(RecommendationItem.created_at >= cutoff)
     )
     recent_keys = {row[0] for row in result if row[0]}
+    original_count = len(candidates)
+    filtered = [c for c in candidates if c["dedup_key"] not in recent_keys]
 
-    return [c for c in candidates if c["dedup_key"] not in recent_keys]
+    logger.info(
+        f"[filter-recent] avoid_days={avoid_days} input={original_count} "
+        f"recent_keys={len(recent_keys)} output={len(filtered)} "
+        f"filtered={original_count - len(filtered)}"
+    )
+    if original_count - len(filtered) > 0:
+        sample = [c["dedup_key"] for c in candidates if c["dedup_key"] in recent_keys][:5]
+        logger.info(f"[filter-recent] sample filtered keys: {sample}")
+
+    return filtered
 
 
 async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
