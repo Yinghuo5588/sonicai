@@ -18,10 +18,19 @@ function StatCard({ label, value, color = 'text-slate-800' }: { label: string; v
   )
 }
 
+function runTypeLabel(type: string) {
+  return type === 'full' ? '完整推荐' : type === 'similar_tracks' ? '相似曲目' : type === 'similar_artists' ? '相邻艺术家' : type
+}
+
+function statusColor(status: string) {
+  return status === 'success' ? 'text-green-600' : status === 'failed' ? 'text-red-500' : status === 'running' ? 'text-blue-500' : 'text-slate-400'
+}
+
 export default function DashboardPage() {
-  const { data, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: fetchDashboard })
+  const { data, isLoading, error } = useQuery({ queryKey: ['dashboard'], queryFn: fetchDashboard })
 
   if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
+  if (error) return <div className="p-4 text-red-500">加载失败</div>
 
   const d = data || {}
 
@@ -33,7 +42,7 @@ export default function DashboardPage() {
         <StatCard label="总执行次数" value={d.total_runs ?? 0} />
         <StatCard label="生成歌单" value={d.total_playlists ?? 0} />
         <StatCard label="命中歌曲" value={d.total_matched ?? 0} color="text-green-600" />
-        <StatCard label="缺失歌曲" value={d.total_missing ?? 0} color={d.total_missing > 0 ? 'text-amber-600' : 'text-slate-700'} />
+        <StatCard label="缺失歌曲" value={d.total_missing ?? 0} color={(d.total_missing ?? 0) > 0 ? 'text-amber-600' : 'text-slate-700'} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -45,14 +54,9 @@ export default function DashboardPage() {
         <div className="bg-white rounded-lg p-4 border border-slate-200">
           <h2 className="text-sm font-medium text-slate-500 mb-2">最近执行</h2>
           <p className="text-slate-800">
-            <span className="font-medium">{d.last_run.run_type}</span>
+            <span className="font-medium">{runTypeLabel(d.last_run.run_type)}</span>
             {' · '}
-            <span className={`text-sm ${
-              d.last_run.status === 'success' ? 'text-green-600' :
-              d.last_run.status === 'failed' ? 'text-red-500' :
-              d.last_run.status === 'running' ? 'text-blue-500' :
-              'text-slate-400'
-            }`}>{d.last_run.status}</span>
+            <span className={`text-sm ${statusColor(d.last_run.status)}`}>{d.last_run.status}</span>
           </p>
           <p className="text-xs text-slate-400 mt-1">{d.last_run.created_at}</p>
         </div>
