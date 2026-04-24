@@ -1,7 +1,7 @@
 """System settings routes."""
 
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 import json
 import httpx
@@ -51,20 +51,20 @@ class SettingsUpdate(BaseModel):
     navidrome_password: str | None = None
     webhook_url: str | None = None
     webhook_headers_json: str | None = None
-    webhook_timeout_seconds: int | None = None
-    webhook_retry_count: int | None = None
-    playlist_keep_days: int | None = None
+    webhook_timeout_seconds: int | None = Field(default=None, ge=1, le=120)
+    webhook_retry_count: int | None = Field(default=None, ge=0, le=10)
+    playlist_keep_days: int | None = Field(default=None, ge=0, le=365)
     library_mode_default: str | None = None
-    duplicate_avoid_days: int | None = None
-    top_track_seed_limit: int | None = None
-    top_artist_seed_limit: int | None = None
-    similar_track_limit: int | None = None
-    similar_artist_limit: int | None = None
-    similar_artist_per_seed_limit: int | None = None
-    artist_top_track_limit: int | None = None
-    similar_playlist_size: int | None = None
-    artist_playlist_size: int | None = None
-    recommendation_balance: int | None = None
+    duplicate_avoid_days: int | None = Field(default=None, ge=0, le=365)
+    top_track_seed_limit: int | None = Field(default=None, ge=1, le=200)
+    top_artist_seed_limit: int | None = Field(default=None, ge=1, le=200)
+    similar_track_limit: int | None = Field(default=None, ge=1, le=100)
+    similar_artist_limit: int | None = Field(default=None, ge=1, le=100)
+    similar_artist_per_seed_limit: int | None = Field(default=None, ge=1, le=50)
+    artist_top_track_limit: int | None = Field(default=None, ge=1, le=20)
+    similar_playlist_size: int | None = Field(default=None, ge=1, le=500)
+    artist_playlist_size: int | None = Field(default=None, ge=1, le=500)
+    recommendation_balance: int | None = Field(default=None, ge=0, le=100)
     cron_enabled: bool | None = None
     cron_expression: str | None = None
 
@@ -93,6 +93,9 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
         if value is not None:
             if key == "navidrome_password":
                 setattr(s, "navidrome_password_encrypted", value)
+            # Validate library_mode_default enum
+            if key == "library_mode_default" and value not in {"library_only", "allow_missing"}:
+                raise HTTPException(status_code=400, detail="library_mode_default must be one of: library_only, allow_missing")
             elif key == "webhook_headers_json":
                 try:
                     json.loads(value)
