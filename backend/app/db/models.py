@@ -106,6 +106,7 @@ class RecommendationRun(Base):
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
     config_snapshot_json = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
