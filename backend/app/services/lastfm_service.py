@@ -21,7 +21,7 @@ async def _get_cached(cache_key: str) -> dict | None:
             select(LastfmCache).where(LastfmCache.cache_key == cache_key)
         )
         row = result.scalar_one_or_none()
-        if row and row.expires_at > datetime.now():
+        if row and row.expires_at > datetime.now(timezone.utc):
             return json.loads(row.payload_json)
     return None
 

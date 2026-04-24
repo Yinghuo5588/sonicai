@@ -72,13 +72,19 @@ async def _nd_get(endpoint: str, params: dict[str, Any] | None = None) -> dict |
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(url, params=auth_params)
             if response.status_code != 200:
+                logger.warning(f"[navidrome] HTTP {response.status_code} for {url}")
                 return None
             data = response.json()
             resp = data.get("subsonic-response", data)
             if resp.get("status") == "failed":
+                logger.warning(f"[navidrome] Subsonic error for {url}: {resp}")
                 return None
             return resp
+    except httpx.TimeoutException:
+        logger.warning(f"[navidrome] timeout connecting to {url}")
+        return None
     except Exception:
+        logger.exception(f"[navidrome] request failed for {url}")
         return None
 
 

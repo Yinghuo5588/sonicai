@@ -80,6 +80,9 @@ async def send_webhook_batch(batch_id: int) -> dict:
             batch.status = "failed"
             batch.response_body = str(e)[:2000]
             batch.retry_count += 1
+            if batch.retry_count < batch.max_retry_count:
+                batch.status = "retrying"
+                batch.next_retry_at = datetime.now(timezone.utc) + timedelta(minutes=_retry_interval(batch.retry_count))
 
         await db.commit()
         return {"success": batch.status == "success", "code": batch.response_code}
