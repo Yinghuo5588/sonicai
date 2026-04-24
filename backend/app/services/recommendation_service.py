@@ -194,6 +194,12 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     candidates = await _filter_recent(db, candidates, settings.duplicate_avoid_days)
     logger.info(f"[similar_tracks] candidates after recent filter: {len(candidates)}")
 
+    logger.info(
+        f"[playlist] ready type=similar_tracks "
+        f"matched={len(matched_song_ids)} missing={len(missing_items)} "
+        f"total_candidates={len(candidates)} name={playlist_name}"
+    )
+
     # 5. Navidrome matching
     matched_song_ids = []
     missing_items = []
@@ -268,7 +274,7 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
 
     # 7. Webhook for missing items (if mode allows)
     if settings.library_mode_default == "allow_missing" and missing_items:
-        await _create_webhook_batch(db, run_id, playlist, missing_items)
+        await _create_webhook_batch(db, run_id, playlist, missing_items, settings)
 
     await db.commit()
 
@@ -412,7 +418,14 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
     playlist.missing_count = len(missing_items)
     playlist.status = "success"
 
-    navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
+    logger.info(
+        f"[playlist] ready type={playlist.playlist_type} "
+        f"matched={len(matched_song_ids)} missing={len(missing_items)} "
+        f"total_candidates={len(candidates)} name={playlist_name}"
+    )
+
+    if matched_song_ids:
+        navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
     if navidrome_playlist_id and matched_song_ids:
         try:
             await navidrome_add_to_playlist(str(navidrome_playlist_id), matched_song_ids)
@@ -426,7 +439,7 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
             return
 
     if settings.library_mode_default == "allow_missing" and missing_items:
-        await _create_webhook_batch(db, run_id, playlist, missing_items)
+        await _create_webhook_batch(db, run_id, playlist, missing_items, settings)
 
     await db.commit()
 
@@ -466,37 +479,53 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
         q = q_info["query"]
         label = q_info["label"]
         results = await navidrome_search(q, limit=10)
-        logger.debug(f"[match] query='{q}' label={label} hits={len(results)}")
+        logger.info(f"[match-query] title={title} artist={artist} query='{q}' label={label} hits={len(results)}")
         for r in results:
             rid = r.get("id")
             if rid and rid not in seen_ids:
                 seen_ids.add(rid)
                 r["_query_label"] = label
                 all_results.append(r)
-        # Early stop: first query returned ≥5 results → enough candidates
-        if len(all_results) >= 5 and label == queries[0]["label"]:
-            break
+        # Run all queries for maximum coverage; no early stop
+        # (keep this comment so we know the break was intentionally removed)
 
     if not all_results:
         logger.warning(f"[match] no results for title={title} artist={artist}")
         return None
 
     # Score all candidates
-    best = None
-    best_score = 0
+    scored = []
     for r in all_results:
         scores = score_candidate(title, artist, r.get("title") or "", r.get("artist") or "")
         r["_title_score"] = scores["title_score"]
         r["_artist_score"] = scores["artist_score"]
         r["_combined_score"] = scores["score"]
-        if scores["score"] > best_score:
-            best_score = scores["score"]
-            best = r
+        scored.append((scores["score"], r))
 
-    first_query_label = all_results[0].get("_query_label", "?") if all_results else "?"
-    logger.info(f"[match] title={title} artist={artist} queries={len(queries)} candidates={len(all_results)} best_score={best_score:.3f} first_query={first_query_label} best_title={best.get('title') if best else None}")
+    scored.sort(key=lambda x: x[0], reverse=True)
+    best_score, best = scored[0]
+
+    # Log top-3 candidates for observability
+    for rank, (sc, cand) in enumerate(scored[:3], 1):
+        logger.info(
+            f"[match-top] title={title} artist={artist} "
+            f"rank={rank} score={sc:.3f} "
+            f"title_score={cand.get('_title_score', 0):.3f} "
+            f"artist_score={cand.get('_artist_score', 0):.3f} "
+            f"nav_title={cand.get('title')} nav_artist={cand.get('artist')}"
+        )
+
+    logger.info(
+        f"[match] title={title} artist={artist} "
+        f"queries={len(queries)} candidates={len(all_results)} "
+        f"best_score={best_score:.3f} "
+        f"title_score={best.get('_title_score', 0):.3f} "
+        f"artist_score={best.get('_artist_score', 0):.3f} "
+        f"best_nav_title={best.get('title')} best_nav_artist={best.get('artist')}"
+    )
 
     if best and best_score > 0.15:
+        logger.info(f"[match-accepted] title={title} artist={artist} best_query_label={best.get('_query_label')} confidence={best_score:.3f}")
         return {
             "selected_song_id": best.get("id"),
             "selected_title": best.get("title"),
@@ -513,13 +542,14 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
     return None
 
 
-async def _create_webhook_batch(db: AsyncSession, run_id: int, playlist, missing_items: list[dict]):
+async def _create_webhook_batch(db: AsyncSession, run_id: int, playlist, missing_items: list[dict], settings=None):
     """Create a webhook batch for missing items."""
+    max_retry = settings.webhook_retry_count if settings else 3
     batch = WebhookBatch(
         run_id=run_id,
         playlist_type=playlist.playlist_type,
         status="pending",
-        max_retry_count=3,
+        max_retry_count=max_retry,
     )
     db.add(batch)
     await db.flush()
