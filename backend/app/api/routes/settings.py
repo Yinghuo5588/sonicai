@@ -30,11 +30,17 @@ class SettingsResponse(BaseModel):
     top_artist_seed_limit: int
     similar_track_limit: int
     similar_artist_limit: int
-    similar_artist_per_seed_limit: int | None
     artist_top_track_limit: int
     similar_playlist_size: int
     artist_playlist_size: int
     recommendation_balance: int
+    seed_source_mode: str
+    recent_tracks_limit: int
+    top_period: str
+    recent_top_mix_ratio: int
+    match_threshold: float
+    candidate_pool_multiplier_min: float
+    candidate_pool_multiplier_max: float
     cron_enabled: bool
     cron_expression: str | None
 
@@ -60,11 +66,17 @@ class SettingsUpdate(BaseModel):
     top_artist_seed_limit: int | None = Field(default=None, ge=1, le=200)
     similar_track_limit: int | None = Field(default=None, ge=1, le=100)
     similar_artist_limit: int | None = Field(default=None, ge=1, le=100)
-    similar_artist_per_seed_limit: int | None = Field(default=None, ge=1, le=50)
     artist_top_track_limit: int | None = Field(default=None, ge=1, le=20)
     similar_playlist_size: int | None = Field(default=None, ge=1, le=500)
     artist_playlist_size: int | None = Field(default=None, ge=1, le=500)
     recommendation_balance: int | None = Field(default=None, ge=0, le=100)
+    seed_source_mode: str | None = Field(default=None)
+    recent_tracks_limit: int | None = Field(default=None, ge=10, le=1000)
+    top_period: str | None = Field(default=None)
+    recent_top_mix_ratio: int | None = Field(default=None, ge=0, le=100)
+    match_threshold: float | None = Field(default=None, ge=0.5, le=0.95)
+    candidate_pool_multiplier_min: float | None = Field(default=None, ge=1.0, le=20.0)
+    candidate_pool_multiplier_max: float | None = Field(default=None, ge=1.0, le=20.0)
     cron_enabled: bool | None = None
     cron_expression: str | None = None
 
@@ -96,6 +108,12 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
             # Validate library_mode_default enum
             if key == "library_mode_default" and value not in {"library_only", "allow_missing"}:
                 raise HTTPException(status_code=400, detail="library_mode_default must be one of: library_only, allow_missing")
+            # Validate seed_source_mode enum
+            if key == "seed_source_mode" and value not in {"recent_only", "top_only", "recent_plus_top"}:
+                raise HTTPException(status_code=400, detail="seed_source_mode must be one of: recent_only, top_only, recent_plus_top")
+            # Validate top_period enum
+            if key == "top_period" and value not in {"7day", "1month", "3month", "6month", "12month", "overall"}:
+                raise HTTPException(status_code=400, detail="top_period must be one of: 7day, 1month, 3month, 6month, 12month, overall")
             elif key == "webhook_headers_json":
                 try:
                     json.loads(value)

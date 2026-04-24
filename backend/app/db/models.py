@@ -67,17 +67,27 @@ class SystemSettings(Base):
     playlist_keep_days = Column(Integer, default=3)
 
     # Recommendation
-    library_mode_default = Column(String(20), default="library_only")  # library_only | allow_missing
+    library_mode_default = Column(String(20), default="allow_missing")  # library_only | allow_missing
     duplicate_avoid_days = Column(Integer, default=14)
     top_track_seed_limit = Column(Integer, default=30)
     top_artist_seed_limit = Column(Integer, default=30)
     similar_track_limit = Column(Integer, default=30)
     similar_artist_limit = Column(Integer, default=30)
-    similar_artist_per_seed_limit = Column(Integer, default=5)  # how many similar artists to use per seed
     artist_top_track_limit = Column(Integer, default=2)
     similar_playlist_size = Column(Integer, default=30)
     artist_playlist_size = Column(Integer, default=30)
-    recommendation_balance = Column(Integer, default=50)
+    recommendation_balance = Column(Integer, default=55)
+
+    # Seed strategy
+    seed_source_mode = Column(String(30), default="recent_plus_top")  # recent_only | top_only | recent_plus_top
+    recent_tracks_limit = Column(Integer, default=100)
+    top_period = Column(String(20), default="1month")  # 7day | 1month | 3month | 6month | 12month | overall
+    recent_top_mix_ratio = Column(Integer, default=70)  # 0-100, how much recent vs top
+
+    # Matching
+    match_threshold = Column(Numeric(4, 3), default=0.75)  # Pool sizing
+    candidate_pool_multiplier_min = Column(Numeric(4, 1), default=2.0)
+    candidate_pool_multiplier_max = Column(Numeric(4, 1), default=10.0)
 
     # Scheduler
     cron_enabled = Column(Boolean, default=False)
@@ -95,7 +105,6 @@ class RecommendationRun(Base):
     status = Column(String(30), default="pending")  # pending|running|success|partial_success|failed
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
-    error_message = Column(Text, nullable=True)
     config_snapshot_json = Column(Text, nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
@@ -114,7 +123,6 @@ class GeneratedPlaylist(Base):
     playlist_date = Column(String(20), nullable=False)
     navidrome_playlist_id = Column(String(100), nullable=True)
     status = Column(String(30), default="pending")
-    error_message = Column(Text, nullable=True)
     total_candidates = Column(Integer, default=0)
     matched_count = Column(Integer, default=0)
     missing_count = Column(Integer, default=0)

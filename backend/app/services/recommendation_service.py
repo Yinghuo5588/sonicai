@@ -129,6 +129,16 @@ async def run_similar_artists_only(trigger_type: str = "manual"):
 # ─────────────────────────────────────────────
 
 async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
+    logger.info(
+        f"[similar_tracks] config: seed_source_mode={getattr(settings, 'seed_source_mode', 'recent_plus_top')} "
+        f"recent_tracks_limit={getattr(settings, 'recent_tracks_limit', 100)} "
+        f"top_period={getattr(settings, 'top_period', '1month')} "
+        f"recent_top_mix_ratio={getattr(settings, 'recent_top_mix_ratio', 70)} "
+        f"match_threshold={getattr(settings, 'match_threshold', 0.75)} "
+        f"duplicate_avoid_days={settings.duplicate_avoid_days} "
+        f"balance={settings.recommendation_balance}"
+    )
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     playlist_name = f"LastFM - 相似曲目 - {today}"
 
@@ -142,50 +152,75 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     db.add(playlist)
     await db.flush()
 
-    # 1. Get user top tracks as seeds
-    # 1. Recent tracks first — recent + top mixed for better variety
-    recent_limit = min(100, (settings.top_track_seed_limit or 30) * 2)
-    recent_tracks = await get_user_recent_tracks(settings.lastfm_username, limit=recent_limit)
+    # 1. Get user seeds based on seed_source_mode
+    seed_mode = getattr(settings, 'seed_source_mode', 'recent_plus_top') or 'recent_plus_top'
+    seed_limit = settings.top_track_seed_limit or 8
 
-    # Aggregate recent tracks by (title, artist) to get frequency-weighted seeds
-    recent_counter: dict[tuple, int] = {}
-    for t in recent_tracks:
-        title = t.get("name", "")
-        artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else (t.get("artist", {}) or "")
-        if title and artist:
-            key = (title.lower(), artist.lower())
-            recent_counter[key] = recent_counter.get(key, 0) + 1
-
-    # Sort by frequency and take top N recent seeds
-    sorted_recent = sorted(recent_counter.items(), key=lambda x: x[1], reverse=True)
-    recent_seeds = [
-        {"name": k[0], "artist": {"name": k[1]}, "play_count": v}
-        for k, v in sorted_recent[:settings.top_track_seed_limit]
-    ]
-
-    # 2. Fill remaining slots with top tracks of last month
-    if len(recent_seeds) < settings.top_track_seed_limit:
-        top_tracks = await get_user_top_tracks(settings.lastfm_username, limit=settings.top_track_seed_limit, period="1month")
-        existing_keys = {(s["name"].lower(), s["artist"]["name"].lower()) for s in recent_seeds}
-        for t in top_tracks:
+    if seed_mode == 'recent_only':
+        recent_limit = getattr(settings, 'recent_tracks_limit', 100) or 100
+        recent_tracks = await get_user_recent_tracks(settings.lastfm_username, limit=recent_limit)
+        recent_counter: dict[tuple, int] = {}
+        for t in recent_tracks:
             title = t.get("name", "")
-            artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else ""
-            if title and artist and (title.lower(), artist.lower()) not in existing_keys:
-                recent_seeds.append(t)
-                existing_keys.add((title.lower(), artist.lower()))
-            if len(recent_seeds) >= settings.top_track_seed_limit:
-                break
+            artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else (t.get("artist", {}) or "")
+            if title and artist:
+                key = (title.lower(), artist.lower())
+                recent_counter[key] = recent_counter.get(key, 0) + 1
+        sorted_recent = sorted(recent_counter.items(), key=lambda x: x[1], reverse=True)
+        seeds = [
+            {"name": k[0], "artist": {"name": k[1]}, "play_count": v}
+            for k, v in sorted_recent[:seed_limit]
+        ]
+    elif seed_mode == 'top_only':
+        period = getattr(settings, 'top_period', '1month') or '1month'
+        top_tracks = await get_user_top_tracks(settings.lastfm_username, limit=seed_limit, period=period)
+        seeds = [t for t in top_tracks if t.get("name") and t.get("artist")]
+    else:  # recent_plus_top
+        recent_limit = getattr(settings, 'recent_tracks_limit', 100) or 100
+        recent_tracks = await get_user_recent_tracks(settings.lastfm_username, limit=recent_limit)
+        recent_counter: dict[tuple, int] = {}
+        for t in recent_tracks:
+            title = t.get("name", "")
+            artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else (t.get("artist", {}) or "")
+            if title and artist:
+                key = (title.lower(), artist.lower())
+                recent_counter[key] = recent_counter.get(key, 0) + 1
+        sorted_recent = sorted(recent_counter.items(), key=lambda x: x[1], reverse=True)
 
-    seeds = recent_seeds
+        # recent_top_mix_ratio: what fraction of seeds come from recent
+        recent_ratio = (getattr(settings, 'recent_top_mix_ratio', 70) or 70) / 100.0
+        target_recent = int(seed_limit * recent_ratio)
+
+        recent_seeds = [
+            {"name": k[0], "artist": {"name": k[1]}, "play_count": v}
+            for k, v in sorted_recent[:target_recent]
+        ]
+        remaining = seed_limit - len(recent_seeds)
+        seeds = list(recent_seeds)
+
+        if remaining > 0:
+            period = getattr(settings, 'top_period', '1month') or '1month'
+            top_tracks = await get_user_top_tracks(settings.lastfm_username, limit=seed_limit, period=period)
+            existing_keys = {(s["name"].lower(), s["artist"]["name"].lower() if isinstance(s["artist"], dict) else "") for s in recent_seeds}
+            for t in top_tracks:
+                title = t.get("name", "")
+                artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else ""
+                if title and artist and (title.lower(), artist.lower()) not in existing_keys:
+                    seeds.append(t)
+                    existing_keys.add((title.lower(), artist.lower()))
+                if len(seeds) >= seed_limit:
+                    break
     logger.info(f"[similar_tracks] seeds: {len(seeds)} total, {sum(1 for s in seeds if 'play_count' in s)} from recent")
 
     candidates = []
     seen_keys = set()
 
     # balance: 0=conservative (fewer candidates), 100=exploratory (more candidates)
-    balance = float(settings.recommendation_balance or 50) / 100.0
-    # candidate pool multiplier: conservative=2x playlist_size, exploratory=10x
-    candidate_pool_size = int(settings.similar_playlist_size * (2 + balance * 8))
+    balance = float(settings.recommendation_balance or 55) / 100.0
+    # candidate pool multiplier: configurable range
+    min_mult = float(getattr(settings, 'candidate_pool_multiplier_min', 2.0) or 2.0)
+    max_mult = float(getattr(settings, 'candidate_pool_multiplier_max', 10.0) or 10.0)
+    candidate_pool_size = int(settings.similar_playlist_size * (min_mult + balance * (max_mult - min_mult)))
 
     # 2. Fetch similar tracks for each seed (with deduplication across seeds)
     for seed in seeds[:settings.top_track_seed_limit]:
@@ -319,6 +354,16 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
 # ─────────────────────────────────────────────
 
 async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
+    logger.info(
+        f"[similar_artists] config: seed_source_mode={getattr(settings, 'seed_source_mode', 'recent_plus_top')} "
+        f"recent_tracks_limit={getattr(settings, 'recent_tracks_limit', 100)} "
+        f"top_period={getattr(settings, 'top_period', '1month')} "
+        f"recent_top_mix_ratio={getattr(settings, 'recent_top_mix_ratio', 70)} "
+        f"match_threshold={getattr(settings, 'match_threshold', 0.75)} "
+        f"duplicate_avoid_days={settings.duplicate_avoid_days} "
+        f"balance={settings.recommendation_balance}"
+    )
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     playlist_name = f"LastFM - 相邻艺术家 - {today}"
 
@@ -380,7 +425,7 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
             continue
 
         similar = await get_similar_artists(seed_name, limit=settings.similar_artist_limit)
-        per_seed = getattr(settings, 'similar_artist_per_seed_limit', 5)
+        per_seed = 5  # fixed: top N similar artists per seed
         for artist in similar[:per_seed]:  # top N similar artists per seed
             artist_name = artist.get("name", "")
             if not artist_name:
@@ -593,7 +638,8 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
         f"best_nav_title={best.get('title')} best_nav_artist={best.get('artist')}"
     )
 
-    if best and best_score >= 0.65:
+    threshold = float(getattr(settings, 'match_threshold', 0.75) or 0.75)
+    if best and best_score >= threshold:
         logger.info(f"[match-accepted] title={title} artist={artist} best_query_label={best.get('_query_label')} confidence={best_score:.3f}")
         return {
             "selected_song_id": best.get("id"),
