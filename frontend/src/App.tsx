@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useAuthStore } from '@/hooks/useAuth'
+import { useNavigate } from 'react-router-dom'
 import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
 import SettingsPage from '@/pages/SettingsPage'
@@ -11,8 +13,28 @@ import RunDetailPage from '@/pages/RunDetailPage'
 import Layout from '@/layouts/Layout'
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
-  const { token } = useAuthStore()
-  if (!token) return <Navigate to="/login" replace />
+  const { token, logout } = useAuthStore()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!token) {
+      navigate('/login', { replace: true })
+      return
+    }
+    // Verify token is still valid by calling /auth/me
+    fetch('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(res => {
+      if (res.status === 401) {
+        logout()
+        navigate('/login', { replace: true })
+      }
+    }).catch(() => {
+      // Network error, let the page handle it
+    })
+  }, [])
+
+  if (!token) return null
   return <>{children}</>
 }
 
