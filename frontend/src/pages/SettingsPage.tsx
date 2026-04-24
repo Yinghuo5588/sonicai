@@ -150,6 +150,25 @@ export default function SettingsPage() {
         {field('webhook_retry_count', '重试次数', 'number')}
       </section>
 
+      {/* Playlist */}
+      <section className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
+        <h2 className="font-medium text-slate-700 text-sm">歌单管理</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {field('playlist_keep_days', '歌单保留天数', 'number')}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">缺失曲目处理</label>
+            <select
+              value={String(s.library_mode_default ?? 'library_only')}
+              onChange={e => setForm({ ...form, library_mode_default: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="library_only">仅匹配库中曲目</option>
+              <option value="allow_missing">允许缺失曲目（发Webhook）</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
       {/* Recommendation */}
       <section className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
         <h2 className="font-medium text-slate-700 text-sm">推荐参数</h2>
@@ -158,6 +177,7 @@ export default function SettingsPage() {
           {field('top_artist_seed_limit', '种子艺术家数', 'number')}
           {field('similar_track_limit', '每曲相似曲目数', 'number')}
           {field('similar_artist_limit', '每艺术家相似艺术家数', 'number')}
+          {field('similar_artist_per_seed_limit', '每种子取相似艺术家数', 'number')}
           {field('artist_top_track_limit', '每相似艺术家热门歌曲', 'number')}
           {field('similar_playlist_size', '相似曲目歌单数量', 'number')}
           {field('artist_playlist_size', '相邻艺术家歌单数量', 'number')}

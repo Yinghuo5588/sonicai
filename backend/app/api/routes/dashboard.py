@@ -57,4 +57,5 @@ async def get_summary(current_user: CurrentUser, db: AsyncSessionLocal = Depends
 
 @router.get("/trends")
 async def get_trends(days: int = 7, current_user: CurrentUser = None):
+    # TODO: implement trends data aggregation
     return {"days": days, "data": []}

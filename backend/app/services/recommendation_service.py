@@ -17,7 +17,7 @@ from app.services.lastfm_service import (
     get_user_top_tracks, get_user_top_artists,
     get_similar_tracks, get_similar_artists, get_artist_top_tracks,
 )
-from app.services.navidrome_service import navidrome_search, navidrome_create_playlist, navidrome_add_to_playlist
+from app.services.navidrome_service import navidrome_search, navidrome_create_playlist, navidrome_add_to_playlist, navidrome_delete_playlist
 from app.utils.text_normalizer import normalize_title, normalize_artist, dedup_key
 
 logger = logging.getLogger(__name__)
@@ -201,7 +201,9 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
 
     for idx, item_data in enumerate(candidates):
         match = await _match_to_navidrome(db, item_data)
-        logger.info(f"[similar_tracks] item {idx+1}/{len(candidates)}: title={item_data['title'][:20]} matched={'YES' if match and match.get('selected_song_id') else 'NO'}")
+        if idx % 50 == 0:
+            logger.info(f"[similar_tracks] Navidrome matching progress: {idx+1}/{len(candidates)}")
+        logger.debug(f"[similar_tracks] item {idx+1}/{len(candidates)}: title={item_data['title'][:20]} matched={'YES' if match and match.get('selected_song_id') else 'NO'}")
         item = RecommendationItem(
             generated_playlist_id=playlist.id,
             title=item_data["title"],
@@ -250,8 +252,17 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     if matched_song_ids:
         navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
         if navidrome_playlist_id:
-            await navidrome_add_to_playlist(str(navidrome_playlist_id), matched_song_ids)
-            playlist.navidrome_playlist_id = str(navidrome_playlist_id)
+            try:
+                await navidrome_add_to_playlist(str(navidrome_playlist_id), matched_song_ids)
+                playlist.navidrome_playlist_id = str(navidrome_playlist_id)
+            except Exception as e:
+                logger.error(f"[playlist] failed to add songs to playlist {navidrome_playlist_id}: {e}")
+                # Rollback: delete the empty playlist from Navidrome to avoid ghost playlists
+                await navidrome_delete_playlist(str(navidrome_playlist_id))
+                playlist.status = "failed"
+                playlist.error_message = f"Failed to add songs: {e}"
+                await db.commit()
+                return
     else:
         logger.warning(f"[playlist] no matched songs for '{playlist_name}', skipping Navidrome playlist creation")
 
@@ -306,7 +317,8 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
             continue
 
         similar = await get_similar_artists(seed_name, limit=settings.similar_artist_limit)
-        for artist in similar[:5]:  # top 5 similar artists per seed
+        per_seed = getattr(settings, 'similar_artist_per_seed_limit', 5)
+        for artist in similar[:per_seed]:  # top N similar artists per seed
             artist_name = artist.get("name", "")
             if not artist_name:
                 continue
@@ -354,6 +366,8 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
 
     for idx, item_data in enumerate(candidates):
         match = await _match_to_navidrome(db, item_data)
+        if idx % 50 == 0:
+            logger.info(f"[similar_artists] Navidrome matching progress: {idx+1}/{len(candidates)}")
         item = RecommendationItem(
             generated_playlist_id=playlist.id,
             title=item_data["title"],
@@ -400,8 +414,16 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
 
     navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
     if navidrome_playlist_id and matched_song_ids:
-        await navidrome_add_to_playlist(str(navidrome_playlist_id), matched_song_ids)
-        playlist.navidrome_playlist_id = str(navidrome_playlist_id)
+        try:
+            await navidrome_add_to_playlist(str(navidrome_playlist_id), matched_song_ids)
+            playlist.navidrome_playlist_id = str(navidrome_playlist_id)
+        except Exception as e:
+            logger.error(f"[playlist] failed to add songs to playlist {navidrome_playlist_id}: {e}")
+            await navidrome_delete_playlist(str(navidrome_playlist_id))
+            playlist.status = "failed"
+            playlist.error_message = f"Failed to add songs: {e}"
+            await db.commit()
+            return
 
     if settings.library_mode_default == "allow_missing" and missing_items:
         await _create_webhook_batch(db, run_id, playlist, missing_items)

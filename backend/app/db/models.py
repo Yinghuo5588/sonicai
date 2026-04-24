@@ -73,6 +73,7 @@ class SystemSettings(Base):
     top_artist_seed_limit = Column(Integer, default=30)
     similar_track_limit = Column(Integer, default=30)
     similar_artist_limit = Column(Integer, default=30)
+    similar_artist_per_seed_limit = Column(Integer, default=5)  # how many similar artists to use per seed
     artist_top_track_limit = Column(Integer, default=2)
     similar_playlist_size = Column(Integer, default=30)
     artist_playlist_size = Column(Integer, default=30)

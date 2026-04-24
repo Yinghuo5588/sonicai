@@ -30,6 +30,7 @@ class SettingsResponse(BaseModel):
     top_artist_seed_limit: int
     similar_track_limit: int
     similar_artist_limit: int
+    similar_artist_per_seed_limit: int
     artist_top_track_limit: int
     similar_playlist_size: int
     artist_playlist_size: int
@@ -59,6 +60,7 @@ class SettingsUpdate(BaseModel):
     top_artist_seed_limit: int | None = None
     similar_track_limit: int | None = None
     similar_artist_limit: int | None = None
+    similar_artist_per_seed_limit: int | None = None
     artist_top_track_limit: int | None = None
     similar_playlist_size: int | None = None
     artist_playlist_size: int | None = None
