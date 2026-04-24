@@ -8,9 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.db.models import User, AuthSession
+from app.core.config import settings
 from app.core.security import (
     hash_password, verify_password, create_access_token,
-    create_refresh_token, decode_token,
+    create_refresh_token, decode_token, decode_refresh_token,
 )
 from app.api.deps import CurrentUser
 
@@ -63,7 +64,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     session_obj = AuthSession(
         user_id=user.id,
         refresh_token_hash=hash_password(refresh_token),
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days),
     )
     db.add(session_obj)
     user.last_login_at = datetime.now(timezone.utc)
@@ -73,9 +74,9 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=LoginResponse)
-async def refresh(refresh_token: str, db: AsyncSession = Depends(get_db)):
-    token_data = decode_token(refresh_token)
-    if not token_data or token_data.get("type") != "refresh":
+async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    token_data = decode_token(body.refresh_token)
+    if not token_data:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
     user_id = int(token_data["sub"])
@@ -84,8 +85,25 @@ async def refresh(refresh_token: str, db: AsyncSession = Depends(get_db)):
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
-    access_token = create_access_token({"sub": str(user.id)})
-    new_refresh = create_refresh_token({"sub": str(user.id)})
+    # Find valid sessions for user (not revoked, not expired)
+    sessions_result = await db.execute(
+        select(AuthSession).where(
+            AuthSession.user_id == user_id,
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > datetime.now(timezone.utc),
+        )
+    )
+    sessions = sessions_result.scalars().all()
+
+    # Verify refresh token hash against stored session
+    matched_session = None
+    for session_obj in sessions:
+        if session_obj.refresh_token_hash and verify_password(body.refresh_token, session_obj.refresh_token_hash):
+            matched_session = session_obj
+            break
+
+    if not matched_session:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh session invalid or revoked")
 
     # Revoke old sessions
     await db.execute(
@@ -93,10 +111,13 @@ async def refresh(refresh_token: str, db: AsyncSession = Depends(get_db)):
         .where(AuthSession.user_id == user_id)
         .values(revoked_at=datetime.now(timezone.utc))
     )
+
+    access_token = create_access_token({"sub": str(user.id)})
+    new_refresh = create_refresh_token({"sub": str(user.id)})
     db.add(AuthSession(
         user_id=user.id,
         refresh_token_hash=hash_password(new_refresh),
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days),
     ))
     await db.commit()
 

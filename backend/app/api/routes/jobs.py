@@ -11,30 +11,54 @@ from app.services.recommendation_service import (
     run_similar_tracks_only,
     run_similar_artists_only,
 )
-from sqlalchemy import select
+from sqlalchemy import select, and_
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
+async def _has_running_job(db: AsyncSessionLocal, run_types: list[str]) -> bool:
+    result = await db.execute(
+        select(RecommendationRun.id).where(
+            and_(
+                RecommendationRun.status == "running",
+                RecommendationRun.run_type.in_(run_types),
+            )
+        ).limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
 @router.post("/run-all")
-async def run_all(current_user: CurrentUser):
+async def run_all(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
     import asyncio
-    asyncio.create_task(run_full_recommendation())
+
+    if await _has_running_job(db, ["full", "similar_tracks", "similar_artists"]):
+        raise HTTPException(status_code=409, detail="Another recommendation job is already running")
+
+    asyncio.create_task(run_full_recommendation(trigger_type="manual"))
     return {"message": "Job queued", "type": "full"}
 
 
 @router.post("/run-similar-tracks")
-async def run_similar_tracks(current_user: CurrentUser):
+async def run_similar_tracks(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
     import asyncio
-    asyncio.create_task(run_similar_tracks_only())
+
+    if await _has_running_job(db, ["full", "similar_tracks"]):
+        raise HTTPException(status_code=409, detail="A similar-tracks related job is already running")
+
+    asyncio.create_task(run_similar_tracks_only(trigger_type="manual"))
     return {"message": "Job queued", "type": "similar_tracks"}
 
 
 @router.post("/run-similar-artists")
-async def run_similar_artists(current_user: CurrentUser):
+async def run_similar_artists(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
     import asyncio
-    asyncio.create_task(run_similar_artists_only())
+
+    if await _has_running_job(db, ["full", "similar_artists"]):
+        raise HTTPException(status_code=409, detail="A similar-artists related job is already running")
+
+    asyncio.create_task(run_similar_artists_only(trigger_type="manual"))
     return {"message": "Job queued", "type": "similar_artists"}
 
 

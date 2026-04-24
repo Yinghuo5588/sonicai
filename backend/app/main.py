@@ -43,8 +43,6 @@ def _run_alembic_upgrade():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting SonicAI backend...")
-    # Run alembic migrations
-    _run_alembic_upgrade()
     # Create initial admin if no users exist
     await _ensure_initial_admin()
     # Start scheduler

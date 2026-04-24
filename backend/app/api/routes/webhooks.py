@@ -40,7 +40,7 @@ async def get_batch(batch_id: int, current_user: CurrentUser, db: AsyncSessionLo
     )
     batch = result.scalar_one_or_none()
     if not batch:
-        return {"error": "Not found"}
+        raise HTTPException(status_code=404, detail="Batch not found")
 
     items_result = await db.execute(
         select(WebhookBatchItem).where(WebhookBatchItem.batch_id == batch_id)

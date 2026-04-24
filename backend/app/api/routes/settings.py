@@ -103,6 +103,11 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
                 setattr(s, key, value)
     await db.commit()
     await db.refresh(s)
+
+    # Reload cron schedule after config change
+    from app.core.scheduler import load_cron_schedule
+    await load_cron_schedule(db)
+
     return SettingsResponse.model_validate(s)
 
 
@@ -148,7 +153,8 @@ async def test_webhook(current_user: CurrentUser, db: AsyncSessionLocal = Depend
 
     test_payload = {"event": "test", "message": "SonicAI connectivity test"}
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        timeout = float(s.webhook_timeout_seconds or 10)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 s.webhook_url,
                 json=test_payload,
@@ -161,6 +167,6 @@ async def test_webhook(current_user: CurrentUser, db: AsyncSessionLocal = Depend
             detail=f"Webhook 返回错误 (HTTP {response.status_code}): {response.text[:200]}"
         )
     except httpx.TimeoutException:
-        raise HTTPException(status_code=400, detail="Webhook 连接超时（10秒）")
+        raise HTTPException(status_code=400, detail=f"Webhook 连接超时（{int(timeout)}秒）")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Webhook 连接失败: {str(e)}")
