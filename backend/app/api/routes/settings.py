@@ -34,13 +34,13 @@ class SettingsResponse(BaseModel):
     similar_playlist_size: int
     artist_playlist_size: int
     recommendation_balance: int
-    seed_source_mode: str
-    recent_tracks_limit: int
-    top_period: str
-    recent_top_mix_ratio: int
-    match_threshold: float
-    candidate_pool_multiplier_min: float
-    candidate_pool_multiplier_max: float
+    seed_source_mode: str | None = None
+    recent_tracks_limit: int | None = None
+    top_period: str | None = None
+    recent_top_mix_ratio: int | None = None
+    match_threshold: float | None = None
+    candidate_pool_multiplier_min: float | None = None
+    candidate_pool_multiplier_max: float | None = None
     cron_enabled: bool
     cron_expression: str | None
 
