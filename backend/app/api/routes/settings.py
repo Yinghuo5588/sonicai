@@ -111,7 +111,13 @@ async def test_lastfm(current_user: CurrentUser, db: AsyncSessionLocal = Depends
     s = await get_settings_session(db)
     if not s.lastfm_api_key or not s.lastfm_username:
         raise HTTPException(status_code=400, detail="Last.fm API key or username not configured")
-    return {"status": "ok", "message": "Last.fm connection OK"}
+    # Actually test the API
+    from app.services.lastfm_service import get_user_top_tracks
+    try:
+        tracks = await get_user_top_tracks(s.lastfm_username, limit=1)
+        return {"status": "ok", "message": f"Last.fm 连通成功，用户：{s.lastfm_username}，最近一首：{tracks[0]['name'] if tracks else '(无)'}"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Last.fm 连接失败：{str(e)}")
 
 
 @router.post("/test-navidrome")

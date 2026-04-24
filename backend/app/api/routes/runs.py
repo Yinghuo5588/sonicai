@@ -10,7 +10,7 @@ from app.api.deps import get_current_user
 from app.db.models import GeneratedPlaylist, RecommendationItem, NavidromeMatch, RecommendationRun
 from app.db.session import get_db
 
-router = APIRouter(prefix="/api/runs", tags=["runs"])
+router = APIRouter(prefix="/runs", tags=["runs"])
 
 
 # ── Shared helper (defined BEFORE endpoints that call it) ────────────────────────
