@@ -22,12 +22,55 @@ _PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)  # sonicai/
 _FRONTEND_DIST = os.path.join(_PROJECT_ROOT, "frontend", "dist")
 
 
+def _ensure_musicrec_database():
+    """Create musicrec database and user if they don't exist (idempotent)."""
+    try:
+        import psycopg
+    except ImportError:
+        logger.warning("psycopg not available for database setup")
+        return
+
+    try:
+        # Connect to default 'postgres' database as postgres admin
+        conn = psycopg.connect(
+            host="postgres", port=5432,
+            user="postgres", password="postgres",
+            dbname="postgres",
+            connect_timeout=5,
+        )
+        conn.autocommit = True
+        cur = conn.cursor()
+
+        # Create user if not exists
+        cur.execute("SELECT 1 FROM pg_roles WHERE rolname='musicrec_user'")
+        if not cur.fetchone():
+            cur.execute("CREATE USER musicrec_user WITH PASSWORD 'change_me_to_strong_password'")
+            logger.info("Created user musicrec_user")
+        else:
+            logger.info("User musicrec_user already exists")
+
+        # Create database if not exists
+        cur.execute("SELECT 1 FROM pg_database WHERE datname='musicrec'")
+        if not cur.fetchone():
+            cur.execute("CREATE DATABASE musicrec OWNER musicrec_user")
+            logger.info("Created database musicrec")
+            cur.execute("GRANT ALL PRIVILEGES ON DATABASE musicrec TO musicrec_user")
+        else:
+            logger.info("Database musicrec already exists")
+
+        cur.close()
+        conn.close()
+        logger.info("Database setup check complete")
+    except Exception as e:
+        logger.warning(f"Database setup check failed: {e}")
+
+
 def _run_alembic_upgrade():
     """Run alembic migrations if needed."""
     try:
         result = subprocess.run(
             ["alembic", "upgrade", "head"],
-            cwd="/app",
+            cwd="/app/backend",
             capture_output=True,
             text=True,
             timeout=30,
@@ -43,11 +86,13 @@ def _run_alembic_upgrade():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting SonicAI backend...")
-    # Run database migrations
+    # Ensure musicrec database and user exist before migrations
     import asyncio
     loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _ensure_musicrec_database)
+    # Run alembic migrations
     await loop.run_in_executor(None, _run_alembic_upgrade)
-    # Create initial admin if no users exist
+    #
     await _ensure_initial_admin()
     # Start scheduler
     start_scheduler()
