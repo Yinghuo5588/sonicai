@@ -178,6 +178,35 @@ async def run_hotboard_sync(
         async with AsyncSessionLocal() as db:
             await _update_run_status(db, run_id, "success")
 
+        # Webhook for missing items (if library mode allows)
+        if missing_items:
+            async with AsyncSessionLocal() as db:
+                settings_result = await db.execute(select(SystemSettings))
+                settings = settings_result.scalar_one_or_none()
+                if settings and settings.library_mode_default == "allow_missing" and settings.webhook_url:
+                    from app.db.models import WebhookBatch, WebhookBatchItem
+                    batch = WebhookBatch(
+                        run_id=run_id,
+                        playlist_type="hotboard",
+                        status="pending",
+                        max_retry_count=settings.webhook_retry_count or 3,
+                    )
+                    db.add(batch)
+                    await db.flush()
+                    for item_data in missing_items:
+                        text = f"{item_data.get('album', '')} - {item_data['artist']}" if item_data.get("album") else f"{item_data['title']} - {item_data['artist']}"
+                        db.add(WebhookBatchItem(
+                            batch_id=batch.id,
+                            track=item_data["title"],
+                            artist=item_data["artist"],
+                            album=item_data.get("album"),
+                            text=text,
+                        ))
+                    await db.commit()
+                    # Fire-and-forget
+                    from app.services.webhook_service import send_webhook_batch
+                    await send_webhook_batch(batch.id)
+
         return {
             "playlist_name": final_name,
             "matched": len(matched_ids),
