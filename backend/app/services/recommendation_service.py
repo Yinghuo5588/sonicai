@@ -27,13 +27,15 @@ logger = logging.getLogger(__name__)
 # Entry points (called by tasks / routes)
 # ─────────────────────────────────────────────
 
-async def run_full_recommendation(run_id: int | None, trigger_type: str = "manual"):
+async def run_full_recommendation(run_id: int, trigger_type: str = "manual"):
     """Run both playlist types as part of a single recommendation run."""
     import json
     logger.info(f"[run] start run_type=full trigger_type={trigger_type} run_id={run_id}")
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
-        settings = result.scalar_one()
+        settings = result.scalar_one_or_none()
+        if not settings:
+            raise RuntimeError("SystemSettings not initialized")
         snapshot = {
             "timezone": settings.timezone,
             "lastfm_username": settings.lastfm_username,
@@ -56,6 +58,8 @@ async def run_full_recommendation(run_id: int | None, trigger_type: str = "manua
             "candidate_pool_multiplier_max": float(settings.candidate_pool_multiplier_max) if settings.candidate_pool_multiplier_max is not None else None,
         }
         run_row = await db.get(RecommendationRun, run_id)
+        if not run_row:
+            raise RuntimeError(f"RecommendationRun not found: run_id={run_id}")
         run_row.status = "running"
         run_row.started_at = datetime.now(timezone.utc)
         run_row.config_snapshot_json = json.dumps(snapshot, ensure_ascii=False)
@@ -70,25 +74,29 @@ async def run_full_recommendation(run_id: int | None, trigger_type: str = "manua
             await _cleanup_old_playlists(settings)
         async with AsyncSessionLocal() as db:
             run_row = await db.get(RecommendationRun, run_id)
-            run_row.status = "success"
-            run_row.finished_at = datetime.now(timezone.utc)
-            await db.commit()
+            if run_row:
+                run_row.status = "success"
+                run_row.finished_at = datetime.now(timezone.utc)
+                await db.commit()
     except Exception as e:
-        logger.exception("Recommendation run failed")
+        logger.exception(f"[run] full run failed run_id={run_id}")
         async with AsyncSessionLocal() as db:
             run_row = await db.get(RecommendationRun, run_id)
-            run_row.status = "failed"
-            run_row.error_message = str(e)
-            run_row.finished_at = datetime.now(timezone.utc)
-            await db.commit()
+            if run_row:
+                run_row.status = "failed"
+                run_row.error_message = str(e)
+                run_row.finished_at = datetime.now(timezone.utc)
+                await db.commit()
 
 
-async def run_similar_tracks_only(run_id: int | None, trigger_type: str = "manual"):
+async def run_similar_tracks_only(run_id: int, trigger_type: str = "manual"):
     import json
     logger.info(f"[run] start run_type=similar_tracks trigger_type={trigger_type} run_id={run_id}")
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
-        settings = result.scalar_one()
+        settings = result.scalar_one_or_none()
+        if not settings:
+            raise RuntimeError("SystemSettings not initialized")
         snapshot = {
             "timezone": settings.timezone,
             "lastfm_username": settings.lastfm_username,
@@ -107,6 +115,8 @@ async def run_similar_tracks_only(run_id: int | None, trigger_type: str = "manua
             "candidate_pool_multiplier_max": float(settings.candidate_pool_multiplier_max) if settings.candidate_pool_multiplier_max is not None else None,
         }
         run_row = await db.get(RecommendationRun, run_id)
+        if not run_row:
+            raise RuntimeError(f"RecommendationRun not found: run_id={run_id}")
         run_row.status = "running"
         run_row.started_at = datetime.now(timezone.utc)
         run_row.config_snapshot_json = json.dumps(snapshot, ensure_ascii=False)
@@ -116,25 +126,29 @@ async def run_similar_tracks_only(run_id: int | None, trigger_type: str = "manua
             await _generate_similar_tracks(db, run_id, settings)
         async with AsyncSessionLocal() as db:
             run_row = await db.get(RecommendationRun, run_id)
-            run_row.status = "success"
-            run_row.finished_at = datetime.now(timezone.utc)
-            await db.commit()
+            if run_row:
+                run_row.status = "success"
+                run_row.finished_at = datetime.now(timezone.utc)
+                await db.commit()
     except Exception as e:
-        logger.exception("Similar tracks run failed")
+        logger.exception(f"[run] similar_tracks failed run_id={run_id}")
         async with AsyncSessionLocal() as db:
             run_row = await db.get(RecommendationRun, run_id)
-            run_row.status = "failed"
-            run_row.error_message = str(e)
-            run_row.finished_at = datetime.now(timezone.utc)
-            await db.commit()
+            if run_row:
+                run_row.status = "failed"
+                run_row.error_message = str(e)
+                run_row.finished_at = datetime.now(timezone.utc)
+                await db.commit()
 
 
-async def run_similar_artists_only(run_id: int | None, trigger_type: str = "manual"):
+async def run_similar_artists_only(run_id: int, trigger_type: str = "manual"):
     import json
     logger.info(f"[run] start run_type=similar_artists trigger_type={trigger_type} run_id={run_id}")
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
-        settings = result.scalar_one()
+        settings = result.scalar_one_or_none()
+        if not settings:
+            raise RuntimeError("SystemSettings not initialized")
         snapshot = {
             "timezone": settings.timezone,
             "lastfm_username": settings.lastfm_username,
@@ -152,6 +166,8 @@ async def run_similar_artists_only(run_id: int | None, trigger_type: str = "manu
             "match_threshold": float(settings.match_threshold) if settings.match_threshold is not None else None,
         }
         run_row = await db.get(RecommendationRun, run_id)
+        if not run_row:
+            raise RuntimeError(f"RecommendationRun not found: run_id={run_id}")
         run_row.status = "running"
         run_row.started_at = datetime.now(timezone.utc)
         run_row.config_snapshot_json = json.dumps(snapshot, ensure_ascii=False)
@@ -161,17 +177,19 @@ async def run_similar_artists_only(run_id: int | None, trigger_type: str = "manu
             await _generate_similar_artists(db, run_id, settings)
         async with AsyncSessionLocal() as db:
             run_row = await db.get(RecommendationRun, run_id)
-            run_row.status = "success"
-            run_row.finished_at = datetime.now(timezone.utc)
-            await db.commit()
+            if run_row:
+                run_row.status = "success"
+                run_row.finished_at = datetime.now(timezone.utc)
+                await db.commit()
     except Exception as e:
-        logger.exception("Similar artists run failed")
+        logger.exception(f"[run] similar_artists failed run_id={run_id}")
         async with AsyncSessionLocal() as db:
             run_row = await db.get(RecommendationRun, run_id)
-            run_row.status = "failed"
-            run_row.error_message = str(e)
-            run_row.finished_at = datetime.now(timezone.utc)
-            await db.commit()
+            if run_row:
+                run_row.status = "failed"
+                run_row.error_message = str(e)
+                run_row.finished_at = datetime.now(timezone.utc)
+                await db.commit()
 
 
 # ─────────────────────────────────────────────
@@ -415,7 +433,7 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
     )
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    playlist_name = f"LastFM - 相邻艺术家 - {today}"
+    playlist_name = f"LastFM - 相似艺术家 - {today}"
 
     playlist = GeneratedPlaylist(
         run_id=run_id,
@@ -747,7 +765,7 @@ async def _cleanup_old_playlists(settings: SystemSettings):
     all_playlists = await navidrome_list_playlists()
     for pl in all_playlists:
         name = pl.get("name", "")
-        if not (name.startswith("LastFM - 相似曲目 -") or name.startswith("LastFM - 相邻艺术家 -")):
+        if not (name.startswith("LastFM - 相似曲目 -") or name.startswith("LastFM - 相似艺术家 -")):
             continue
         # Extract date from name: "LastFM - 相似曲目 - 2026-04-22"
         date_str = name.split(" - ")[-1]

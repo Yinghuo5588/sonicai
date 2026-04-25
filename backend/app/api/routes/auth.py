@@ -75,8 +75,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/refresh", response_model=LoginResponse)
 async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
-    token_data = decode_token(body.refresh_token)
-    if not token_data:
+    token_data = decode_refresh_token(body.refresh_token)
+    if not token_data or token_data.get("type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
     user_id = int(token_data["sub"])
@@ -136,6 +136,12 @@ async def change_password(body: ChangePasswordRequest, current_user: CurrentUser
     if not verify_password(body.old_password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Old password is incorrect")
     user.password_hash = hash_password(body.new_password)
+    # Revoke all existing sessions so old refresh tokens stop working
+    await db.execute(
+        AuthSession.__table__.update()
+        .where(AuthSession.user_id == current_user.id)
+        .values(revoked_at=datetime.now(timezone.utc))
+    )
     await db.commit()
     return {"message": "Password updated"}
 

@@ -101,7 +101,8 @@ class RecommendationRun(Base):
     __tablename__ = "recommendation_runs"
 
     id = Column(Integer, primary_key=True)
-    run_type = Column(String(20), nullable=False)  # manual | scheduled
+    run_type = Column(String(30), nullable=False)  # full | similar_tracks | similar_artists
+    trigger_type = Column(String(20), nullable=True)  # manual | scheduled
     status = Column(String(30), default="pending")  # pending|running|success|partial_success|failed
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
