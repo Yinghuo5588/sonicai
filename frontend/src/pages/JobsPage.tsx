@@ -14,11 +14,25 @@ async function triggerJob(type: string) {
   return res.json()
 }
 
+async function triggerHotboard(limit: number = 50, threshold: number = 0.75) {
+  const token = localStorage.getItem('sonicai_access_token')
+  const res = await fetch(`/api/hotboard/sync?limit=${limit}&match_threshold=${threshold}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 export default function JobsPage() {
   const navigate = useNavigate()
   const allMutation = useMutation({ mutationFn: triggerJob })
   const tracksMutation = useMutation({ mutationFn: () => triggerJob('similar-tracks') })
   const artistsMutation = useMutation({ mutationFn: () => triggerJob('similar-artists') })
+  const hotboardMutation = useMutation({ mutationFn: () => triggerHotboard(50, 0.75) })
 
   const run = (mutation: ReturnType<typeof useMutation>, label: string) => (
     <button
@@ -39,6 +53,9 @@ export default function JobsPage() {
           {run(allMutation, '执行全部')}
           {run(tracksMutation, '仅相似曲目')}
           {run(artistsMutation, '仅相邻艺术家')}
+        </div>
+        <div className="flex flex-col gap-2">
+          {run(hotboardMutation, '🌟 网易云热榜同步')}
         </div>
         {allMutation.isSuccess && (
           <p className="text-green-600 text-sm">✅ 已提交，可在推荐历史查看进度</p>

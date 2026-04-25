@@ -19,7 +19,11 @@ function StatCard({ label, value, color = 'text-slate-800' }: { label: string; v
 }
 
 function runTypeLabel(type: string) {
-  return type === 'full' ? '完整推荐' : type === 'similar_tracks' ? '相似曲目' : type === 'similar_artists' ? '相邻艺术家' : type
+  return type === 'full' ? '完整推荐'
+    : type === 'similar_tracks' ? '相似曲目'
+    : type === 'similar_artists' ? '相邻艺术家'
+    : type === 'hotboard' ? '网易云热榜'
+    : type
 }
 
 function statusColor(status: string) {
