@@ -38,6 +38,27 @@ async def sync_hotboard(
     if not (0.0 < match_threshold <= 1.0):
         raise HTTPException(status_code=400, detail="match_threshold must be between 0 and 1")
 
+    # Clean up any stale hotboard jobs stuck in "running" state (≥10 min)
+    from datetime import datetime, timezone, timedelta
+    stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
+    stale_result = await db.execute(
+        select(RecommendationRun)
+        .where(
+            RecommendationRun.status == "running",
+            RecommendationRun.run_type == "hotboard",
+            RecommendationRun.started_at < stale_cutoff,
+        )
+    )
+    stale_rows = stale_result.scalars().all()
+    if stale_rows:
+        logger.info(f"[hotboard] cleaning {len(stale_rows)} stale stuck hotboard runs")
+        for row in stale_rows:
+            row.status = "failed"
+            row.error_message = "Stale job cleaned — auto-marked failed"
+            row.finished_at = datetime.now(timezone.utc)
+        await db.commit()
+
+    # Check for currently running jobs
     result = await db.execute(
         select(RecommendationRun.id).where(
             RecommendationRun.status.in_(["pending", "running"]),
@@ -74,6 +95,6 @@ async def sync_hotboard(
         "run_id": run_id,
         "limit": limit,
         "threshold": match_threshold,
-        "playlist_name": playlist_name or f"网易云热榜 - (自动日期)",
+        "playlist_name": playlist_name or "(自动日期)",
         "overwrite": overwrite,
     }
