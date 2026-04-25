@@ -49,7 +49,7 @@ async def send_webhook_batch(batch_id: int) -> dict:
             "created_at": batch.created_at.isoformat() if batch.created_at else datetime.now(timezone.utc).isoformat(),
         }
 
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json; charset=utf-8"}
         if settings.webhook_headers_json:
             try:
                 extra = json.loads(settings.webhook_headers_json)
