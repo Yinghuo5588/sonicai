@@ -62,7 +62,7 @@ async def send_webhook_batch(batch_id: int) -> dict:
         try:
             async def _do_send():
                 async with httpx.AsyncClient(timeout=float(timeout)) as client:
-                    body = json.dumps(payload, ensure_ascii=False)
+                    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
                     response = await client.post(
                         settings.webhook_url,
                         content=body,
