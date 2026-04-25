@@ -87,72 +87,93 @@ def _parse_netease_details(data: dict) -> list[dict]:
 
 async def parse_netease_url(url: str) -> tuple[str, list[dict]]:
     """
-    Parse NetEase playlist by scraping the mobile page (m.163.com).
-    This avoids authentication issues that plague the API endpoints.
+    Parse NetEase playlist by scraping music.163.com playlist page.
     """
     pid = extract_netease_id(url)
     if not pid:
         raise ValueError("unable to extract netease playlist id from: " + url)
 
-    # Try the mobile playlist page - public playlists work without login
-    mobile_url = f"https://music.163.com/playlist?id={pid}"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept": "text/html,application/xhtml+xml",
         "Accept-Language": "zh-CN,zh;q=0.9",
     }
     async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
-        resp = await client.get(mobile_url)
+        resp = await client.get(f"https://music.163.com/playlist?id={pid}")
         resp.raise_for_status()
         text = resp.text
 
-    # Extract playlist name from page title
-    import re
+    import re, json as _json
+
+    # Extract playlist name
     name_match = re.search(r'<title>([^<]+)</title>', text)
     playlist_name = name_match.group(1).replace("- 歌单 - 网易云音乐", "").strip() if name_match else "NetEase Playlist"
 
     songs = []
 
-    # Try window.__NUXT__ first
-    nuxt_match = re.search(r'window\.__NUXT__\s*=\s*(\{.*?\});', text, re.DOTALL)
-    if nuxt_match:
+    # Try multiple extraction strategies
+    extraction_strategies = [
+        # Strategy 1: window.__INITIAL_STATE__
+        lambda t: re.search(r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});', t, re.DOTALL),
+        # Strategy 2: window.__NUXT__
+        lambda t: re.search(r'window\.__NUXT__\s*=\s*(\{.*?\});', t, re.DOTALL),
+        # Strategy 3: window.__PLAYLIST__
+        lambda t: re.search(r'window\.__PLAYLIST__\s*=\s*(\{.*?\});', t, re.DOTALL),
+        # Strategy 4: var playlistData
+        lambda t: re.search(r'playlistData\s*=\s*(\{.*?\});', t, re.DOTALL),
+        # Strategy 5: search for song IDs in data-player-id
+        lambda t: re.search(r'data-player-id="(\d+)"', t),
+    ]
+
+    for strategy_idx, strategy in enumerate(extraction_strategies[:3]):  # only json strategies
+        m = strategy(text)
+        if not m:
+            continue
         try:
-            import json as _json
-            nuxt_data = _json.loads(nuxt_match.group(1))
-            tracks = nuxt_data.get("state", {}).get("playlist", {}).get("tracks", [])
-            for t in tracks:
-                artists = [a.get("name", "") for a in t.get("ar", [])]
-                songs.append({
-                    "title": t.get("name", ""),
-                    "artist": " / ".join(artists),
-                    "album": t.get("al", {}).get("name", ""),
-                })
-        except Exception as e:
-            logger.warning("[playlist] nuxt parse failed: %s", e)
-
-    # Fallback: try window.__INITIAL_STATE__
-    if not songs:
-        state_match = re.search(r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});', text, re.DOTALL)
-        if state_match:
-            try:
-                import json as _json
-                state = _json.loads(state_match.group(1))
-                tracks = state.get("playlistDetail", {}).get("tracks", [])
+            data = _json.loads(m.group(1))
+            tracks = None
+            if "playlist" in data and isinstance(data["playlist"], dict):
+                tracks = data["playlist"].get("tracks") or data["playlist"].get("trackIds") or []
+            elif "tracks" in data:
+                tracks = data["tracks"]
+            elif isinstance(data, list):
+                tracks = data
+            if tracks:
                 for t in tracks:
-                    artists_list = t.get("artists", [])
-                    artist_names = [a.get("name", "") for a in artists_list]
-                    songs.append({
-                        "title": t.get("name", ""),
-                        "artist": " / ".join(filter(None, artist_names)),
-                        "album": t.get("albumName", ""),
-                    })
-            except Exception as e:
-                logger.warning("[playlist] initial state parse failed: %s", e)
+                    if isinstance(t, dict):
+                        artists = []
+                        if "ar" in t:
+                            artists = [a.get("name", "") for a in t["ar"]]
+                        elif "artists" in t:
+                            artists = [a.get("name", "") for a in t["artists"]]
+                        songs.append({
+                            "title": t.get("name", t.get("title", "")),
+                            "artist": " / ".join(filter(None, artists)),
+                            "album": t.get("al", {}).get("name", "") if isinstance(t.get("al"), dict) else t.get("albumName", ""),
+                        })
+                break
+        except Exception as e:
+            logger.warning("[playlist] strategy %d parse failed: %s", strategy_idx, e)
+
+    # Strategy 4: simple song ID + title extraction from page
+    if not songs:
+        song_pattern = re.findall(r'data-songname="([^"]+)".*?data-artistname="([^"]+)"', text)
+        if not song_pattern:
+            song_pattern = re.findall(r'"name"\s*:\s*"([^"]+)".*?"artists"\s*:\s*\[\{"name"\s*:\s*"([^"]+)"\}', text)
+        if not song_pattern:
+            # Try: song titles with IDs
+            titles = re.findall(r'data-songname="([^"]+)"', text)
+            ids = re.findall(r'data-songid="(\d+)"', text)
+            if titles and ids:
+                for title in titles[:len(ids)]:
+                    songs.append({"title": title, "artist": "", "album": ""})
 
     if not songs:
-        raise ValueError("failed to extract songs from netease mobile page (public playlist required)")
+        logger.warning("[playlist] no songs extracted from music.163.com page, page len=%d", len(text))
+        logger.warning("[playlist] page sample (first 500): %s", text[:500])
+        raise ValueError("failed to extract songs — page may require JS rendering, try public playlist")
 
-    logger.info("[playlist] netease mobile \'%s\': %d songs", playlist_name, len(songs))
+    logger.info("[playlist] netease '%s': %d songs (from %d strategy)", playlist_name, len(songs), strategy_idx)
     return playlist_name, songs
 
 # ── QQ Music ────────────────────────────────────────────────────────────────
