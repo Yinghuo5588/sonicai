@@ -12,9 +12,7 @@ logger = logging.getLogger(__name__)
 
 # ── NetEase Music ──────────────────────────────────────────────────────────────
 
-NETEASE_API = "https://music.163.com/api/v6/playlist/detail"
 NETEASE_DETAIL_API = "https://music.163.com/api/v3/song/detail"
-NETEASE_SONG_API = "https://music.163.com/api/song/detail"
 
 
 def extract_netease_id(url: str) -> str | None:
@@ -29,60 +27,7 @@ def extract_netease_id(url: str) -> str | None:
     return None
 
 
-async def fetch_netease_playlist(playlist_id: str) -> dict:
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://music.163.com/",
-    }
-    async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
-        resp = await client.post(
-            NETEASE_API,
-            content=("id=" + playlist_id).encode(),
-            headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": headers["User-Agent"]},
-        )
-        resp.raise_for_status()
-        text = resp.text
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError as e:
-            logger.warning(f"[playlist] netease API returned non-JSON (pos %d): {text[:200]!r}", e.pos)
-            raise ValueError(f"netease API returned invalid JSON: {e}") from e
 
-
-NETEASE_SONG_API = "https://music.163.com/api/song/detail"
-
-async def _fetch_netease_song_details(ids: list[dict]) -> dict:
-    """Fetch song details using /api/song/detail (simpler comma-separated ids format)."""
-    song_ids = [str(item["id"]) for item in ids]
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://music.163.com/",
-    }
-    params = {"ids": ",".join(song_ids), "types": ",".join(["1"] * len(song_ids))}
-    async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
-        resp = await client.get(NETEASE_SONG_API, params=params)
-        resp.raise_for_status()
-        try:
-            return resp.json()
-        except json.JSONDecodeError as e:
-            logger.warning(f"[playlist] netease song detail returned non-JSON (pos %d): {resp.text[:200]!r}", e.pos)
-            raise ValueError(f"netease song detail returned invalid JSON: {e}") from e
-
-
-def _parse_netease_details(data: dict) -> list[dict]:
-    # /api/song/detail returns {songs: [...]} or {data: [{song}]}
-    songs = data.get("songs") or data.get("data") or []
-    if isinstance(songs, dict):
-        songs = songs.get("songs", [])
-    result = []
-    for s in songs:
-        if not isinstance(s, dict):
-            continue
-        name = s.get("name", "")
-        artists = [a.get("name", "") for a in s.get("ar", [])]
-        album = s.get("al", {}).get("name", "")
-        result.append({"title": name, "artist": " / ".join(artists), "album": album})
-    return result
 
 
 async def parse_netease_url(url: str) -> tuple[str, list[dict]]:
