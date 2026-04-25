@@ -5,10 +5,10 @@ import os
 import subprocess
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.scheduler import start_scheduler, shutdown_scheduler
@@ -17,14 +17,12 @@ from app.api.routes import router as api_router
 
 logger = logging.getLogger(__name__)
 
-# Resolve frontend dist directory relative to backend/
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)  # sonicai/
+_PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)
 _FRONTEND_DIST = os.path.join(_PROJECT_ROOT, "frontend", "dist")
 
 
 def _run_alembic_upgrade():
-    """Run alembic migrations if needed."""
     try:
         result = subprocess.run(
             ["alembic", "upgrade", "head"],
@@ -44,13 +42,11 @@ def _run_alembic_upgrade():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting SonicAI backend...")
-    # Run alembic migrations
     import asyncio
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, _run_alembic_upgrade)
     #
     await _ensure_initial_admin()
-    # Start scheduler and reload cron from DB
     start_scheduler()
     from app.core.scheduler import load_cron_schedule
     from app.db.session import AsyncSessionLocal
@@ -79,11 +75,10 @@ app.add_middleware(
 # API routes
 app.include_router(api_router, prefix="/api")
 
-
-# Serve frontend static files at root
+# SPA static files — mounted at /assets for JS/CSS, NOT as catch-all
 if os.path.isdir(_FRONTEND_DIST):
-    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")
-    logger.info(f"Serving frontend from: {_FRONTEND_DIST}")
+    app.mount("/assets", StaticFiles(directory=_FRONTEND_DIST), name="frontend-assets")
+    logger.info(f"Serving frontend assets from: {_FRONTEND_DIST}/assets")
 else:
     logger.warning(f"Frontend dist not found at {_FRONTEND_DIST} — frontend will not be served")
 
@@ -98,8 +93,20 @@ async def version():
     return {"version": "1.0.0", "name": "SonicAI"}
 
 
+# Catch-all: serve index.html for any non-API GET (supports SPA refresh /playlist-sync, etc.)
+@app.get("/{path:path}", tags=["spa"])
+async def spa_fallback(path: str):
+    """Serve index.html for client-side routes (SPA refresh, direct links)."""
+    if path.startswith("api"):
+        raise HTTPException(status_code=404, detail="Not found")
+    index_path = os.path.join(_FRONTEND_DIST, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    logger.warning(f"index.html not found at {index_path}")
+    raise HTTPException(status_code=404, detail="Frontend not built")
+
+
 async def _ensure_initial_admin():
-    """Create initial admin user if no users exist."""
     from sqlalchemy import select
     from app.db.session import AsyncSessionLocal
     from app.db.models import User
@@ -108,7 +115,7 @@ async def _ensure_initial_admin():
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User))
         if result.scalars().first() is not None:
-            return  # Users exist
+            return
 
         logger.info("No users found — creating initial admin")
         admin = User(
@@ -121,19 +128,3 @@ async def _ensure_initial_admin():
         db.add(admin)
         await db.commit()
         logger.info(f"Initial admin created: {settings.init_admin_username}")
-
-
-# SPA fallback — serve index.html for non-API frontend routes (handles refresh on /playlist-sync etc)
-from fastapi.responses import FileResponse
-import re
-@app.get("/{path:path}")
-async def spa_fallback(path: str):
-    if path.startswith("api/"):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Not found")
-    index_path = os.path.join(_FRONTEND_DIST, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    from fastapi import HTTPException
-    raise HTTPException(status_code=404, detail="Frontend not built")
-
