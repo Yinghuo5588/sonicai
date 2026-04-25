@@ -67,9 +67,14 @@ async def _fetch_netease_song_details(ids: list[dict]) -> dict:
 
 
 def _parse_netease_details(data: dict) -> list[dict]:
-    songs = data.get("songs") or []
+    # /api/song/detail returns {songs: [...]} or {data: [{song}]}
+    songs = data.get("songs") or data.get("data") or []
+    if isinstance(songs, dict):
+        songs = songs.get("songs", [])
     result = []
     for s in songs:
+        if not isinstance(s, dict):
+            continue
         name = s.get("name", "")
         artists = [a.get("name", "") for a in s.get("ar", [])]
         album = s.get("al", {}).get("name", "")
@@ -93,11 +98,16 @@ async def parse_netease_url(url: str) -> tuple[str, list[dict]]:
         return playlist_name, []
 
     all_songs = []
-    chunk_size = 400
+    chunk_size = 20  # fetch fewer per request to avoid 400 errors
     for i in range(0, len(track_ids), chunk_size):
         chunk = [{"id": t["id"]} for t in track_ids[i:i + chunk_size]]
         detail = await _fetch_netease_song_details(chunk)
-        all_songs.extend(_parse_netease_details(detail))
+        parsed = _parse_netease_details(detail)
+        if not parsed:
+            # log the raw response for debugging
+            import json as _json
+            logger.warning("[playlist] no songs parsed from chunk, raw: %s", _json.dumps(detail)[:300])
+        all_songs.extend(parsed)
 
     logger.info("[playlist] netease '%s': %d songs", playlist_name, len(all_songs))
     return playlist_name, all_songs
