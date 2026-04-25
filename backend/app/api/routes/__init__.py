@@ -1,7 +1,7 @@
 """API routes."""
 
 from fastapi import APIRouter
-from app.api.routes import auth, settings, jobs, runs, webhooks, dashboard, hotboard
+from app.api.routes import auth, settings, jobs, runs, webhooks, dashboard, hotboard, playlist
 
 router = APIRouter()
 router.include_router(auth.router)
@@ -11,3 +11,4 @@ router.include_router(runs.router)
 router.include_router(webhooks.router)
 router.include_router(dashboard.router)
 router.include_router(hotboard.router)
+router.include_router(playlist.router)
