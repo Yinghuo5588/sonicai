@@ -83,35 +83,74 @@ def _parse_netease_details(data: dict) -> list[dict]:
 
 
 async def parse_netease_url(url: str) -> tuple[str, list[dict]]:
+    """
+    Parse NetEase playlist by scraping the mobile page (m.163.com).
+    This avoids authentication issues that plague the API endpoints.
+    """
     pid = extract_netease_id(url)
     if not pid:
         raise ValueError("unable to extract netease playlist id from: " + url)
-    data = await fetch_netease_playlist(pid)
-    if data.get("code") == 401:
-        raise ValueError("no permission to access this netease playlist (login required)")
 
-    playlist = data.get("playlist", {})
-    playlist_name = playlist.get("name", "netEase playlist")
-    track_ids = playlist.get("trackIds", [])
+    # Try the mobile playlist page - public playlists work without login
+    mobile_url = f"https://m.163.com/playlist?id={pid}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+    }
+    async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
+        resp = await client.get(mobile_url)
+        resp.raise_for_status()
+        text = resp.text
 
-    if not track_ids:
-        return playlist_name, []
+    # Extract playlist name from page title
+    import re
+    name_match = re.search(r'<title>([^<]+)</title>', text)
+    playlist_name = name_match.group(1).replace("- 歌单 - 网易云音乐", "").strip() if name_match else "NetEase Playlist"
 
-    all_songs = []
-    chunk_size = 20  # fetch fewer per request to avoid 400 errors
-    for i in range(0, len(track_ids), chunk_size):
-        chunk = [{"id": t["id"]} for t in track_ids[i:i + chunk_size]]
-        detail = await _fetch_netease_song_details(chunk)
-        parsed = _parse_netease_details(detail)
-        if not parsed:
-            # log the raw response for debugging
+    songs = []
+
+    # Try window.__NUXT__ first
+    nuxt_match = re.search(r'window\.__NUXT__\s*=\s*(\{.*?\});', text, re.DOTALL)
+    if nuxt_match:
+        try:
             import json as _json
-            logger.warning("[playlist] no songs parsed from chunk, raw: %s", _json.dumps(detail)[:300])
-        all_songs.extend(parsed)
+            nuxt_data = _json.loads(nuxt_match.group(1))
+            tracks = nuxt_data.get("state", {}).get("playlist", {}).get("tracks", [])
+            for t in tracks:
+                artists = [a.get("name", "") for a in t.get("ar", [])]
+                songs.append({
+                    "title": t.get("name", ""),
+                    "artist": " / ".join(artists),
+                    "album": t.get("al", {}).get("name", ""),
+                })
+        except Exception as e:
+            logger.warning("[playlist] nuxt parse failed: %s", e)
 
-    logger.info("[playlist] netease '%s': %d songs", playlist_name, len(all_songs))
-    return playlist_name, all_songs
+    # Fallback: try window.__INITIAL_STATE__
+    if not songs:
+        state_match = re.search(r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});', text, re.DOTALL)
+        if state_match:
+            try:
+                import json as _json
+                state = _json.loads(state_match.group(1))
+                tracks = state.get("playlistDetail", {}).get("tracks", [])
+                for t in tracks:
+                    artists_list = t.get("artists", [])
+                    artist_names = [a.get("name", "") for a in artists_list]
+                    songs.append({
+                        "title": t.get("name", ""),
+                        "artist": " / ".join(filter(None, artist_names)),
+                        "album": t.get("albumName", ""),
+                    })
+            except Exception as e:
+                logger.warning("[playlist] initial state parse failed: %s", e)
 
+    if not songs:
+        raise ValueError("failed to extract songs from netease mobile page (public playlist required)")
+
+    logger.info("[playlist] netease mobile \'%s\': %d songs", playlist_name, len(songs))
+    return playlist_name, songs
 
 # ── QQ Music ────────────────────────────────────────────────────────────────
 
