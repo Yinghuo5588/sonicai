@@ -75,11 +75,11 @@ async def run_playlist_sync(
 
         # Resolve playlist name
         if playlist_name and playlist_name.strip():
-    final_name = playlist_name.strip()
-else:
-    from datetime import datetime
-    today = datetime.now().strftime("%Y-%m-%d")
-    final_name = f"{parsed_name} - {today}"
+            final_name = playlist_name.strip()
+        else:
+            from datetime import datetime
+            today = datetime.now().strftime("%Y-%m-%d")
+            final_name = f"{parsed_name} - {today}"
 
         # Overwrite: delete existing playlist with same name
         if overwrite:
