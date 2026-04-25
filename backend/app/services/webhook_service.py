@@ -1,7 +1,8 @@
 """Webhook service."""
 
+import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import httpx
 
 from sqlalchemy import select
@@ -59,23 +60,25 @@ async def send_webhook_batch(batch_id: int) -> dict:
         timeout = settings.webhook_timeout_seconds or 10
 
         try:
-            async with httpx.AsyncClient(timeout=float(timeout)) as client:
-                response = await client.post(
-                    settings.webhook_url,
-                    json=payload,
-                    headers=headers,
-                )
-                batch.response_code = response.status_code
-                batch.response_body = response.text[:2000]
-                if 200 <= response.status_code < 300:
-                    batch.status = "success"
-                else:
-                    batch.status = "failed"
-                    batch.retry_count += 1
-                    if batch.retry_count < batch.max_retry_count:
-                        from datetime import timedelta
-                        batch.status = "retrying"
-                        batch.next_retry_at = datetime.now(timezone.utc) + timedelta(minutes=_retry_interval(batch.retry_count))
+            async def _do_send():
+                async with httpx.AsyncClient(timeout=float(timeout)) as client:
+                    body = json.dumps(payload, ensure_ascii=False)
+                    response = await client.post(
+                        settings.webhook_url,
+                        content=body,
+                        headers=headers,
+                    )
+                    batch.response_code = response.status_code
+                    batch.response_body = response.text[:2000]
+                    if 200 <= response.status_code < 300:
+                        batch.status = "success"
+                    else:
+                        batch.status = "failed"
+                        batch.retry_count += 1
+                        if batch.retry_count < batch.max_retry_count:
+                            batch.status = "retrying"
+                            batch.next_retry_at = datetime.now(timezone.utc) + timedelta(minutes=_retry_interval(batch.retry_count))
+            await _do_send()
         except Exception as e:
             batch.status = "failed"
             batch.response_body = str(e)[:2000]
