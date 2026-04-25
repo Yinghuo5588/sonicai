@@ -203,7 +203,6 @@ async def run_hotboard_sync(
                             artist=item_data["artist"],
                             album=item_data.get("album"),
                             text=text,
-                            raw_payload_json=_json.dumps(item_data, ensure_ascii=False),
                         ))
                     await db.commit()
                     # Fire-and-forget

@@ -45,9 +45,6 @@ function BatchPreview({ batchId }: { batchId: number }) {
               <div>artist  : {item.artist}</div>
               <div>album   : {item.album}</div>
               <div>text    : {item.text}</div>
-              {item.raw_payload_json && (
-                <div className="mt-1 text-slate-500">raw    : {item.raw_payload_json}</div>
-              )}
             </div>
           ))
         : <div className="text-slate-500">无曲目数据</div>

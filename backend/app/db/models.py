@@ -202,7 +202,6 @@ class WebhookBatchItem(Base):
     artist = Column(String(500), nullable=True)
     album = Column(String(500), nullable=True)
     text = Column(String(1000), nullable=True)
-    raw_payload_json = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     batch = relationship("WebhookBatch", back_populates="items")
