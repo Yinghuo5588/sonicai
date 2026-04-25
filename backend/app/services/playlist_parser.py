@@ -87,94 +87,48 @@ def _parse_netease_details(data: dict) -> list[dict]:
 
 async def parse_netease_url(url: str) -> tuple[str, list[dict]]:
     """
-    Parse NetEase playlist by scraping music.163.com playlist page.
+    Parse NetEase playlist via unmeta.cn proxy API.
+    Returns (playlist_name, songs) where songs = [{"title": "...", "artist": "...", "album": ""}]
     """
-    pid = extract_netease_id(url)
-    if not pid:
-        raise ValueError("unable to extract netease playlist id from: " + url)
+    import urllib.parse
 
+    unmeta_url = "https://sss.unmeta.cn/songlist"
+    payload = urllib.parse.urlencode({"url": url})
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "zh-CN,zh;q=0.9",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     }
+
     async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
-        resp = await client.get(f"https://music.163.com/playlist?id={pid}")
+        resp = await client.post(unmeta_url, content=payload.encode())
         resp.raise_for_status()
-        text = resp.text
+        result = resp.json()
 
-    import re, json as _json
+    if result.get("code") != 1:
+        raise ValueError(f"unmeta API error: {result.get('msg', 'unknown')}")
 
-    # Extract playlist name
-    name_match = re.search(r'<title>([^<]+)</title>', text)
-    playlist_name = name_match.group(1).replace("- 歌单 - 网易云音乐", "").strip() if name_match else "NetEase Playlist"
+    data = result.get("data") or {}
+    playlist_name = data.get("name") or "NetEase Playlist"
+    raw_songs = data.get("songs") or []
 
     songs = []
+    for item in raw_songs:
+        # Format is "Title - Artist1 / Artist2 / ..." or just "Title"
+        if " - " in item:
+            parts = item.split(" - ", 1)
+            title = parts[0].strip()
+            artist = parts[1].strip().replace(" / ", " / ")
+        else:
+            title = item.strip()
+            artist = ""
+        if title:
+            songs.append({"title": title, "artist": artist, "album": ""})
 
-    # Try multiple extraction strategies
-    extraction_strategies = [
-        # Strategy 1: window.__INITIAL_STATE__
-        lambda t: re.search(r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});', t, re.DOTALL),
-        # Strategy 2: window.__NUXT__
-        lambda t: re.search(r'window\.__NUXT__\s*=\s*(\{.*?\});', t, re.DOTALL),
-        # Strategy 3: window.__PLAYLIST__
-        lambda t: re.search(r'window\.__PLAYLIST__\s*=\s*(\{.*?\});', t, re.DOTALL),
-        # Strategy 4: var playlistData
-        lambda t: re.search(r'playlistData\s*=\s*(\{.*?\});', t, re.DOTALL),
-        # Strategy 5: search for song IDs in data-player-id
-        lambda t: re.search(r'data-player-id="(\d+)"', t),
-    ]
-
-    for strategy_idx, strategy in enumerate(extraction_strategies[:3]):  # only json strategies
-        m = strategy(text)
-        if not m:
-            continue
-        try:
-            data = _json.loads(m.group(1))
-            tracks = None
-            if "playlist" in data and isinstance(data["playlist"], dict):
-                tracks = data["playlist"].get("tracks") or data["playlist"].get("trackIds") or []
-            elif "tracks" in data:
-                tracks = data["tracks"]
-            elif isinstance(data, list):
-                tracks = data
-            if tracks:
-                for t in tracks:
-                    if isinstance(t, dict):
-                        artists = []
-                        if "ar" in t:
-                            artists = [a.get("name", "") for a in t["ar"]]
-                        elif "artists" in t:
-                            artists = [a.get("name", "") for a in t["artists"]]
-                        songs.append({
-                            "title": t.get("name", t.get("title", "")),
-                            "artist": " / ".join(filter(None, artists)),
-                            "album": t.get("al", {}).get("name", "") if isinstance(t.get("al"), dict) else t.get("albumName", ""),
-                        })
-                break
-        except Exception as e:
-            logger.warning("[playlist] strategy %d parse failed: %s", strategy_idx, e)
-
-    # Strategy 4: simple song ID + title extraction from page
-    if not songs:
-        song_pattern = re.findall(r'data-songname="([^"]+)".*?data-artistname="([^"]+)"', text)
-        if not song_pattern:
-            song_pattern = re.findall(r'"name"\s*:\s*"([^"]+)".*?"artists"\s*:\s*\[\{"name"\s*:\s*"([^"]+)"\}', text)
-        if not song_pattern:
-            # Try: song titles with IDs
-            titles = re.findall(r'data-songname="([^"]+)"', text)
-            ids = re.findall(r'data-songid="(\d+)"', text)
-            if titles and ids:
-                for title in titles[:len(ids)]:
-                    songs.append({"title": title, "artist": "", "album": ""})
-
-    if not songs:
-        logger.warning("[playlist] no songs extracted from music.163.com page, page len=%d", len(text))
-        logger.warning("[playlist] page sample (first 500): %s", text[:500])
-        raise ValueError("failed to extract songs — page may require JS rendering, try public playlist")
-
-    logger.info("[playlist] netease '%s': %d songs (from %d strategy)", playlist_name, len(songs), strategy_idx)
+    logger.info("[playlist] netease via unmeta '%s': %d songs", playlist_name, len(songs))
     return playlist_name, songs
+
+
 
 # ── QQ Music ────────────────────────────────────────────────────────────────
 
