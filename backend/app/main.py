@@ -120,3 +120,19 @@ async def _ensure_initial_admin():
         db.add(admin)
         await db.commit()
         logger.info(f"Initial admin created: {settings.init_admin_username}")
+
+
+# SPA fallback — serve index.html for non-API frontend routes (handles refresh on /playlist-sync etc)
+from fastapi.responses import FileResponse
+import re
+@app.get("/{path:path}")
+async def spa_fallback(path: str):
+    if path.startswith("api/"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Not found")
+    index_path = os.path.join(_FRONTEND_DIST, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Frontend not built")
+
