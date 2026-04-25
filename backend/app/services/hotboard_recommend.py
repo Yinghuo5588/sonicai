@@ -185,11 +185,13 @@ async def run_hotboard_sync(
                 settings = settings_result.scalar_one_or_none()
                 if settings and settings.library_mode_default == "allow_missing" and settings.webhook_url:
                     from app.db.models import WebhookBatch, WebhookBatchItem
+                    import json as _json
                     batch = WebhookBatch(
                         run_id=run_id,
                         playlist_type="hotboard",
                         status="pending",
                         max_retry_count=settings.webhook_retry_count or 3,
+                        payload_json=_json.dumps({"items": missing_items}, ensure_ascii=False),
                     )
                     db.add(batch)
                     await db.flush()
@@ -201,6 +203,7 @@ async def run_hotboard_sync(
                             artist=item_data["artist"],
                             album=item_data.get("album"),
                             text=text,
+                            raw_payload_json=_json.dumps(item_data, ensure_ascii=False),
                         ))
                     await db.commit()
                     # Fire-and-forget

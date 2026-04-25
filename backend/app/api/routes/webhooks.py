@@ -1,6 +1,6 @@
 """Webhook batch routes."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy import select
 
 from app.db.session import get_db, AsyncSessionLocal
@@ -54,6 +54,7 @@ async def get_batch(batch_id: int, current_user: CurrentUser, db: AsyncSessionLo
         "status": batch.status,
         "response_code": batch.response_code,
         "response_body": batch.response_body,
+        "payload_json": batch.payload_json,
         "retry_count": batch.retry_count,
         "created_at": batch.created_at.isoformat() if batch.created_at else None,
         "items": [
@@ -63,6 +64,7 @@ async def get_batch(batch_id: int, current_user: CurrentUser, db: AsyncSessionLo
                 "artist": i.artist,
                 "album": i.album,
                 "text": i.text,
+                "raw_payload_json": i.raw_payload_json,
             }
             for i in items
         ],
