@@ -2,6 +2,7 @@
 
 import logging
 import asyncio
+from typing import Annotated
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/hotboard", tags=["hotboard"])
 async def sync_hotboard(
     limit: int = 50,
     match_threshold: float = 0.75,
-    current_user: CurrentUser = Depends(get_db),
+    current_user: Annotated[CurrentUser, Depends(get_db)],
     db: AsyncSession = Depends(get_db),
 ):
     """
