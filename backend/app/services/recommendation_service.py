@@ -27,28 +27,47 @@ logger = logging.getLogger(__name__)
 # Entry points (called by tasks / routes)
 # ─────────────────────────────────────────────
 
-async def run_full_recommendation(trigger_type: str = "manual"):
+async def run_full_recommendation(run_id: int | None, trigger_type: str = "manual"):
     """Run both playlist types as part of a single recommendation run."""
-    logger.info(f"[run] start run_type=full trigger_type={trigger_type}")
+    import json
+    logger.info(f"[run] start run_type=full trigger_type={trigger_type} run_id={run_id}")
     async with AsyncSessionLocal() as db:
-        run = RecommendationRun(run_type="full", status="running")
-        db.add(run)
-        await db.flush()
-        run_id = run.id
+        result = await db.execute(select(SystemSettings))
+        settings = result.scalar_one()
+        snapshot = {
+            "timezone": settings.timezone,
+            "lastfm_username": settings.lastfm_username,
+            "library_mode_default": settings.library_mode_default,
+            "duplicate_avoid_days": settings.duplicate_avoid_days,
+            "top_track_seed_limit": settings.top_track_seed_limit,
+            "top_artist_seed_limit": settings.top_artist_seed_limit,
+            "similar_track_limit": settings.similar_track_limit,
+            "similar_artist_limit": settings.similar_artist_limit,
+            "artist_top_track_limit": settings.artist_top_track_limit,
+            "similar_playlist_size": settings.similar_playlist_size,
+            "artist_playlist_size": settings.artist_playlist_size,
+            "recommendation_balance": settings.recommendation_balance,
+            "seed_source_mode": settings.seed_source_mode,
+            "recent_tracks_limit": settings.recent_tracks_limit,
+            "top_period": settings.top_period,
+            "recent_top_mix_ratio": settings.recent_top_mix_ratio,
+            "match_threshold": float(settings.match_threshold) if settings.match_threshold is not None else None,
+            "candidate_pool_multiplier_min": float(settings.candidate_pool_multiplier_min) if settings.candidate_pool_multiplier_min is not None else None,
+            "candidate_pool_multiplier_max": float(settings.candidate_pool_multiplier_max) if settings.candidate_pool_multiplier_max is not None else None,
+        }
+        run_row = await db.get(RecommendationRun, run_id)
+        run_row.status = "running"
+        run_row.started_at = datetime.now(timezone.utc)
+        run_row.config_snapshot_json = json.dumps(snapshot, ensure_ascii=False)
         await db.commit()
 
     try:
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(SystemSettings))
-            settings = result.scalar_one()
-
         async with AsyncSessionLocal() as db:
             await _generate_similar_tracks(db, run_id, settings)
         async with AsyncSessionLocal() as db:
             await _generate_similar_artists(db, run_id, settings)
         async with AsyncSessionLocal() as db:
             await _cleanup_old_playlists(settings)
-
         async with AsyncSessionLocal() as db:
             run_row = await db.get(RecommendationRun, run_id)
             run_row.status = "success"
@@ -64,19 +83,35 @@ async def run_full_recommendation(trigger_type: str = "manual"):
             await db.commit()
 
 
-async def run_similar_tracks_only(trigger_type: str = "manual"):
-    logger.info(f"[run] start run_type=similar_tracks trigger_type={trigger_type}")
+async def run_similar_tracks_only(run_id: int | None, trigger_type: str = "manual"):
+    import json
+    logger.info(f"[run] start run_type=similar_tracks trigger_type={trigger_type} run_id={run_id}")
     async with AsyncSessionLocal() as db:
-        run = RecommendationRun(run_type="similar_tracks", status="running")
-        db.add(run)
-        await db.flush()
-        run_id = run.id
+        result = await db.execute(select(SystemSettings))
+        settings = result.scalar_one()
+        snapshot = {
+            "timezone": settings.timezone,
+            "lastfm_username": settings.lastfm_username,
+            "library_mode_default": settings.library_mode_default,
+            "duplicate_avoid_days": settings.duplicate_avoid_days,
+            "top_track_seed_limit": settings.top_track_seed_limit,
+            "similar_track_limit": settings.similar_track_limit,
+            "similar_playlist_size": settings.similar_playlist_size,
+            "recommendation_balance": settings.recommendation_balance,
+            "seed_source_mode": settings.seed_source_mode,
+            "recent_tracks_limit": settings.recent_tracks_limit,
+            "top_period": settings.top_period,
+            "recent_top_mix_ratio": settings.recent_top_mix_ratio,
+            "match_threshold": float(settings.match_threshold) if settings.match_threshold is not None else None,
+            "candidate_pool_multiplier_min": float(settings.candidate_pool_multiplier_min) if settings.candidate_pool_multiplier_min is not None else None,
+            "candidate_pool_multiplier_max": float(settings.candidate_pool_multiplier_max) if settings.candidate_pool_multiplier_max is not None else None,
+        }
+        run_row = await db.get(RecommendationRun, run_id)
+        run_row.status = "running"
+        run_row.started_at = datetime.now(timezone.utc)
+        run_row.config_snapshot_json = json.dumps(snapshot, ensure_ascii=False)
         await db.commit()
-
     try:
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(SystemSettings))
-            settings = result.scalar_one()
         async with AsyncSessionLocal() as db:
             await _generate_similar_tracks(db, run_id, settings)
         async with AsyncSessionLocal() as db:
@@ -94,19 +129,34 @@ async def run_similar_tracks_only(trigger_type: str = "manual"):
             await db.commit()
 
 
-async def run_similar_artists_only(trigger_type: str = "manual"):
-    logger.info(f"[run] start run_type=similar_artists trigger_type={trigger_type}")
+async def run_similar_artists_only(run_id: int | None, trigger_type: str = "manual"):
+    import json
+    logger.info(f"[run] start run_type=similar_artists trigger_type={trigger_type} run_id={run_id}")
     async with AsyncSessionLocal() as db:
-        run = RecommendationRun(run_type="similar_artists", status="running")
-        db.add(run)
-        await db.flush()
-        run_id = run.id
+        result = await db.execute(select(SystemSettings))
+        settings = result.scalar_one()
+        snapshot = {
+            "timezone": settings.timezone,
+            "lastfm_username": settings.lastfm_username,
+            "library_mode_default": settings.library_mode_default,
+            "duplicate_avoid_days": settings.duplicate_avoid_days,
+            "top_artist_seed_limit": settings.top_artist_seed_limit,
+            "similar_artist_limit": settings.similar_artist_limit,
+            "artist_top_track_limit": settings.artist_top_track_limit,
+            "artist_playlist_size": settings.artist_playlist_size,
+            "recommendation_balance": settings.recommendation_balance,
+            "seed_source_mode": settings.seed_source_mode,
+            "recent_tracks_limit": settings.recent_tracks_limit,
+            "top_period": settings.top_period,
+            "recent_top_mix_ratio": settings.recent_top_mix_ratio,
+            "match_threshold": float(settings.match_threshold) if settings.match_threshold is not None else None,
+        }
+        run_row = await db.get(RecommendationRun, run_id)
+        run_row.status = "running"
+        run_row.started_at = datetime.now(timezone.utc)
+        run_row.config_snapshot_json = json.dumps(snapshot, ensure_ascii=False)
         await db.commit()
-
     try:
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(SystemSettings))
-            settings = result.scalar_one()
         async with AsyncSessionLocal() as db:
             await _generate_similar_artists(db, run_id, settings)
         async with AsyncSessionLocal() as db:
@@ -271,7 +321,7 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     logger.info(f"[similar_tracks] starting Navidrome matching for {len(candidates)} candidates")
 
     for idx, item_data in enumerate(candidates):
-        match = await _match_to_navidrome(db, item_data)
+        match = await _match_to_navidrome(db, item_data, settings)
         if idx % 50 == 0:
             logger.info(f"[similar_tracks] Navidrome matching progress: {idx+1}/{len(candidates)}")
         logger.debug(f"[similar_tracks] item {idx+1}/{len(candidates)}: title={item_data['title'][:20]} matched={'YES' if match and match.get('selected_song_id') else 'NO'}")
@@ -473,7 +523,7 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
     missing_items = []
 
     for idx, item_data in enumerate(candidates):
-        match = await _match_to_navidrome(db, item_data)
+        match = await _match_to_navidrome(db, item_data, settings)
         if idx % 50 == 0:
             logger.info(f"[similar_artists] Navidrome matching progress: {idx+1}/{len(candidates)}")
         item = RecommendationItem(
@@ -577,7 +627,7 @@ async def _filter_recent(db: AsyncSession, candidates: list[dict], avoid_days: i
     return filtered
 
 
-async def _match_to_navidrome(db: AsyncSession, item_data: dict) -> dict | None:
+async def _match_to_navidrome(db: AsyncSession, item_data: dict, settings) -> dict | None:
     """Search Navidrome with 8-strategy multi-query, score all results, return best."""
     from app.utils.text_normalizer import score_candidate, make_search_queries, to_simplified
 

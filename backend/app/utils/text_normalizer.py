@@ -152,6 +152,7 @@ def normalize_artist(artist: str) -> str:
     if not artist:
         return ""
     t = nfkc(artist)
+    t = to_simplified(t)
     t = fullwidth_to_halfwidth(t)
     t = t.lower()
     t = strip_feat(t)
@@ -163,7 +164,9 @@ def normalize_artist(artist: str) -> str:
 
 
 def dedup_key(title: str, artist: str) -> str:
-    return f"{normalize_title(title)}|{normalize_artist(artist)}"
+    # Use normalize_for_compare (with 繁简) so that
+    # 《開始懂了》/《开始懂了》 generates the same dedup_key
+    return f"{normalize_for_compare(title)}|{normalize_for_compare(artist)}"
 
 
 # ── Multi-query generation + scoring ─────────────────────────────────────────
@@ -223,9 +226,9 @@ def score_candidate(lastfm_title: str, lastfm_artist: str, nav_title: str, nav_a
         r1 = fuzz.ratio(la, lb) / 100.0
         r2 = fuzz.token_sort_ratio(la, lb) / 100.0
         r3 = fuzz.partial_ratio(la, lb) / 100.0
-        # Prefer token_sort for normal titles, partial_ratio for short titles
+        # Cap partial_ratio for short titles to avoid false positives from substring matching
         if len(la) <= 6 or len(lb) <= 6:
-            return max(r1, r2, r3)
+            return max(r1, r2, min(r3, 0.92))
         return max(r1, r2)
 
     t_s_raw = title_score(lf_title_raw, nav_title_raw)

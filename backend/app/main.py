@@ -86,16 +86,18 @@ def _run_alembic_upgrade():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting SonicAI backend...")
-    # Ensure musicrec database and user exist before migrations
+    # Run alembic migrations
     import asyncio
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, _ensure_musicrec_database)
-    # Run alembic migrations
     await loop.run_in_executor(None, _run_alembic_upgrade)
     #
     await _ensure_initial_admin()
-    # Start scheduler
+    # Start scheduler and reload cron from DB
     start_scheduler()
+    from app.core.scheduler import load_cron_schedule
+    from app.db.session import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        await load_cron_schedule(db)
     yield
     shutdown_scheduler()
     logger.info("SonicAI backend stopped")

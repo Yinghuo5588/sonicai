@@ -29,6 +29,25 @@ async def _has_running_job(db: AsyncSessionLocal, run_types: list[str]) -> bool:
     return result.scalar_one_or_none() is not None
 
 
+async def _create_pending_run(
+    db: AsyncSessionLocal, run_type: str, current_user_id: int | None
+) -> int:
+    """Create a pending run in DB first, then hand off to async task (avoids race condition)."""
+    from datetime import datetime, timezone
+    run = RecommendationRun(
+        run_type=run_type,
+        status="pending",
+        started_at=None,
+        finished_at=None,
+        created_by_user_id=current_user_id,
+    )
+    db.add(run)
+    await db.flush()
+    run_id = run.id
+    await db.commit()
+    return run_id
+
+
 @router.post("/run-all")
 async def run_all(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
     import asyncio
@@ -36,8 +55,9 @@ async def run_all(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get
     if await _has_running_job(db, ["full", "similar_tracks", "similar_artists"]):
         raise HTTPException(status_code=409, detail="Another recommendation job is already running")
 
-    asyncio.create_task(run_full_recommendation(trigger_type="manual"))
-    return {"message": "Job queued", "type": "full"}
+    run_id = await _create_pending_run(db, "full", current_user.id)
+    asyncio.create_task(run_full_recommendation(run_id=run_id, trigger_type="manual"))
+    return {"message": "Job queued", "type": "full", "run_id": run_id}
 
 
 @router.post("/run-similar-tracks")
@@ -47,8 +67,9 @@ async def run_similar_tracks(current_user: CurrentUser, db: AsyncSessionLocal = 
     if await _has_running_job(db, ["full", "similar_tracks"]):
         raise HTTPException(status_code=409, detail="A similar-tracks related job is already running")
 
-    asyncio.create_task(run_similar_tracks_only(trigger_type="manual"))
-    return {"message": "Job queued", "type": "similar_tracks"}
+    run_id = await _create_pending_run(db, "similar_tracks", current_user.id)
+    asyncio.create_task(run_similar_tracks_only(run_id=run_id, trigger_type="manual"))
+    return {"message": "Job queued", "type": "similar_tracks", "run_id": run_id}
 
 
 @router.post("/run-similar-artists")
@@ -58,8 +79,9 @@ async def run_similar_artists(current_user: CurrentUser, db: AsyncSessionLocal =
     if await _has_running_job(db, ["full", "similar_artists"]):
         raise HTTPException(status_code=409, detail="A similar-artists related job is already running")
 
-    asyncio.create_task(run_similar_artists_only(trigger_type="manual"))
-    return {"message": "Job queued", "type": "similar_artists"}
+    run_id = await _create_pending_run(db, "similar_artists", current_user.id)
+    asyncio.create_task(run_similar_artists_only(run_id=run_id, trigger_type="manual"))
+    return {"message": "Job queued", "type": "similar_artists", "run_id": run_id}
 
 
 @router.get("")
