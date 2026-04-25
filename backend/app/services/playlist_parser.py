@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 NETEASE_API = "https://music.163.com/api/v6/playlist/detail"
 NETEASE_DETAIL_API = "https://music.163.com/api/v3/song/detail"
+NETEASE_SONG_API = "https://music.163.com/api/song/detail"
 
 
 def extract_netease_id(url: str) -> str | None:
@@ -45,18 +46,18 @@ async def fetch_netease_playlist(playlist_id: str) -> dict:
             raise ValueError(f"netease API returned invalid JSON: {e}") from e
 
 
+NETEASE_SONG_API = "https://music.163.com/api/song/detail"
+
 async def _fetch_netease_song_details(ids: list[dict]) -> dict:
+    """Fetch song details using /api/song/detail (simpler comma-separated ids format)."""
+    song_ids = [str(item["id"]) for item in ids]
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://music.163.com/",
     }
+    params = {"ids": ",".join(song_ids), "types": ",".join(["1"] * len(song_ids))}
     async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
-        body = json.dumps({"c": ids}, ensure_ascii=False)
-        resp = await client.post(
-            NETEASE_DETAIL_API,
-            content=body.encode("utf-8"),
-            headers={"Content-Type": "application/json; charset=utf-8", "User-Agent": headers["User-Agent"]},
-        )
+        resp = await client.get(NETEASE_SONG_API, params=params)
         resp.raise_for_status()
         try:
             return resp.json()
