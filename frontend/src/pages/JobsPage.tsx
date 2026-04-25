@@ -128,17 +128,17 @@ export default function JobsPage() {
           <p className="text-red-500 text-sm">❌ 提交失败：{String(hotboardMutation.error?.message)}</p>
         )}
       </div>
-    </div>
-        <div className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
-          <h2 className="font-medium text-slate-700 text-sm">🔗 第三方歌单同步</h2>
-          <p className="text-xs text-slate-500">从网易云/QQ/汽水音乐导入歌单，同步到 Navidrome</p>
-          <button
-            onClick={() => window.location.href = '/playlist-sync'}
-            className="w-full bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
-          >
-            🔗 打开歌单同步
-          </button>
-        </div>
 
+      <div className="bg-white rounded-lg p-4 border border-green-200 space-y-3">
+        <h2 className="font-medium text-slate-700 text-sm">🔗 第三方歌单同步</h2>
+        <p className="text-xs text-slate-500">从网易云/QQ/汽水音乐导入歌单，同步到 Navidrome</p>
+        <button
+          onClick={() => window.location.href = '/playlist-sync'}
+          className="w-full bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
+        >
+          🔗 打开歌单同步
+        </button>
+      </div>
     </div>
   )
+}
