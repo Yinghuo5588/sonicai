@@ -33,20 +33,26 @@ def extract_netease_id(url: str) -> str | None:
 async def parse_netease_url(url: str) -> tuple[str, list[dict]]:
     """
     Parse NetEase playlist via unmeta.cn proxy API.
-    Returns (playlist_name, songs) where songs = [{"title": "...", "artist": "...", "album": ""}]
+    Supports both GET (detailed=false) and POST modes.
+    Returns (playlist_name, songs).
     """
     import urllib.parse
 
-    unmeta_url = "https://sss.unmeta.cn/songlist"
-    payload = urllib.parse.urlencode({"url": url})
+    # Prefer GET mode with detailed=false for cleaner response
+    params = urllib.parse.urlencode({
+        "detailed": "false",
+        "format": "song-singer",
+        "order": "normal",
+        "url": url,
+    })
+    get_url = f"https://sss.unmeta.cn/songlist?{params}"
     headers = {
-        "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "application/json",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     }
 
-    async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
-        resp = await client.post(unmeta_url, content=payload.encode())
+    async with httpx.AsyncClient(timeout=20.0, headers=headers) as client:
+        resp = await client.get(get_url)
         resp.raise_for_status()
         result = resp.json()
 
@@ -72,7 +78,6 @@ async def parse_netease_url(url: str) -> tuple[str, list[dict]]:
 
     logger.info("[playlist] netease via unmeta '%s': %d songs", playlist_name, len(songs))
     return playlist_name, songs
-
 
 
 # ── QQ Music ────────────────────────────────────────────────────────────────
