@@ -1,7 +1,7 @@
 """System settings routes."""
 
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 import json
 import httpx
@@ -49,6 +49,11 @@ class SettingsResponse(BaseModel):
 
 
 class SettingsUpdate(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def empty_strings_to_none(cls, values):
+        return {k: (None if v == "" else v) for k, v in values.items()}
+
     timezone: str | None = None
     lastfm_api_key: str | None = None
     lastfm_username: str | None = None
