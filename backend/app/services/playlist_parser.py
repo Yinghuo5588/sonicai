@@ -18,11 +18,14 @@ NETEASE_SONG_API = "https://music.163.com/api/song/detail"
 
 
 def extract_netease_id(url: str) -> str | None:
-    patterns = [r"playlist[/\?]?id=(\d+)", r"/(\d+)"]
-    for p in patterns:
-        m = re.search(p, url)
-        if m:
-            return m.group(1)
+    # Always prefer the id= query param first
+    m = re.search(r"id=(\d+)", url)
+    if m:
+        return m.group(1)
+    # Fall back to trailing numeric ID
+    m = re.search(r"/(\d+)(?:/|$)", url)
+    if m:
+        return m.group(1)
     return None
 
 
@@ -92,9 +95,9 @@ async def parse_netease_url(url: str) -> tuple[str, list[dict]]:
         raise ValueError("unable to extract netease playlist id from: " + url)
 
     # Try the mobile playlist page - public playlists work without login
-    mobile_url = f"https://m.163.com/playlist?id={pid}"
+    mobile_url = f"https://music.163.com/playlist?id={pid}"
     headers = {
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "zh-CN,zh;q=0.9",
     }
