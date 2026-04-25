@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
 
 async function triggerJob(type: string) {
   const token = localStorage.getItem('sonicai_access_token')
@@ -15,9 +14,17 @@ async function triggerJob(type: string) {
   return res.json()
 }
 
-async function triggerHotboard(limit: number, threshold: number) {
+async function triggerHotboard(limit: number, threshold: number, playlistName: string, overwrite: boolean) {
   const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch(`/api/hotboard/sync?limit=${limit}&match_threshold=${threshold}`, {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    match_threshold: String(threshold / 100),
+  })
+  if (playlistName.trim()) {
+    params.set('playlist_name', playlistName.trim())
+  }
+  params.set('overwrite', String(overwrite))
+  const res = await fetch(`/api/hotboard/sync?${params}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -29,18 +36,21 @@ async function triggerHotboard(limit: number, threshold: number) {
 }
 
 export default function JobsPage() {
-  const navigate = useNavigate()
-  const allMutation = useMutation({ mutationFn: triggerJob })
+  const allMutation = useMutation({ mutationFn: () => triggerJob('full') })
   const tracksMutation = useMutation({ mutationFn: () => triggerJob('similar-tracks') })
   const artistsMutation = useMutation({ mutationFn: () => triggerJob('similar-artists') })
 
   const [limit, setLimit] = useState(50)
   const [threshold, setThreshold] = useState(75)
-  const hotboardMutation = useMutation({ mutationFn: () => triggerHotboard(limit, threshold / 100) })
+  const [playlistName, setPlaylistName] = useState('')
+  const [overwrite, setOverwrite] = useState(false)
+  const hotboardMutation = useMutation({
+    mutationFn: () => triggerHotboard(limit, threshold, playlistName, overwrite),
+  })
 
-  const run = (mutation: ReturnType<typeof useMutation>, label: string, onClick?: () => void) => (
+  const run = (mutation: ReturnType<typeof useMutation>, label: string) => (
     <button
-      onClick={onClick ?? (() => mutation.mutate())}
+      onClick={() => mutation.mutate()}
       disabled={mutation.isPending}
       className="flex-1 bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm font-medium"
     >
@@ -62,6 +72,7 @@ export default function JobsPage() {
 
       <div className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
         <h2 className="font-medium text-slate-700 text-sm">🌟 网易云热榜同步</h2>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-slate-500 mb-1">抓取热榜歌曲数</label>
@@ -86,12 +97,35 @@ export default function JobsPage() {
             />
           </div>
         </div>
+
+        <div>
+          <label className="block text-xs text-slate-500 mb-1">歌单名称（留空则自动生成）</label>
+          <input
+            type="text"
+            value={playlistName}
+            onChange={e => setPlaylistName(e.target.value)}
+            placeholder="网易云热榜 - 2026-04-25"
+            className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={overwrite}
+            onChange={e => setOverwrite(e.target.checked)}
+            className="w-4 h-4 accent-blue-500"
+          />
+          覆盖同名歌单（勾选后先删除再创建）
+        </label>
+
         {run(hotboardMutation, '🌟 网易云热榜同步')}
+
         {hotboardMutation.isSuccess && (
           <p className="text-green-600 text-sm">✅ 已提交，可在推荐历史查看进度</p>
         )}
         {hotboardMutation.isError && (
-          <p className="text-red-500 text-sm">❌ 提交失败：{hotboardMutation.error?.message}</p>
+          <p className="text-red-500 text-sm">❌ 提交失败：{String(hotboardMutation.error?.message)}</p>
         )}
       </div>
     </div>

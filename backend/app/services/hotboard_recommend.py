@@ -14,6 +14,7 @@ from app.services.navidrome_service import (
     navidrome_create_playlist,
     navidrome_add_to_playlist,
     navidrome_delete_playlist,
+    navidrome_list_playlists,
 )
 from app.utils.text_normalizer import score_candidate, dedup_key
 
@@ -26,6 +27,8 @@ async def run_hotboard_sync(
     run_id: int,
     limit: int = 50,
     match_threshold: float = 0.75,
+    playlist_name: str | None = None,
+    overwrite: bool = False,
     trigger_type: str = "manual",
 ) -> dict:
     """
@@ -33,11 +36,11 @@ async def run_hotboard_sync(
     1. Fetch hotboard tracks from NetEase
     2. For each track run multi-strategy Navidrome search
     3. Score & filter by threshold
-    4. Create Navidrome playlist with matched songs
+    4. Create / overwrite Navidrome playlist with matched songs
     5. Persist run results in DB
     Returns a summary dict.
     """
-    logger.info(f"[hotboard] start run_id={run_id} limit={limit} threshold={match_threshold}")
+    logger.info(f"[hotboard] start run_id={run_id} limit={limit} threshold={match_threshold} playlist_name={playlist_name} overwrite={overwrite}")
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
@@ -68,7 +71,22 @@ async def run_hotboard_sync(
             return {"matched": 0, "missing": 0, "total": 0, "error": "fetch failed"}
 
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        playlist_name = f"网易云热榜 - {today}"
+
+        # Determine playlist name
+        if not playlist_name or playlist_name.strip() == "":
+            playlist_name = f"网易云热榜 - {today}"
+
+        # If overwrite=True, find and delete existing playlist with the same name
+        navidrome_playlist_id: str | None = None
+        if overwrite:
+            all_pls = await navidrome_list_playlists()
+            for pl in all_pls:
+                if pl.get("name") == playlist_name:
+                    pid = pl.get("id")
+                    logger.info(f"[hotboard] overwriting existing playlist name={playlist_name} id={pid}")
+                    if pid:
+                        await navidrome_delete_playlist(str(pid))
+                    break
 
         async with AsyncSessionLocal() as db:
             playlist = GeneratedPlaylist(
@@ -91,7 +109,6 @@ async def run_hotboard_sync(
                 if not title or not artist:
                     continue
 
-                # Multi-strategy Navidrome search (8 query variants, deduplicated results)
                 nav_results = await navidrome_multi_search(title, artist)
                 best_match = _pick_best_match(title, artist, nav_results, match_threshold)
 
@@ -146,7 +163,6 @@ async def run_hotboard_sync(
             playlist.missing_count = len(missing_items)
 
             # 2. Create Navidrome playlist
-            navidrome_playlist_id = None
             if matched_ids:
                 navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
                 if navidrome_playlist_id:
@@ -197,10 +213,6 @@ async def run_hotboard_sync(
 # ── Scoring helpers ───────────────────────────────────────────────────────────
 
 def _pick_best_match(title: str, artist: str, nav_results: list[dict], threshold: float) -> dict | None:
-    """
-    Given Navidrome search results and the original track info,
-    score each result and return the best one above threshold.
-    """
     if not nav_results:
         return None
 
