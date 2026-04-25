@@ -17,10 +17,10 @@ router = APIRouter(prefix="/hotboard", tags=["hotboard"])
 
 @router.post("/sync")
 async def sync_hotboard(
-    limit: int = 50,
-    match_threshold: float = 0.75,
     current_user: Annotated[CurrentUser, Depends(get_db)],
     db: AsyncSession = Depends(get_db),
+    limit: int = 50,
+    match_threshold: float = 0.75,
 ):
     """
     Trigger a hotboard sync:
