@@ -35,7 +35,7 @@ async def sync_hotboard(
         raise HTTPException(status_code=400, detail="match_threshold must be between 0 and 1")
 
     # Check for conflicting jobs
-    from sqlalchemy import and_
+    from sqlalchemy import and_, select
     result = await db.execute(
         select(RecommendationRun.id).where(
             and_(
