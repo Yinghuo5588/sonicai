@@ -2,12 +2,11 @@
 
 import logging
 import asyncio
-from typing import Annotated
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.db.models import RecommendationRun
+from app.db.models import RecommendationRun, User
 from app.api.deps import CurrentUser
 from app.services.hotboard_recommend import run_hotboard_sync
 
@@ -17,7 +16,7 @@ router = APIRouter(prefix="/hotboard", tags=["hotboard"])
 
 @router.post("/sync")
 async def sync_hotboard(
-    current_user: Annotated[CurrentUser, Depends(get_db)],
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
     limit: int = 50,
     match_threshold: float = 0.75,
