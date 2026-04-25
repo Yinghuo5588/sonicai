@@ -26,26 +26,43 @@ def extract_netease_id(url: str) -> str | None:
 
 
 async def fetch_netease_playlist(playlist_id: str) -> dict:
-    async with httpx.AsyncClient(timeout=20.0) as client:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://music.163.com/",
+    }
+    async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
         resp = await client.post(
             NETEASE_API,
             content=("id=" + playlist_id).encode(),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": headers["User-Agent"]},
         )
         resp.raise_for_status()
-        return resp.json()
+        text = resp.text
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            logger.warning(f"[playlist] netease API returned non-JSON (pos %d): {text[:200]!r}", e.pos)
+            raise ValueError(f"netease API returned invalid JSON: {e}") from e
 
 
 async def _fetch_netease_song_details(ids: list[dict]) -> dict:
-    async with httpx.AsyncClient(timeout=20.0) as client:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://music.163.com/",
+    }
+    async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
         body = json.dumps({"c": ids}, ensure_ascii=False)
         resp = await client.post(
             NETEASE_DETAIL_API,
             content=body.encode("utf-8"),
-            headers={"Content-Type": "application/json; charset=utf-8"},
+            headers={"Content-Type": "application/json; charset=utf-8", "User-Agent": headers["User-Agent"]},
         )
         resp.raise_for_status()
-        return resp.json()
+        try:
+            return resp.json()
+        except json.JSONDecodeError as e:
+            logger.warning(f"[playlist] netease song detail returned non-JSON (pos %d): {resp.text[:200]!r}", e.pos)
+            raise ValueError(f"netease song detail returned invalid JSON: {e}") from e
 
 
 def _parse_netease_details(data: dict) -> list[dict]:
