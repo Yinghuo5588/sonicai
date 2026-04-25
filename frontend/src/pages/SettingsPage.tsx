@@ -78,6 +78,7 @@ const ADVANCED_FIELDS = [
 ]
 
 function Tooltip({ text }: { text: string }) {
+  if (!text) return null
   return (
     <span className="ml-1 text-slate-400 cursor-help text-xs" title={text}>?</span>
   )
