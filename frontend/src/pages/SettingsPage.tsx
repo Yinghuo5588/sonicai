@@ -63,6 +63,7 @@ const FIELD_LABELS: Record<string, { label: string; type?: string; help?: string
   webhook_retry_count: { label: 'Webhook 重试次数', type: 'number', help: '缺失歌曲 webhook 失败后自动重试次数' },
   webhook_timeout_seconds: { label: 'Webhook 超时时间', type: 'number', help: 'Webhook 请求超时秒数' },
   playlist_keep_days: { label: '歌单保留天数', type: 'number', help: '推荐歌单在 Navidrome 中保留几天' },
+  playlist_api_url: { label: 'Playlist API 地址', type: 'text', help: '歌单解析接口地址，如 https://sss.unmeta.cn/songlist' },
 }
 
 const BASIC_FIELDS = [
