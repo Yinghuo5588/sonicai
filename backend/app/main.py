@@ -43,6 +43,13 @@ async def lifespan(app: FastAPI):
     from app.core.scheduler import load_cron_schedule
     from app.db.session import AsyncSessionLocal
     async with AsyncSessionLocal() as db:
+        # Fallback: ensure playlist_api_url column exists even if alembic missed it
+        try:
+            from sqlalchemy import text
+            await db.execute(text("ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS playlist_api_url VARCHAR(500);"))
+            await db.commit()
+        except Exception:
+            await db.rollback()
         await load_cron_schedule(db)
     yield
     shutdown_scheduler()
