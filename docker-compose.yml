@@ -25,9 +25,6 @@ services:
       - run.py
 
   sonicai-frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
     image: yinghuo5588/sonicai-frontend:latest
     container_name: sonicai-frontend
     restart: always
