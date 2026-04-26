@@ -10,6 +10,21 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
+
+# ── Configurable API endpoint ────────────────────────────────────────────────
+_UNMETA_URL = "https://sss.unmeta.cn/songlist"
+
+
+def set_unmeta_url(url: str | None) -> None:
+    global _UNMETA_URL
+    if url:
+        _UNMETA_URL = url
+        logger.info(f"[playlist] unmeta URL updated to: {url}")
+
+
+def get_unmeta_url() -> str:
+    return _UNMETA_URL
+
 # ── NetEase Music ──────────────────────────────────────────────────────────────
 
 NETEASE_API = "https://music.163.com/api/v6/playlist/detail"
@@ -92,7 +107,7 @@ async def parse_netease_url(url: str) -> tuple[str, list[dict]]:
     """
     import urllib.parse
 
-    unmeta_url = "https://sss.unmeta.cn/songlist"
+    unmeta_url = get_unmeta_url()
     payload = urllib.parse.urlencode({"url": url})
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
