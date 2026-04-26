@@ -1,14 +1,11 @@
 """FastAPI application entry point."""
 
 import logging
-import os
 import subprocess
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.scheduler import start_scheduler, shutdown_scheduler
@@ -16,9 +13,6 @@ from app.core.logging import *  # noqa: F401,F403
 from app.api.routes import router as api_router
 
 logger = logging.getLogger(__name__)
-
-# Direct path -- container structure: /app/app/main.py, /app/frontend/dist
-_FRONTEND_DIST = "/app/frontend/dist"
 
 
 def _run_alembic_upgrade():
@@ -44,7 +38,6 @@ async def lifespan(app: FastAPI):
     import asyncio
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, _run_alembic_upgrade)
-    #
     await _ensure_initial_admin()
     start_scheduler()
     from app.core.scheduler import load_cron_schedule
@@ -62,7 +55,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin],
@@ -71,15 +63,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API routes
 app.include_router(api_router, prefix="/api")
-
-# SPA static files
-if os.path.isdir(_FRONTEND_DIST):
-    app.mount("/assets", StaticFiles(directory=_FRONTEND_DIST), name="frontend-assets")
-    logger.info(f"Serving frontend assets from: {_FRONTEND_DIST}/assets")
-else:
-    logger.warning(f"Frontend dist not found at {_FRONTEND_DIST} -- frontend will not be served")
 
 
 @app.get("/api/health")
@@ -90,19 +74,6 @@ async def health():
 @app.get("/api/version")
 async def version():
     return {"version": "1.0.0", "name": "SonicAI"}
-
-
-# Catch-all: serve index.html for any non-API GET (supports SPA refresh /playlist-sync, etc.)
-@app.get("/{path:path}", tags=["spa"])
-async def spa_fallback(path: str):
-    """Serve index.html for client-side routes (SPA refresh, direct links)."""
-    if path.startswith("api"):
-        raise HTTPException(status_code=404, detail="Not found")
-    index_path = os.path.join(_FRONTEND_DIST, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    logger.warning(f"index.html not found at {index_path}")
-    raise HTTPException(status_code=404, detail="Frontend not built")
 
 
 async def _ensure_initial_admin():
