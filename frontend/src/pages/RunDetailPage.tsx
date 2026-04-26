@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
 
 async function fetchRunDetail(runId: number) {
@@ -25,6 +26,19 @@ async function fetchRunPlaylists(runId: number) {
   return res.json()
 }
 
+async function stopJob(runId: number) {
+  const token = localStorage.getItem('sonicai_access_token')
+  const res = await fetch(`/api/jobs/${runId}/stop`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 function StatCard({ label, value }: { label: string; value: number | string; color?: string }) {
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-4 text-center">
@@ -42,6 +56,7 @@ function statusBadge(status: string) {
   const cls = status === 'success' ? 'bg-green-100 text-green-700'
     : status === 'failed' ? 'bg-red-100 text-red-700'
     : status === 'running' ? 'bg-blue-100 text-blue-700'
+    : status === 'stopped' ? 'bg-orange-100 text-orange-700'
     : 'bg-slate-100 text-slate-600'
   return <span className={`px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{status}</span>
 }
@@ -49,6 +64,8 @@ function statusBadge(status: string) {
 export default function RunDetailPage() {
   const { run_id } = useParams<{ run_id: string }>()
   const rid = Number(run_id)
+  const queryClient = useQueryClient()
+  const [stopping, setStopping] = useState(false)
 
   const { data: run, isLoading: runLoading, error: runError } = useQuery({
     queryKey: ['run', rid],
@@ -61,6 +78,25 @@ export default function RunDetailPage() {
     enabled: !!run,
   })
 
+  const stopMutation = useMutation({
+    mutationFn: () => stopJob(rid),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['run', rid] })
+      queryClient.invalidateQueries({ queryKey: ['runs'] })
+      setStopping(false)
+    },
+    onError: (err: Error) => {
+      alert(`停止失败: ${err.message}`)
+      setStopping(false)
+    },
+  })
+
+  const handleStop = () => {
+    if (!confirm('确定停止这个任务吗？')) return
+    setStopping(true)
+    stopMutation.mutate()
+  }
+
   if (runLoading) return <div className="p-6 text-slate-500">加载中...</div>
   if (runError) return <div className="p-6 text-red-500">加载失败：{(runError as Error).message}</div>
   if (!run) return <div className="p-6 text-slate-500">任务不存在</div>
@@ -68,8 +104,17 @@ export default function RunDetailPage() {
   return (
     <div className="p-4 md:p-6 space-y-4">
       {/* Back */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between">
         <Link to="/history" className="text-sm text-blue-500 hover:underline">← 推荐历史</Link>
+        {(run.status === 'pending' || run.status === 'running') && (
+          <button
+            onClick={handleStop}
+            disabled={stopping || stopMutation.isPending}
+            className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-red-600 disabled:opacity-50 transition-colors"
+          >
+            {stopping || stopMutation.isPending ? '停止中...' : '⏹ 停止任务'}
+          </button>
+        )}
       </div>
 
       {/* Run header */}
