@@ -133,7 +133,7 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
 
     # Reload playlist API URL cache
     from app.services.playlist_parser import set_unmeta_url
-    if body.playlist_api_url is not None:
+    if getattr(body, 'playlist_api_url', None) is not None:
         set_unmeta_url(body.playlist_api_url)
 
     # Reload cron schedule after config change
