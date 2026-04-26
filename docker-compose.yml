@@ -2,18 +2,15 @@ version: '3'
 
 services:
   sonicai-backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: yinghuo5588/sonicai-backend:latest
-    container_name: sonicai-backend
+    container_name: sonicai
     restart: always
-    expose:
-      - "8000"
+    ports:
+      - "8768:8000"
     environment:
       TZ: Asia/Shanghai
-      DATABASE_URL: "postgresql+psycopg://postgres:postgres@emby-postgres:5432/musicrec"
-      REDIS_URL: "redis://emby-redis:6379/3"
+      DATABASE_URL: "postgresql+psycopg://postgres:postgres@postgres:5432/musicrec"
+      REDIS_URL: "redis://redis:6379/3"
       REDIS_KEY_PREFIX: sonicai
       INIT_ADMIN_USERNAME: admin
       INIT_ADMIN_PASSWORD: change_me_after_deploy
@@ -21,9 +18,11 @@ services:
       JWT_SECRET_KEY: sonicai-access-change-in-production
       JWT_REFRESH_SECRET_KEY: sonicai-refresh-change-in-production
       APP_TIMEZONE: Asia/Shanghai
-      FRONTEND_ORIGIN: "https://so.zillion.dpdns.org"
     networks:
       - console_default
+    command:
+      - python
+      - run.py
 
   sonicai-frontend:
     build:
