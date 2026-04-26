@@ -12,6 +12,7 @@ from app.services.recommendation_service import (
     run_full_recommendation,
     run_similar_tracks_only,
     run_similar_artists_only,
+    stop_run,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,26 @@ async def run_similar_artists(current_user: CurrentUser, db: AsyncSession = Depe
     logger.info(f"[jobs] queued run_type=similar_artists run_id={run_id} user_id={current_user.id}")
     asyncio.create_task(run_similar_artists_only(run_id=run_id, trigger_type="manual"))
     return {"message": "Job queued", "type": "similar_artists", "run_id": run_id}
+
+
+@router.post("/{job_id}/stop")
+async def stop_job(job_id: int, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+    """Force-stop a running or pending job."""
+    result = await db.execute(
+        select(RecommendationRun).where(RecommendationRun.id == job_id)
+    )
+    run = result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if run.status not in ["pending", "running"]:
+        raise HTTPException(status_code=400, detail=f"Job is {run.status}, cannot stop")
+
+    stopped = stop_run(job_id)
+    run.status = "stopped"
+    run.finished_at = datetime.now(timezone.utc)
+    await db.commit()
+    logger.info(f"[jobs] stopped job_id={job_id} signaled={stopped}")
+    return {"message": "Job stopped", "job_id": job_id}
 
 
 @router.get("")
