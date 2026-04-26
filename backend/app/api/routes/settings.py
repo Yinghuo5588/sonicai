@@ -43,6 +43,7 @@ class SettingsResponse(BaseModel):
     candidate_pool_multiplier_max: float | None = None
     cron_enabled: bool
     cron_expression: str | None
+    playlist_api_url: str | None
 
     class Config:
         from_attributes = True
@@ -129,6 +130,11 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
                 setattr(s, key, value)
     await db.commit()
     await db.refresh(s)
+
+    # Reload playlist API URL cache
+    from app.services.playlist_parser import set_unmeta_url
+    if body.playlist_api_url is not None:
+        set_unmeta_url(body.playlist_api_url)
 
     # Reload cron schedule after config change
     from app.core.scheduler import load_cron_schedule
