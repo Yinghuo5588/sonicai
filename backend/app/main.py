@@ -17,9 +17,8 @@ from app.api.routes import router as api_router
 
 logger = logging.getLogger(__name__)
 
-_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)
-_FRONTEND_DIST = os.path.join(_PROJECT_ROOT, "frontend", "dist")
+# Direct path -- container structure: /app/app/main.py, /app/frontend/dist
+_FRONTEND_DIST = "/app/frontend/dist"
 
 
 def _run_alembic_upgrade():
@@ -75,12 +74,12 @@ app.add_middleware(
 # API routes
 app.include_router(api_router, prefix="/api")
 
-# SPA static files — mounted at /assets for JS/CSS, NOT as catch-all
+# SPA static files
 if os.path.isdir(_FRONTEND_DIST):
     app.mount("/assets", StaticFiles(directory=_FRONTEND_DIST), name="frontend-assets")
     logger.info(f"Serving frontend assets from: {_FRONTEND_DIST}/assets")
 else:
-    logger.warning(f"Frontend dist not found at {_FRONTEND_DIST} — frontend will not be served")
+    logger.warning(f"Frontend dist not found at {_FRONTEND_DIST} -- frontend will not be served")
 
 
 @app.get("/api/health")
@@ -117,7 +116,7 @@ async def _ensure_initial_admin():
         if result.scalars().first() is not None:
             return
 
-        logger.info("No users found — creating initial admin")
+        logger.info("No users found -- creating initial admin")
         admin = User(
             username=settings.init_admin_username,
             email=settings.init_admin_email,
