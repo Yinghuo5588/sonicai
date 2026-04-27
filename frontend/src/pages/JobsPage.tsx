@@ -49,6 +49,37 @@ export default function JobsPage() {
     mutationFn: () => triggerPlaylistSync(playlistUrl, playlistThreshold / 100, playlistName, playlistOverwrite),
   })
 
+  // Text upload state
+  const [textFile, setTextFile] = useState<File | null>(null)
+  const [textThreshold, setTextThreshold] = useState(75)
+  const [textPlaylistName, setTextPlaylistName] = useState('')
+  const [textOverwrite, setTextOverwrite] = useState(false)
+  const textMutation = useMutation({
+    mutationFn: async () => {
+      if (!textFile) throw new Error('请选择文件')
+      const formData = new FormData()
+      formData.append('file', textFile)
+      const params = new URLSearchParams({
+        match_threshold: String(textThreshold / 100),
+        overwrite: String(textOverwrite),
+      })
+      if (textPlaylistName.trim()) {
+        params.set('playlist_name', textPlaylistName.trim())
+      }
+      const token = localStorage.getItem('sonicai_access_token')
+      const res = await fetch(`/api/playlist/sync-text?${params}`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as any).detail || `HTTP ${res.status}`)
+      }
+      return res.json()
+    },
+  })
+
   const run = (mutation: ReturnType<typeof useMutation>, label: string) => (
     <button
       onClick={() => mutation.mutate()}
@@ -161,6 +192,95 @@ export default function JobsPage() {
           {playlistMutation.isPending ? '解析中...' : playlistMutation.isSuccess ? '✅ 已提交，可前往推荐历史查看' : playlistMutation.isError ? `❌ ${String(playlistMutation.error?.message)}` : '🎵 解析并同步到 Navidrome'}
         </button>
         {playlistMutation.isSuccess && <p className="text-green-600 text-sm">✅ 任务已提交！</p>}
+      </div>
+
+      {/* 文本歌单上传 */}
+      <div className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
+        <h2 className="font-medium text-slate-700 text-sm">📄 文本歌单上传</h2>
+        <p className="text-xs text-slate-400">
+          上传 .txt 文件，每行格式：
+          <code className="bg-slate-100 px-1 rounded">歌名 - 艺术家</code>
+          ，支持中/日/韩/英等任意语言
+        </p>
+
+        {/* File select */}
+        <div>
+          <label className="block text-xs text-slate-500 mb-1">选择 .txt 文件</label>
+          <input
+            type="file"
+            accept=".txt"
+            onChange={e => {
+              setTextFile(e.target.files?.[0] || null)
+              textMutation.reset()
+            }}
+            className="w-full text-sm text-slate-600
+              file:mr-4 file:py-2 file:px-4
+              file:rounded-lg file:border-0 file:text-sm file:font-medium
+              file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+          />
+          {textFile && (
+            <p className="text-xs text-slate-400 mt-1">
+              已选择：{textFile.name}（{(textFile.size / 1024).toFixed(1)} KB）
+            </p>
+          )}
+        </div>
+
+        {/* Parameters */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">
+              匹配阈值 ({textThreshold}%)
+            </label>
+            <input
+              type="range" min={50} max={95} value={textThreshold}
+              onChange={e => setTextThreshold(Number(e.target.value))}
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">
+              歌单名称（留空自动）
+            </label>
+            <input
+              type="text" value={textPlaylistName}
+              onChange={e => setTextPlaylistName(e.target.value)}
+              placeholder="文本歌单"
+              className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+        </div>
+
+        {/* Overwrite */}
+        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input
+            type="checkbox" checked={textOverwrite}
+            onChange={e => setTextOverwrite(e.target.checked)}
+            className="w-4 h-4 accent-blue-500"
+          />
+          覆盖同名歌单
+        </label>
+
+        {/* Submit */}
+        <button
+          onClick={() => textMutation.mutate()}
+          disabled={!textFile || textMutation.isPending}
+          className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg
+            hover:bg-blue-600 transition-colors disabled:opacity-50
+            text-sm font-medium disabled:cursor-not-allowed"
+        >
+          {textMutation.isPending ? '上传中...' :
+            textMutation.isSuccess ? '✅ 已提交' :
+              textMutation.isError
+                ? `❌ ${String(textMutation.error?.message)}`
+                : '📄 上传并同步到 Navidrome'}
+        </button>
+
+        {/* Result feedback */}
+        {textMutation.isSuccess && (
+          <p className="text-green-600 text-sm">
+            ✅ 任务已提交，可前往推荐历史查看进度
+          </p>
+        )}
       </div>
     </div>
   )
