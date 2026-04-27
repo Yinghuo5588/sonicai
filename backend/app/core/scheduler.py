@@ -92,6 +92,7 @@ def shutdown_scheduler():
 # Register cache cleanup job (every 6 hours) — appended at end of load_cron_schedule
 # This is handled at the end of the function
 def _register_cache_cleanup(sched):
+    from app.tasks.recommendation_tasks import cleanup_expired_cache
     from apscheduler.triggers.interval import IntervalTrigger
     existing = [j for j in sched.get_jobs() if j.id == "cache_cleanup"]
     if not existing:
