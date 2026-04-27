@@ -10,7 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.core.logging import *  # noqa: F401,F403
+from app.core.rate_limit import limiter
 from app.api.routes import router as api_router
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +65,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Register rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin],
@@ -75,7 +82,33 @@ app.include_router(api_router, prefix="/api")
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "1.0.0"}
+    """Deep health check — verify DB connectivity."""
+    from app.db.session import AsyncSessionLocal
+    from sqlalchemy import text
+    from fastapi.responses import JSONResponse
+
+    db_ok = False
+    db_error = None
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception as e:
+        db_error = str(e)
+
+    status = "ok" if db_ok else "degraded"
+    result = {
+        "status": status,
+        "version": "1.0.0",
+        "checks": {
+            "database": {"ok": db_ok},
+        },
+    }
+    if db_error:
+        result["checks"]["database"]["error"] = db_error
+
+    status_code = 200 if db_ok else 503
+    return JSONResponse(content=result, status_code=status_code)
 
 
 @app.get("/api/version")

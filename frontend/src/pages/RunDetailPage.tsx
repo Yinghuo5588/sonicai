@@ -1,42 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
+import apiFetch from '@/lib/api'
 
 async function fetchRunDetail(runId: number) {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch(`/api/runs/${runId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return apiFetch(`/runs/${runId}`)
 }
 
 async function fetchRunPlaylists(runId: number) {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch(`/api/runs/${runId}/playlists`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return apiFetch(`/runs/${runId}/playlists`)
 }
 
 async function stopJob(runId: number) {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch(`/api/jobs/${runId}/stop`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return apiFetch(`/jobs/${runId}/stop`, { method: 'POST' })
 }
 
 function StatCard({ label, value }: { label: string; value: number | string; color?: string }) {

@@ -48,4 +48,5 @@ def decode_refresh_token(token: str) -> dict[str, Any] | None:
         return None
 
 def decode_token(token: str) -> dict[str, Any] | None:
-    return decode_access_token(token) or decode_refresh_token(token)
+    """Decode a token — for auth dependency, only accept access tokens."""
+    return decode_access_token(token)

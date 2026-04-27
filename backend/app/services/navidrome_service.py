@@ -39,6 +39,7 @@ async def _navidrome_config() -> dict | None:
     from sqlalchemy import select
     from app.db.session import AsyncSessionLocal
     from app.db.models import SystemSettings
+    from app.core.crypto import decrypt_value
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
@@ -48,7 +49,7 @@ async def _navidrome_config() -> dict | None:
     return {
         "url": settings.navidrome_url.rstrip("/"),
         "username": settings.navidrome_username or "",
-        "password": settings.navidrome_password_encrypted or "",
+        "password": decrypt_value(settings.navidrome_password_encrypted or ""),
     }
 
 
@@ -134,22 +135,30 @@ async def navidrome_multi_search(title: str, artist: str) -> list[dict]:
     seen_ids: set[str] = set()
     all_results: list[dict] = []
 
-    for q_info in queries:
+    for idx, q_info in enumerate(queries):
         q = q_info["query"]
         label = q_info["label"]
         logger.debug(f"[navidrome] trying query '{q}' ({label})")
         results = await navidrome_search(q, limit=10)
+
         for r in results:
             rid = r.get("id")
             if rid and rid not in seen_ids:
                 seen_ids.add(rid)
                 r["_query_label"] = label
                 all_results.append(r)
-        # Stop if we already have good results (≥3 songs from first query)
-        if len(all_results) >= 3 and label == queries[0]["label"]:
+
+        # Early exit: first strategy hit ≥3 results → good enough
+        if idx == 0 and len(all_results) >= 3:
+            logger.debug(f"[navidrome] early exit: first strategy yielded {len(all_results)} results")
             break
 
-    logger.info(f"[navidrome] multi_search title={title} artist={artist} queries_tried={len(queries)} results_total={len(all_results)}")
+        # Stop if we already have enough results (≥10 total) — any strategy
+        if len(all_results) >= 10:
+            logger.debug(f"[navidrome] early exit: accumulated {len(all_results)} results")
+            break
+
+    logger.info(f"[navidrome] multi_search title={title} artist={artist} queries_tried={min(idx + 1, len(queries))} results_total={len(all_results)}")
     return all_results
 
 

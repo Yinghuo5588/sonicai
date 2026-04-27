@@ -1,161 +1,26 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import apiFetch from '@/lib/api'
 
 async function fetchSettings() {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch('/api/settings', {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Failed to fetch settings')
-  return res.json()
+  return apiFetch('/settings')
 }
 
 async function updateSettings(data: Record<string, unknown>) {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch('/api/settings', {
+  return apiFetch('/settings', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to update')
-  return res.json()
 }
 
 async function testNavidrome() {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch('/api/settings/test-navidrome', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Connection failed')
-  return data
+  return apiFetch('/settings/test-navidrome', { method: 'POST' })
 }
 
 async function testWebhook() {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch('/api/settings/test-webhook', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Connection failed')
-  return data
+  return apiFetch('/settings/test-webhook', { method: 'POST' })
 }
 
-const FIELD_LABELS: Record<string, { label: string; type?: string; help?: string }> = {
-  top_track_seed_limit: { label: '种子曲目数', type: 'number', help: '相似曲目歌单从多少首种子歌出发' },
-  top_artist_seed_limit: { label: '种子艺术家数', type: 'number', help: '相邻艺术家歌单从多少个种子艺人出发' },
-  similar_track_limit: { label: '每曲相似曲目数', type: 'number', help: '每首种子歌曲获取多少首相似曲目' },
-  similar_artist_limit: { label: '每种子取相似艺术家数', type: 'number', help: '每个种子艺人获取多少个相似艺人' },
-  artist_top_track_limit: { label: '每相似艺术家热门歌曲', type: 'number', help: '每个相似艺人取多少首热门歌曲' },
-  similar_playlist_size: { label: '相似曲目歌单大小', type: 'number', help: '相似曲目歌单最终保留多少首歌' },
-  artist_playlist_size: { label: '相邻艺术家歌单大小', type: 'number', help: '相邻艺术家歌单最终保留多少首歌' },
-  duplicate_avoid_days: { label: '去重天数', type: 'number', help: '最近多少天推荐过的歌不再重复推荐，0=关闭' },
-  recommendation_balance: { label: '推荐平衡', type: 'slider', help: '0=更保守，100=更探索' },
-  library_mode_default: { label: '推荐模式', type: 'select', help: 'library_only=仅推荐库内曲目，allow_missing=允许缺失发Webhook' },
-  // Advanced
-  seed_source_mode: { label: '种子来源模式', type: 'select', help: 'recent_only=只用最近播放，top_only=只用历史排行，recent_plus_top=混合' },
-  recent_tracks_limit: { label: 'Recent Tracks 抓取条数', type: 'number', help: 'recent种子统计窗口大小' },
-  top_period: { label: 'Top 数据周期', type: 'select', help: 'user.getTopTracks 的 period 参数' },
-  recent_top_mix_ratio: { label: 'Recent/Top 混合比例', type: 'slider', help: '种子中 recent 的占比，70=70% recent 30% top' },
-  match_threshold: { label: '匹配阈值', type: 'number', help: 'Navidrome 搜索结果接受的最小分数，0.5-0.95' },
-  webhook_retry_count: { label: 'Webhook 重试次数', type: 'number', help: '缺失歌曲 webhook 失败后自动重试次数' },
-  webhook_timeout_seconds: { label: 'Webhook 超时时间', type: 'number', help: 'Webhook 请求超时秒数' },
-  playlist_keep_days: { label: '歌单保留天数', type: 'number', help: '推荐歌单在 Navidrome 中保留几天' },
-  playlist_api_url: { label: 'Playlist API 地址', type: 'text', help: '第三方歌单解析 API（必填）。例: https://sss.unmeta.cn/songlist' },
-}
-
-const BASIC_FIELDS = [
-  'top_track_seed_limit', 'top_artist_seed_limit', 'similar_track_limit',
-  'similar_artist_limit', 'artist_top_track_limit', 'similar_playlist_size',
-  'artist_playlist_size', 'duplicate_avoid_days', 'recommendation_balance',
-  'library_mode_default',
-]
-
-const ADVANCED_FIELDS = [
-  'seed_source_mode', 'recent_tracks_limit', 'top_period', 'recent_top_mix_ratio',
-  'match_threshold', 'webhook_retry_count', 'webhook_timeout_seconds', 'playlist_keep_days',
-]
-
-const PLAYLIST_FIELDS = [
-  'playlist_api_url',
-]
-
-function Tooltip({ text }: { text: string }) {
-  if (!text) return null
-  return (
-    <span className="ml-1 text-slate-400 cursor-help text-xs" title={text}>?</span>
-  )
-}
-
-function FieldInput({ fieldKey, value, onChange }: { fieldKey: string; value: unknown; onChange: (v: unknown) => void }) {
-  const meta = FIELD_LABELS[fieldKey]
-  if (!meta) return null
-
-  if (meta.type === 'select') {
-    const options: Record<string, string[]> = {
-      library_mode_default: ['library_only', 'allow_missing'],
-      seed_source_mode: ['recent_only', 'top_only', 'recent_plus_top'],
-      top_period: ['7day', '1month', '3month', '6month', '12month', 'overall'],
-    }
-    const opts = options[fieldKey] || []
-    return (
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-          {meta.label}<Tooltip text={meta.help || ''} />
-        </label>
-        <select
-          value={String(value ?? '')}
-          onChange={e => onChange(e.target.value)}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-        >
-          {opts.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      </div>
-    )
-  }
-
-  if (meta.type === 'slider') {
-    return (
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-500">
-            {fieldKey === 'recent_top_mix_ratio' ? '更偏Recent' : '更稳'}
-          </span>
-          <span className="font-medium text-slate-700">
-            {meta.label}：{value ?? (fieldKey === 'recommendation_balance' ? 55 : 70)}
-          </span>
-          <span className="text-slate-500">
-            {fieldKey === 'recent_top_mix_ratio' ? '更偏Top' : '更探索'}
-          </span>
-        </div>
-        <input
-          type="range" min="0" max="100"
-          value={Number(value ?? (fieldKey === 'recommendation_balance' ? 55 : 70))}
-          onChange={e => onChange(Number(e.target.value))}
-          className="w-full accent-orange-500"
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1">
-        {meta.label}<Tooltip text={meta.help || ''} />
-      </label>
-      <input
-        type={meta.type || 'text'}
-        value={String(value ?? '')}
-        onChange={e => onChange(meta.type === 'number' ? Number(e.target.value) : e.target.value)}
-        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-      />
-    </div>
-  )
-}
 
 export default function SettingsPage() {
   const queryClient = useQueryClient()

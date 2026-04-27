@@ -23,7 +23,7 @@ def get_scheduler() -> AsyncIOScheduler:
 async def load_cron_schedule(db: AsyncSession):
     """Load cron expression from DB and reschedule the recommendation job."""
     from app.db.models import SystemSettings
-    from app.tasks.recommendation_tasks import run_recommendation_job
+    from app.tasks.recommendation_tasks import run_recommendation_job, retry_pending_webhooks
 
     result = await db.execute(select(SystemSettings))
     config = result.scalar_one_or_none()
@@ -57,6 +57,19 @@ async def load_cron_schedule(db: AsyncSession):
                 logger.info(f"Cron schedule loaded: {config.cron_expression}")
         except Exception as e:
             logger.warning(f"Invalid cron expression '{config.cron_expression}': {e}")
+
+    # Register webhook retry job (every 2 minutes)
+    from apscheduler.triggers.interval import IntervalTrigger
+    existing_retry_jobs = [j for j in sched.get_jobs() if j.id == "webhook_retry"]
+    if not existing_retry_jobs:
+        sched.add_job(
+            retry_pending_webhooks,
+            IntervalTrigger(minutes=2),
+            id="webhook_retry",
+            replace_existing=True,
+            misfire_grace_time=30,
+        )
+        logger.info("Webhook retry job registered (every 2 min)")
 
 
 def start_scheduler():

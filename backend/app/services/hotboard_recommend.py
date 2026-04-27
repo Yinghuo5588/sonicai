@@ -1,13 +1,16 @@
 """Hotboard-based recommendation — fetch netease hotboard and sync to Navidrome playlist."""
 
 import logging
+import json as _json
 from datetime import datetime, timezone
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import AsyncSessionLocal
-from app.db.models import SystemSettings, RecommendationRun, GeneratedPlaylist, RecommendationItem, NavidromeMatch
+from app.db.models import (
+    SystemSettings, RecommendationRun, GeneratedPlaylist,
+    RecommendationItem, NavidromeMatch, WebhookBatch, WebhookBatchItem,
+)
 from app.services.hotboard_service import fetch_netease_hotboard
 from app.services.navidrome_service import (
     navidrome_multi_search,
@@ -16,20 +19,11 @@ from app.services.navidrome_service import (
     navidrome_delete_playlist,
     navidrome_list_playlists,
 )
-from app.utils.text_normalizer import score_candidate, dedup_key
+from app.services.matching_service import pick_best_match
+from app.utils.text_normalizer import dedup_key
+from app.services.webhook_service import send_webhook_batch
 
 logger = logging.getLogger(__name__)
-
-
-async def _update_run_status(db: AsyncSession, run_id: int, status: str, error: str | None = None):
-    """Update run status — helper to avoid scattered commits."""
-    run_row = await db.get(RecommendationRun, run_id)
-    if run_row:
-        run_row.status = status
-        run_row.finished_at = datetime.now(timezone.utc)
-        if error:
-            run_row.error_message = error
-        await db.commit()
 
 
 async def run_hotboard_sync(
@@ -41,33 +35,34 @@ async def run_hotboard_sync(
     trigger_type: str = "manual",
 ) -> dict:
     """
-    Main pipeline:
-    1. Fetch hotboard tracks from NetEase
-    2. For each track run multi-strategy Navidrome search
-    3. Score & filter by threshold
-    4. Create / overwrite Navidrome playlist with matched songs
-    5. Persist run results in DB
-    Returns a summary dict.
+    Main pipeline — single DB session for all writes.
     """
     logger.info(f"[hotboard] start run_id={run_id} limit={limit} threshold={match_threshold}")
 
+    # Mark run as running
     async with AsyncSessionLocal() as db:
-        # Mark as running
-        await _update_run_status(db, run_id, "running")
+        run_row = await db.get(RecommendationRun, run_id)
+        if run_row:
+            run_row.status = "running"
+            run_row.started_at = datetime.now(timezone.utc)
+            await db.commit()
 
     try:
-        # 1. Fetch hotboard
+        # 1. Fetch hotboard (no DB session needed)
         hot_tracks = await fetch_netease_hotboard(limit=limit)
         logger.info(f"[hotboard] fetched {len(hot_tracks)} tracks")
 
         if not hot_tracks:
             async with AsyncSessionLocal() as db:
-                await _update_run_status(db, run_id, "failed", "Failed to fetch hotboard data")
+                run_row = await db.get(RecommendationRun, run_id)
+                if run_row:
+                    run_row.status = "failed"
+                    run_row.error_message = "Failed to fetch hotboard data"
+                    run_row.finished_at = datetime.now(timezone.utc)
+                    await db.commit()
             return {"matched": 0, "missing": 0, "total": 0, "error": "fetch failed"}
 
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-        # Resolve playlist name
         final_name = playlist_name.strip() if playlist_name and playlist_name.strip() else f"网易云热榜 - {today}"
 
         # Overwrite: delete existing playlist with same name from Navidrome
@@ -79,7 +74,7 @@ async def run_hotboard_sync(
                     await navidrome_delete_playlist(str(pl["id"]))
                     break
 
-        # All DB writes in ONE session — avoids partial-commit issues
+        # All DB writes in ONE session
         async with AsyncSessionLocal() as db:
             playlist = GeneratedPlaylist(
                 run_id=run_id,
@@ -97,12 +92,11 @@ async def run_hotboard_sync(
             for idx, track in enumerate(hot_tracks):
                 title = track.get("title", "")
                 artist = track.get("artist", "")
-
                 if not title or not artist:
                     continue
 
                 nav_results = await navidrome_multi_search(title, artist)
-                best_match = _pick_best_match(title, artist, nav_results, match_threshold)
+                best_match = pick_best_match(title, artist, nav_results, match_threshold)
 
                 item = RecommendationItem(
                     generated_playlist_id=playlist.id,
@@ -130,7 +124,6 @@ async def run_hotboard_sync(
                         selected_artist=best_match.get("artist"),
                         selected_album=best_match.get("album"),
                         confidence_score=best_match["score"],
-                        raw_response_json="",
                     ))
                 else:
                     db.add(NavidromeMatch(
@@ -143,10 +136,7 @@ async def run_hotboard_sync(
                 if (idx + 1) % 20 == 0:
                     logger.info(f"[hotboard] matching progress: {idx+1}/{len(hot_tracks)}")
 
-            logger.info(
-                f"[hotboard] done total={len(hot_tracks)} "
-                f"matched={len(matched_ids)} missing={len(missing_items)}"
-            )
+            logger.info(f"[hotboard] done total={len(hot_tracks)} matched={len(matched_ids)} missing={len(missing_items)}")
 
             playlist.total_candidates = len(hot_tracks)
             playlist.matched_count = len(matched_ids)
@@ -161,9 +151,14 @@ async def run_hotboard_sync(
                         playlist.navidrome_playlist_id = str(navidrome_playlist_id)
                     else:
                         playlist.error_message = "Failed to add songs to Navidrome playlist"
-                        await navidrome_delete_playlist(str(navidrome_playlist_id))
                         playlist.status = "failed"
-                        await _update_run_status(db, run_id, "failed", "Failed to add songs")
+                        await navidrome_delete_playlist(str(navidrome_playlist_id))
+                        run_row = await db.get(RecommendationRun, run_id)
+                        if run_row:
+                            run_row.status = "failed"
+                            run_row.error_message = "Failed to add songs"
+                            run_row.finished_at = datetime.now(timezone.utc)
+                        await db.commit()
                         return {
                             "matched": len(matched_ids),
                             "missing": len(missing_items),
@@ -172,20 +167,16 @@ async def run_hotboard_sync(
                         }
 
             playlist.status = "success"
-            await db.commit()
+            run_row = await db.get(RecommendationRun, run_id)
+            if run_row:
+                run_row.status = "success"
+                run_row.finished_at = datetime.now(timezone.utc)
 
-        # Finally update run status
-        async with AsyncSessionLocal() as db:
-            await _update_run_status(db, run_id, "success")
-
-        # Webhook for missing items (if library mode allows)
-        if missing_items:
-            async with AsyncSessionLocal() as db:
+            # Webhook for missing items
+            if missing_items:
                 settings_result = await db.execute(select(SystemSettings))
                 settings = settings_result.scalar_one_or_none()
                 if settings and settings.library_mode_default == "allow_missing" and settings.webhook_url:
-                    from app.db.models import WebhookBatch, WebhookBatchItem
-                    import json as _json
                     batch = WebhookBatch(
                         run_id=run_id,
                         playlist_type="hotboard",
@@ -204,9 +195,17 @@ async def run_hotboard_sync(
                             album=item_data.get("album"),
                             text=text,
                         ))
-                    await db.commit()
-                    # Fire-and-forget
-                    from app.services.webhook_service import send_webhook_batch
+
+            await db.commit()
+
+        # Fire-and-forget webhook (outside main session)
+        if missing_items:
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(WebhookBatch).where(WebhookBatch.run_id == run_id).order_by(WebhookBatch.id.desc())
+                )
+                batch = result.scalar_one_or_none()
+                if batch:
                     await send_webhook_batch(batch.id)
 
         return {
@@ -220,29 +219,10 @@ async def run_hotboard_sync(
     except Exception as e:
         logger.exception(f"[hotboard] run failed run_id={run_id}")
         async with AsyncSessionLocal() as db:
-            await _update_run_status(db, run_id, "failed", str(e))
+            run_row = await db.get(RecommendationRun, run_id)
+            if run_row:
+                run_row.status = "failed"
+                run_row.error_message = str(e)
+                run_row.finished_at = datetime.now(timezone.utc)
+                await db.commit()
         raise
-
-
-def _pick_best_match(title: str, artist: str, nav_results: list[dict], threshold: float) -> dict | None:
-    if not nav_results:
-        return None
-
-    scored = []
-    for r in nav_results:
-        scores = score_candidate(title, artist, r.get("title") or "", r.get("artist") or "")
-        if scores["score"] >= threshold:
-            scored.append((scores["score"], r))
-
-    if not scored:
-        return None
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-    best_score, best = scored[0]
-    return {
-        "id": best.get("id"),
-        "title": best.get("title"),
-        "artist": best.get("artist"),
-        "album": best.get("album"),
-        "score": best_score,
-    }

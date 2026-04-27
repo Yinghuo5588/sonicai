@@ -685,19 +685,30 @@ async def _create_webhook_batch(db: AsyncSession, run_id: int, playlist, missing
 
 
 async def _cleanup_old_playlists(settings: SystemSettings):
+    """Delete old SonicAI-generated playlists from Navidrome by DB created_at."""
     from datetime import timedelta
-    from app.services.navidrome_service import navidrome_list_playlists, navidrome_delete_playlist
-    keep_date = datetime.now(timezone.utc) - timedelta(days=settings.playlist_keep_days)
-    all_playlists = await navidrome_list_playlists()
-    for pl in all_playlists:
-        name = pl.get("name", "")
-        if not (name.startswith("LastFM - 相似曲目 -") or name.startswith("LastFM - 相似艺术家 -")):
-            continue
-        date_str = name.split(" - ")[-1]
-        try:
-            playlist_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-        if playlist_date < keep_date:
-            logger.info(f"Deleting old playlist: {name}")
-            await navidrome_delete_playlist(pl.get("id"))
+    from sqlalchemy import select
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import GeneratedPlaylist
+    from app.services.navidrome_service import navidrome_delete_playlist
+
+    keep_cutoff = datetime.now(timezone.utc) - timedelta(days=settings.playlist_keep_days)
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(GeneratedPlaylist).where(
+                GeneratedPlaylist.created_at < keep_cutoff,
+                GeneratedPlaylist.navidrome_playlist_id.isnot(None),
+            )
+        )
+        old_playlists = result.scalars().all()
+
+        for pl in old_playlists:
+            try:
+                logger.info(f"Deleting old playlist: {pl.playlist_name} (id={pl.navidrome_playlist_id})")
+                await navidrome_delete_playlist(pl.navidrome_playlist_id)
+                pl.navidrome_playlist_id = None
+            except Exception as e:
+                logger.warning(f"Failed to delete playlist {pl.playlist_name}: {e}")
+
+        await db.commit()

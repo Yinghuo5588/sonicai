@@ -9,6 +9,7 @@ import httpx
 from app.db.session import get_db, AsyncSessionLocal
 from app.db.models import SystemSettings
 from app.api.deps import CurrentUser
+from app.core.crypto import encrypt_value
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -110,7 +111,7 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
     s = await get_settings_session(db)
     for key, value in body.model_dump(exclude_unset=True).items():
         if key == "navidrome_password":
-            setattr(s, "navidrome_password_encrypted", value)
+            setattr(s, "navidrome_password_encrypted", encrypt_value(value) if value else None)
             continue
         # Validate enum fields
         if key == "library_mode_default" and value not in {"library_only", "allow_missing"}:

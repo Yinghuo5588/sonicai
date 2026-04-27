@@ -1,16 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import apiFetch from '@/lib/api'
 
 async function fetchRuns() {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch('/api/runs', {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return apiFetch('/runs')
 }
 
 function runTypeLabel(type: string) {

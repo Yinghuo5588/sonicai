@@ -1,7 +1,7 @@
 """Authentication routes."""
 
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ from app.core.security import (
     hash_password, verify_password, create_access_token,
     create_refresh_token, decode_token, decode_refresh_token,
 )
+from app.core.rate_limit import limiter
 from app.api.deps import CurrentUser
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -48,7 +49,8 @@ class UserInfo(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.username == body.username))
     user = result.scalar_one_or_none()
 

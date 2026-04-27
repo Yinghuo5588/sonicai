@@ -51,6 +51,40 @@ async def run_recommendation_job(run_type: str = "full"):
                 await db.commit()
 
 
+async def retry_pending_webhooks():
+    """Scan webhook batches that are due for retry and resend them."""
+    from datetime import datetime, timezone
+    from sqlalchemy import select, and_
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import WebhookBatch
+    from app.services.webhook_service import send_webhook_batch
+
+    logger.info("[webhook-retry] scanning for pending retries")
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(WebhookBatch).where(
+                and_(
+                    WebhookBatch.status == "retrying",
+                    WebhookBatch.next_retry_at <= datetime.now(timezone.utc),
+                )
+            )
+        )
+        batches = result.scalars().all()
+
+        if not batches:
+            logger.info("[webhook-retry] no pending retries found")
+            return
+
+        logger.info(f"[webhook-retry] found {len(batches)} batches to retry")
+        for batch in batches:
+            try:
+                await send_webhook_batch(batch.id)
+                logger.info(f"[webhook-retry] retried batch_id={batch.id}")
+            except Exception as e:
+                logger.warning(f"[webhook-retry] failed batch_id={batch.id}: {e}")
+
+
 def cleanup_old_playlists():
     """Cleanup task (synchronous APScheduler entry)."""
     from sqlalchemy import select

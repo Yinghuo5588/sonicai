@@ -1,13 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
+import apiFetch from '@/lib/api'
 
 async function fetchPlaylistItems(playlistId: number, offset = 0) {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch(`/api/runs/playlists/${playlistId}/items?limit=50&offset=${offset}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Failed to fetch')
-  return res.json()
+  return apiFetch(`/runs/playlists/${playlistId}/items?limit=50&offset=${offset}`)
 }
 
 export default function PlaylistDetailPage() {

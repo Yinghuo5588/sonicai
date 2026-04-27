@@ -13,10 +13,6 @@ class Settings(BaseSettings):
     # Database
     database_url: str = Field(default="", alias="DATABASE_URL")
 
-    # Redis
-    redis_url: str = Field(default="", alias="REDIS_URL")
-    redis_key_prefix: str = Field(default="sonicai:", alias="REDIS_KEY_PREFIX")
-
     # Initial admin (created on first start if no users exist)
     init_admin_username: str = Field(default="admin", alias="INIT_ADMIN_USERNAME")
     init_admin_password: str = Field(default="change_me", alias="INIT_ADMIN_PASSWORD")
@@ -36,9 +32,29 @@ class Settings(BaseSettings):
         extra = "ignore"
 
     def get_jwt_secrets(self) -> tuple[str, str]:
-        """Return (access_secret, refresh_secret), generating defaults if empty."""
-        access = self.jwt_secret_key or "sonicai-access-secret-dev-only-change-in-production"
-        refresh = self.jwt_refresh_secret_key or "sonicai-refresh-secret-dev-only-change-in-production"
+        """Return (access_secret, refresh_secret). Raise if not configured in production."""
+        import warnings
+
+        access = self.jwt_secret_key
+        refresh = self.jwt_refresh_secret_key
+
+        if not access or not refresh:
+            warnings.warn(
+                "⚠️ JWT_SECRET_KEY / JWT_REFRESH_SECRET_KEY 未配置，使用开发默认值。"
+                "生产环境请务必在 .env 中设置！",
+                stacklevel=2,
+            )
+            access = access or "sonicai-access-secret-dev-only-change-in-production"
+            refresh = refresh or "sonicai-refresh-secret-dev-only-change-in-production"
+
+        # Extra check: warn if default markers are detected
+        _DEFAULT_MARKERS = ("dev-only", "change-in-production")
+        if any(m in access for m in _DEFAULT_MARKERS) or any(m in refresh for m in _DEFAULT_MARKERS):
+            warnings.warn(
+                "⚠️ 检测到 JWT 密钥包含默认值标记，生产环境请更换为随机字符串！",
+                stacklevel=2,
+            )
+
         return access, refresh
 
 

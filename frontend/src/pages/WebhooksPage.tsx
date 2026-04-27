@@ -1,69 +1,19 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import apiFetch from '@/lib/api'
 
 async function fetchBatches() {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch('/api/webhooks/batches', { headers: { Authorization: `Bearer ${token}` } })
-  if (!res.ok) throw new Error('Failed')
-  return res.json()
+  return apiFetch('/webhooks/batches')
 }
 
 async function fetchBatchDetail(id: number) {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch(`/api/webhooks/batches/${id}`, { headers: { Authorization: `Bearer ${token}` } })
-  if (!res.ok) throw new Error('Failed')
-  return res.json()
+  return apiFetch(`/webhooks/batches/${id}`)
 }
 
 async function retryBatch(id: number) {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch(`/api/webhooks/batches/${id}/retry`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Failed')
-  return res.json()
+  return apiFetch(`/webhooks/batches/${id}/retry`, { method: 'POST' })
 }
 
-function BatchPreview({ batchId }: { batchId: number }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['webhook-batch', batchId],
-    queryFn: () => fetchBatchDetail(batchId),
-  })
-
-  if (isLoading) return <div className="p-3 text-slate-400 text-xs">加载中...</div>
-  if (!data) return null
-
-  return (
-    <div className="bg-slate-900 text-green-400 rounded-lg p-4 text-xs font-mono overflow-x-auto whitespace-pre">
-      <div className="text-slate-400 mb-2">// {data.playlist_type} | run #{data.run_id}</div>
-      {data.items && data.items.length > 0
-        ? data.items.map((item: any, idx: number) => (
-            <div key={idx} className="mb-3 border border-slate-700 rounded p-2">
-              <div className="text-yellow-300">#{idx + 1}</div>
-              <div>track   : {item.track}</div>
-              <div>artist  : {item.artist}</div>
-              <div>album   : {item.album}</div>
-              <div>text    : {item.text}</div>
-            </div>
-          ))
-        : <div className="text-slate-500">无曲目数据</div>
-      }
-      {data.payload_json && (
-        <div className="mt-3 pt-2 border-t border-slate-700">
-          <div className="text-slate-400 mb-1">// payload_json (DB stored)</div>
-          <pre className="text-orange-300">{data.payload_json}</pre>
-        </div>
-      )}
-      {data.response_body && (
-        <div className="mt-3 pt-2 border-t border-slate-700">
-          <div className="text-slate-400 mb-1">// response ({data.response_code})</div>
-          <pre className="text-red-300">{data.response_body}</pre>
-        </div>
-      )}
-    </div>
-  )
-}
 
 export default function WebhooksPage() {
   const queryClient = useQueryClient()

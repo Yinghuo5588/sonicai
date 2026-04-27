@@ -1,12 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
+import apiFetch from '@/lib/api'
 
 async function fetchDashboard() {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch('/api/dashboard/summary', {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Failed to fetch')
-  return res.json()
+  return apiFetch('/dashboard/summary')
 }
 
 function StatCard({ label, value, color = 'text-slate-800' }: { label: string; value: number; color?: string }) {

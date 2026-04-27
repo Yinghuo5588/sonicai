@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import apiFetch from '@/lib/api'
 
 interface SyncResult {
   message: string
@@ -11,22 +12,13 @@ interface SyncResult {
 }
 
 async function triggerSync(url: string, threshold: number, playlistName: string, overwrite: boolean): Promise<SyncResult> {
-  const token = localStorage.getItem('sonicai_access_token')
   const params = new URLSearchParams({
     url,
     match_threshold: String(threshold / 100),
     overwrite: String(overwrite),
   })
   if (playlistName.trim()) params.set('playlist_name', playlistName.trim())
-  const res = await fetch(`/api/playlist/sync?${params}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return apiFetch(`/playlist/sync?${params}`, { method: 'POST' })
 }
 
 const PLATFORMS = [

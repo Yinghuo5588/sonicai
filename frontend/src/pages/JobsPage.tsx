@@ -1,21 +1,12 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import apiFetch from '@/lib/api'
 
 async function triggerJob(type: string) {
-  const token = localStorage.getItem('sonicai_access_token')
-  const res = await fetch(`/api/jobs/run-${type}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return apiFetch(`/jobs/run-${type}`, { method: 'POST' })
 }
 
 async function triggerHotboard(limit: number, threshold: number, playlistName: string, overwrite: boolean) {
-  const token = localStorage.getItem('sonicai_access_token')
   const params = new URLSearchParams({
     limit: String(limit),
     match_threshold: String(threshold / 100),
@@ -24,32 +15,16 @@ async function triggerHotboard(limit: number, threshold: number, playlistName: s
     params.set('playlist_name', playlistName.trim())
   }
   params.set('overwrite', String(overwrite))
-  const res = await fetch(`/api/hotboard/sync?${params}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return apiFetch(`/hotboard/sync?${params}`, { method: 'POST' })
 }
 
 async function triggerPlaylistSync(url: string, threshold: number, playlistName: string, overwrite: boolean) {
-  const token = localStorage.getItem('sonicai_access_token')
   const params = new URLSearchParams({ url, match_threshold: String(threshold) })
   if (playlistName.trim()) params.set('playlist_name', playlistName.trim())
   params.set('overwrite', String(overwrite))
-  const res = await fetch(`/api/playlist/sync?${params}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return apiFetch(`/playlist/sync?${params}`, { method: 'POST' })
 }
+
 
 export default function JobsPage() {
   const allMutation = useMutation({ mutationFn: () => triggerJob('full') })
