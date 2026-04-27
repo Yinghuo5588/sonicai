@@ -109,26 +109,23 @@ async def get_settings(current_user: CurrentUser, db: AsyncSessionLocal = Depend
 async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
     s = await get_settings_session(db)
     for key, value in body.model_dump(exclude_unset=True).items():
-        if value is not None:
-            if key == "navidrome_password":
-                setattr(s, "navidrome_password_encrypted", value)
-            # Validate library_mode_default enum
-            if key == "library_mode_default" and value not in {"library_only", "allow_missing"}:
-                raise HTTPException(status_code=400, detail="library_mode_default must be one of: library_only, allow_missing")
-            # Validate seed_source_mode enum
-            if key == "seed_source_mode" and value not in {"recent_only", "top_only", "recent_plus_top"}:
-                raise HTTPException(status_code=400, detail="seed_source_mode must be one of: recent_only, top_only, recent_plus_top")
-            # Validate top_period enum
-            if key == "top_period" and value not in {"7day", "1month", "3month", "6month", "12month", "overall"}:
-                raise HTTPException(status_code=400, detail="top_period must be one of: 7day, 1month, 3month, 6month, 12month, overall")
-            elif key == "webhook_headers_json":
-                try:
-                    json.loads(value)
-                    setattr(s, key, value)
-                except Exception:
-                    raise HTTPException(status_code=400, detail="webhook_headers_json must be valid JSON")
-            else:
-                setattr(s, key, value)
+        if key == "navidrome_password":
+            setattr(s, "navidrome_password_encrypted", value)
+            continue
+        # Validate enum fields
+        if key == "library_mode_default" and value not in {"library_only", "allow_missing"}:
+            raise HTTPException(status_code=400, detail="library_mode_default must be one of: library_only, allow_missing")
+        if key == "seed_source_mode" and value not in {"recent_only", "top_only", "recent_plus_top"}:
+            raise HTTPException(status_code=400, detail="seed_source_mode must be one of: recent_only, top_only, recent_plus_top")
+        if key == "top_period" and value not in {"7day", "1month", "3month", "6month", "12month", "overall"}:
+            raise HTTPException(status_code=400, detail="top_period must be one of: 7day, 1month, 3month, 6month, 12month, overall")
+        if key == "webhook_headers_json":
+            try:
+                json.loads(value)
+            except Exception:
+                raise HTTPException(status_code=400, detail="webhook_headers_json must be valid JSON")
+        # All other fields (including None) are saved as-is
+        setattr(s, key, value)
     await db.commit()
     await db.refresh(s)
 
