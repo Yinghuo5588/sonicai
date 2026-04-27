@@ -3,10 +3,15 @@
 import re
 import logging
 import httpx
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
+# Match a full URL (scheme + everything up to whitespace)
 URL_RE = re.compile(r"https?://[^\s]+")
+
+# Platforms that need the id-only URL (strip extra params like creatorId)
+NETEASE_CLEAN_PARAMS = {"id"}
 
 
 async def parse_playlist_url(url: str, api_base: str) -> tuple[str, str, list[dict]]:
@@ -26,25 +31,29 @@ async def parse_playlist_url(url: str, api_base: str) -> tuple[str, str, list[di
     urls = URL_RE.findall(url)
     if not urls:
         raise ValueError("unrecognized url format: " + url)
-    clean_url = urls[0]
+    raw_url = urls[0]
 
-    # Build full URL with query params (no url in query, only in body)
-    import urllib.parse
+    # Normalize: extract only the `id` param for netease URLs (remove creatorId etc.)
+    clean_url = _normalize_url(raw_url)
+
+    # Build API URL with query params
     parsed = urllib.parse.urlparse(api_base)
     existing = dict(urllib.parse.parse_qsl(parsed.query))
-    # Query: detailed + format + order, no url in query string
     query_parts = [
         ("detailed", existing.get("detailed", "false")),
         ("format", existing.get("format", "song-singer")),
         ("order", existing.get("order", "normal")),
     ]
-    full_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{urllib.parse.urlencode(query_parts)}"
+    api_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{urllib.parse.urlencode(query_parts)}"
+
+    logger.info(f"[parser] API URL: {api_url}")
+    logger.info(f"[parser] sending URL: {clean_url}")
 
     try:
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
             resp = await client.post(
-                full_url,
-                data={"url": clean_url},  # dict = form-urlencoded automatically
+                api_url,
+                data={"url": clean_url},
                 headers={
                     "Accept": "application/json, text/plain, */*",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -55,16 +64,22 @@ async def parse_playlist_url(url: str, api_base: str) -> tuple[str, str, list[di
     except httpx.TimeoutException:
         raise ValueError(f"Playlist API 请求超时，请检查地址是否正确: {api_base}")
     except httpx.HTTPStatusError as e:
-        raise ValueError(f"Playlist API 返回错误 HTTP {e.response.status_code}: {api_base}")
+        status = e.response.status_code
+        if status == 503:
+            raise ValueError(f"Playlist API 服务暂时不可用（HTTP 503），可能是服务维护中，请稍后重试。地址: {api_base}")
+        raise ValueError(f"Playlist API 返回错误 HTTP {status}: {api_base}")
+    except httpx.RequestError as e:
+        raise ValueError(f"Playlist API 连接失败: {e}。请检查地址是否可访问: {api_base}")
     except Exception as e:
         raise ValueError(f"Playlist API 请求失败: {e}")
 
     if data.get("code") == 1 and data.get("data"):
         name = data["data"].get("name", "第三方歌单")
         songs_raw = data["data"].get("songs", [])
+        songs_count = data["data"].get("songs_count", len(songs_raw))
+        logger.info(f"[parser] got playlist '{name}' with {songs_count} songs")
         songs = []
         for s in songs_raw:
-            # unmeta format: "标题 - 艺术家1 / 艺术家2"
             text = s if isinstance(s, str) else str(s)
             if " - " in text:
                 title, rest = text.split(" - ", 1)
@@ -73,10 +88,35 @@ async def parse_playlist_url(url: str, api_base: str) -> tuple[str, str, list[di
                 title = text.strip()
                 artist = ""
             songs.append({"title": title.strip(), "artist": artist, "album": ""})
-        logger.info("[playlist] unmeta '%s': %d songs", name, len(songs))
         return name, "netease", songs
     else:
+        msg = data.get("msg", "unknown error")
         raise ValueError(
-            f"Playlist API 返回异常: code={data.get('code')} msg={data.get('msg')}。"
-            "请检查 API 地址是否正确，或联系 API 服务商。"
+            f"Playlist API 返回异常: code={data.get('code')} msg={msg}。"
+            "请检查歌单链接是否有效（私密歌单无法解析），或稍后重试。"
         )
+
+
+def _normalize_url(url: str) -> str:
+    """
+    Strip platform-specific extra params from the URL.
+    E.g. https://music.163.com/m/playlist?id=14199757875&creatorId=xxx
+    → https://music.163.com/playlist?id=14199757875
+    Also prefer the desktop /playlist path over /m/playlist.
+    """
+    parsed = urllib.parse.urlparse(url)
+    query = urllib.parse.parse_qsl(parsed.query)
+
+    # Normalize path: /m/playlist → /playlist for netease
+    path = parsed.path.rstrip("/")
+    if path.endswith("/m/playlist"):
+        path = path[:-6] + "/playlist"  # /m/playlist → /playlist
+
+    # Keep only `id` (strip creatorId, uin, etc.)
+    id_params = [(k, v) for k, v in query if k == "id"]
+    if not id_params:
+        # Nothing to strip, return as-is
+        return url
+
+    normalized_query = urllib.parse.urlencode(id_params)
+    return f"{parsed.scheme}://{parsed.netloc}{path}?{normalized_query}"
