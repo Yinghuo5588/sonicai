@@ -35,17 +35,43 @@ async function triggerHotboard(limit: number, threshold: number, playlistName: s
   return res.json()
 }
 
+async function triggerPlaylistSync(url: string, threshold: number, playlistName: string, overwrite: boolean) {
+  const token = localStorage.getItem('sonicai_access_token')
+  const params = new URLSearchParams({ url, match_threshold: String(threshold) })
+  if (playlistName.trim()) params.set('playlist_name', playlistName.trim())
+  params.set('overwrite', String(overwrite))
+  const res = await fetch(`/api/playlist/sync?${params}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error((data as any)?.detail || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 export default function JobsPage() {
   const allMutation = useMutation({ mutationFn: () => triggerJob('full') })
   const tracksMutation = useMutation({ mutationFn: () => triggerJob('similar-tracks') })
   const artistsMutation = useMutation({ mutationFn: () => triggerJob('similar-artists') })
 
+  // Hotboard state
   const [limit, setLimit] = useState(50)
   const [threshold, setThreshold] = useState(75)
-  const [playlistName, setPlaylistName] = useState('')
-  const [overwrite, setOverwrite] = useState(false)
+  const [hotboardName, setHotboardName] = useState('')
+  const [hotboardOverwrite, setHotboardOverwrite] = useState(false)
   const hotboardMutation = useMutation({
-    mutationFn: () => triggerHotboard(limit, threshold, playlistName, overwrite),
+    mutationFn: () => triggerHotboard(limit, threshold, hotboardName, hotboardOverwrite),
+  })
+
+  // Playlist sync state
+  const [playlistUrl, setPlaylistUrl] = useState('')
+  const [playlistThreshold, setPlaylistThreshold] = useState(75)
+  const [playlistName, setPlaylistName] = useState('')
+  const [playlistOverwrite, setPlaylistOverwrite] = useState(false)
+  const playlistMutation = useMutation({
+    mutationFn: () => triggerPlaylistSync(playlistUrl, playlistThreshold / 100, playlistName, playlistOverwrite),
   })
 
   const run = (mutation: ReturnType<typeof useMutation>, label: string) => (
@@ -58,9 +84,15 @@ export default function JobsPage() {
     </button>
   )
 
+  const isPlaylistUrlValid = (v: string) =>
+    /https?:\/\//.test(v) &&
+    (v.includes('163') || v.includes('qq.com') || v.includes('qishui') || v.includes('douyin.com'))
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       <h1 className="text-xl md:text-2xl font-bold text-slate-800">任务执行</h1>
+
+      {/* Last.fm 推荐 */}
       <div className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
         <h2 className="font-medium text-slate-700 text-sm">手动执行推荐</h2>
         <div className="flex flex-col gap-2">
@@ -70,17 +102,14 @@ export default function JobsPage() {
         </div>
       </div>
 
+      {/* 网易云热榜同步 */}
       <div className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
         <h2 className="font-medium text-slate-700 text-sm">🌟 网易云热榜同步</h2>
-
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-slate-500 mb-1">抓取热榜歌曲数</label>
             <input
-              type="number"
-              min={1}
-              max={200}
-              value={limit}
+              type="number" min={1} max={200} value={limit}
               onChange={e => setLimit(Number(e.target.value))}
               className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
@@ -88,56 +117,75 @@ export default function JobsPage() {
           <div>
             <label className="block text-xs text-slate-500 mb-1">匹配阈值 ({threshold}%)</label>
             <input
-              type="range"
-              min={50}
-              max={95}
-              value={threshold}
+              type="range" min={50} max={95} value={threshold}
               onChange={e => setThreshold(Number(e.target.value))}
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
             />
           </div>
         </div>
-
         <div>
           <label className="block text-xs text-slate-500 mb-1">歌单名称（留空则自动生成）</label>
           <input
-            type="text"
-            value={playlistName}
-            onChange={e => setPlaylistName(e.target.value)}
+            type="text" value={hotboardName}
+            onChange={e => setHotboardName(e.target.value)}
             placeholder="网易云热榜 - 2026-04-25"
             className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
         </div>
-
         <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={overwrite}
-            onChange={e => setOverwrite(e.target.checked)}
-            className="w-4 h-4 accent-blue-500"
-          />
-          覆盖同名歌单（勾选后先删除再创建）
+          <input type="checkbox" checked={hotboardOverwrite}
+            onChange={e => setHotboardOverwrite(e.target.checked)} className="w-4 h-4 accent-blue-500" />
+          覆盖同名歌单
         </label>
-
         {run(hotboardMutation, '🌟 网易云热榜同步')}
-
-        {hotboardMutation.isSuccess && (
-          <p className="text-green-600 text-sm">✅ 已提交，可在推荐历史查看进度</p>
-        )}
-        {hotboardMutation.isError && (
-          <p className="text-red-500 text-sm">❌ 提交失败：{String(hotboardMutation.error?.message)}</p>
-        )}
+        {hotboardMutation.isSuccess && <p className="text-green-600 text-sm">✅ 已提交，可在推荐历史查看进度</p>}
+        {hotboardMutation.isError && <p className="text-red-500 text-sm">❌ {String(hotboardMutation.error?.message)}</p>}
       </div>
 
-      <div className="bg-white rounded-lg p-4 border border-green-200 space-y-3">
-        <h2 className="font-medium text-slate-700 text-sm">🔗 第三方歌单同步</h2>
-        <p className="text-xs text-slate-500">从网易云/QQ/汽水音乐导入歌单，同步到 Navidrome</p>
+      {/* 第三方歌单同步 */}
+      <div className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
+        <h2 className="font-medium text-slate-700 text-sm">🎵 第三方歌单同步</h2>
+        <div>
+          <label className="block text-xs text-slate-500 mb-1">歌单链接</label>
+          <input
+            type="text" value={playlistUrl}
+            onChange={e => setPlaylistUrl(e.target.value)}
+            placeholder="https://music.163.com/playlist?id=xxx"
+            className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">匹配阈值 ({playlistThreshold}%)</label>
+            <input
+              type="range" min={50} max={95} value={playlistThreshold}
+              onChange={e => setPlaylistThreshold(Number(e.target.value))}
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">歌单名称（留空自动）</label>
+            <input
+              type="text" value={playlistName}
+              onChange={e => setPlaylistName(e.target.value)}
+              placeholder="自动从歌单名"
+              className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input type="checkbox" checked={playlistOverwrite}
+            onChange={e => setPlaylistOverwrite(e.target.checked)} className="w-4 h-4 accent-blue-500" />
+          覆盖同名歌单
+        </label>
         <button
-          onClick={() => window.location.href = '/playlist-sync'}
-          className="w-full bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
+          onClick={() => playlistMutation.mutate()}
+          disabled={!isPlaylistUrlValid(playlistUrl) || playlistMutation.isPending}
+          className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm font-medium disabled:cursor-not-allowed"
         >
-          🔗 打开歌单同步
+          {playlistMutation.isPending ? '解析中...' : playlistMutation.isSuccess ? '✅ 已提交，可前往推荐历史查看' : playlistMutation.isError ? `❌ ${String(playlistMutation.error?.message)}` : '🎵 解析并同步到 Navidrome'}
         </button>
+        {playlistMutation.isSuccess && <p className="text-green-600 text-sm">✅ 任务已提交！</p>}
       </div>
     </div>
   )
