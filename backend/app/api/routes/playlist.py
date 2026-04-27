@@ -87,8 +87,8 @@ async def sync_playlist(
 
 @router.post("/sync-text")
 async def sync_text_playlist(
+    current_user: CurrentUser,
     file: UploadFile = File(...),
-    current_user: CurrentUser = Depends(),
     db: AsyncSession = Depends(get_db),
     match_threshold: float = 0.75,
     playlist_name: str | None = None,
