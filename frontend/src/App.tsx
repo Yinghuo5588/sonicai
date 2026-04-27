@@ -9,7 +9,6 @@ import JobsPage from '@/pages/JobsPage'
 import HistoryPage from '@/pages/HistoryPage'
 import WebhooksPage from '@/pages/WebhooksPage'
 import PlaylistDetailPage from '@/pages/PlaylistDetailPage'
-import PlaylistSyncPage from '@/pages/PlaylistSyncPage'
 import RunDetailPage from '@/pages/RunDetailPage'
 import Layout from '@/layouts/Layout'
 
@@ -58,7 +57,6 @@ export default function App() {
         <Route path="history/run/:run_id" element={<RunDetailPage />} />
         <Route path="history/playlist/:playlist_id" element={<PlaylistDetailPage />} />
         <Route path="webhooks" element={<WebhooksPage />} />
-        <Route path="playlist-sync" element={<PlaylistSyncPage />} />
       </Route>
     </Routes>
   )

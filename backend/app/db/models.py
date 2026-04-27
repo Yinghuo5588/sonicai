@@ -63,11 +63,9 @@ class SystemSettings(Base):
     webhook_timeout_seconds = Column(Integer, default=10)
     webhook_retry_count = Column(Integer, default=3)
 
-
-    # Playlist API
-    playlist_api_url = Column(String(500), nullable=True)  # e.g. https://sss.unmeta.cn/songlist
     # Playlist
     playlist_keep_days = Column(Integer, default=3)
+    playlist_api = Column(String(500), nullable=True)  # e.g. https://sss.unmeta.cn/songlist
 
     # Recommendation
     library_mode_default = Column(String(20), default="allow_missing")  # library_only | allow_missing

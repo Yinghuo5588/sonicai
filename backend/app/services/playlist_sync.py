@@ -54,7 +54,8 @@ async def run_playlist_sync(
     try:
         # 1. Parse the third-party playlist
         try:
-            parsed_name, platform, songs = await parse_playlist_url(url)
+            api_base = settings.playlist_api if settings else None
+            parsed_name, platform, songs = await parse_playlist_url(url, api_base=api_base)
         except Exception as e:
             async with AsyncSessionLocal() as db:
                 run_row = await db.get(RecommendationRun, run_id)
@@ -192,7 +193,10 @@ async def run_playlist_sync(
             await db.commit()
 
         # Webhook for missing items
-        if missing_items and settings and settings.webhook_url and settings.library_mode_default == "allow_missing":
+        async with AsyncSessionLocal() as db:
+            settings_result = await db.execute(select(SystemSettings))
+            settings_loaded = settings_result.scalar_one_or_none()
+        if missing_items and settings_loaded and settings_loaded.webhook_url and settings_loaded.library_mode_default == "allow_missing":
             async with AsyncSessionLocal() as db:
                 from app.db.models import WebhookBatch, WebhookBatchItem
                 import json as _json
@@ -200,7 +204,7 @@ async def run_playlist_sync(
                     run_id=run_id,
                     playlist_type=f"playlist_{platform}",
                     status="pending",
-                    max_retry_count=settings.webhook_retry_count or 3,
+                    max_retry_count=settings_loaded.webhook_retry_count or 3,
                     payload_json=_json.dumps({"items": missing_items}, ensure_ascii=False),
                 )
                 db.add(batch)
