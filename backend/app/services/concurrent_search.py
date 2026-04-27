@@ -9,6 +9,8 @@ from app.services.matching_service import pick_best_match
 
 logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
+
 
 async def _search_one(
     index: int,
