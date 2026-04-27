@@ -11,9 +11,9 @@ from app.db.models import (
     SystemSettings, RecommendationRun, GeneratedPlaylist,
     RecommendationItem, NavidromeMatch, WebhookBatch, WebhookBatchItem,
 )
+from app.services.concurrent_search import batch_search_and_match
 from app.services.hotboard_service import fetch_netease_hotboard
 from app.services.navidrome_service import (
-    navidrome_multi_search,
     navidrome_create_playlist,
     navidrome_add_to_playlist,
     navidrome_delete_playlist,
@@ -89,14 +89,29 @@ async def run_hotboard_sync(
             matched_ids: list[str] = []
             missing_items: list[dict] = []
 
-            for idx, track in enumerate(hot_tracks):
-                title = track.get("title", "")
-                artist = track.get("artist", "")
+            # Build track list for concurrent search
+            search_tracks = [
+                {"title": t.get("title", ""), "artist": t.get("artist", ""), "album": t.get("album", "")}
+                for t in hot_tracks
+            ]
+
+            async def _log_progress(done: int, total: int):
+                if done % 20 == 0:
+                    logger.info(f"[hotboard] matching progress: {done}/{total}")
+
+            search_results = await batch_search_and_match(
+                tracks=search_tracks,
+                threshold=match_threshold,
+                concurrency=5,
+                progress_callback=_log_progress,
+            )
+
+            for idx, sr in enumerate(search_results):
+                track = hot_tracks[idx]
+                title = sr["title"]
+                artist = sr["artist"]
                 if not title or not artist:
                     continue
-
-                nav_results = await navidrome_multi_search(title, artist)
-                best_match = pick_best_match(title, artist, nav_results, match_threshold)
 
                 item = RecommendationItem(
                     generated_playlist_id=playlist.id,
@@ -113,17 +128,18 @@ async def run_hotboard_sync(
                 db.add(item)
                 await db.flush()
 
-                if best_match:
-                    matched_ids.append(best_match["id"])
+                best = sr.get("best_match")
+                if best:
+                    matched_ids.append(best["id"])
                     db.add(NavidromeMatch(
                         recommendation_item_id=item.id,
                         matched=True,
                         search_query=f"{title} {artist}",
-                        selected_song_id=best_match["id"],
-                        selected_title=best_match.get("title"),
-                        selected_artist=best_match.get("artist"),
-                        selected_album=best_match.get("album"),
-                        confidence_score=best_match["score"],
+                        selected_song_id=best["id"],
+                        selected_title=best.get("title"),
+                        selected_artist=best.get("artist"),
+                        selected_album=best.get("album"),
+                        confidence_score=best["score"],
                     ))
                 else:
                     db.add(NavidromeMatch(
@@ -132,9 +148,6 @@ async def run_hotboard_sync(
                         search_query=f"{title} {artist}",
                     ))
                     missing_items.append(track)
-
-                if (idx + 1) % 20 == 0:
-                    logger.info(f"[hotboard] matching progress: {idx+1}/{len(hot_tracks)}")
 
             logger.info(f"[hotboard] done total={len(hot_tracks)} matched={len(matched_ids)} missing={len(missing_items)}")
 

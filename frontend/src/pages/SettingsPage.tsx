@@ -65,6 +65,7 @@ const FIELD_LABELS: Record<string, { label: string; type?: string; help?: string
 
   playlist_api_url: { label: 'Playlist API 地址', type: 'text', help: '第三方歌单解析 API（必填）。例: https://sss.unmeta.cn/songlist' },
 
+  search_concurrency: { label: '搜索并发数', type: 'number', help: 'Navidrome 并发搜索数，1-20，默认5' },
 }
 
 
@@ -87,7 +88,7 @@ const ADVANCED_FIELDS = [
 
   'seed_source_mode', 'recent_tracks_limit', 'top_period', 'recent_top_mix_ratio',
 
-  'match_threshold', 'webhook_retry_count', 'webhook_timeout_seconds', 'playlist_keep_days',
+  'match_threshold', 'candidate_pool_multiplier_min', 'candidate_pool_multiplier_max', 'search_concurrency', 'webhook_retry_count', 'webhook_timeout_seconds', 'playlist_keep_days',
 
 ]
 

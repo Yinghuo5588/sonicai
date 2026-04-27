@@ -43,6 +43,7 @@ class SettingsResponse(BaseModel):
     match_threshold: float | None = None
     candidate_pool_multiplier_min: float | None = None
     candidate_pool_multiplier_max: float | None = None
+    search_concurrency: int | None = None
     cron_enabled: bool
     cron_expression: str | None
 
@@ -85,6 +86,7 @@ class SettingsUpdate(BaseModel):
     match_threshold: float | None = Field(default=None, ge=0.5, le=0.95)
     candidate_pool_multiplier_min: float | None = Field(default=None, ge=1.0, le=20.0)
     candidate_pool_multiplier_max: float | None = Field(default=None, ge=1.0, le=20.0)
+    search_concurrency: int | None = Field(default=None, ge=1, le=20)
     cron_enabled: bool | None = None
     cron_expression: str | None = None
 

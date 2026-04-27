@@ -33,27 +33,30 @@ class Settings(BaseSettings):
 
     def get_jwt_secrets(self) -> tuple[str, str]:
         """Return (access_secret, refresh_secret). Raise if not configured in production."""
-        import warnings
+        import os
 
         access = self.jwt_secret_key
         refresh = self.jwt_refresh_secret_key
 
-        if not access or not refresh:
-            warnings.warn(
-                "⚠️ JWT_SECRET_KEY / JWT_REFRESH_SECRET_KEY 未配置，使用开发默认值。"
-                "生产环境请务必在 .env 中设置！",
-                stacklevel=2,
-            )
-            access = access or "sonicai-access-secret-dev-only-change-in-production"
-            refresh = refresh or "sonicai-refresh-secret-dev-only-change-in-production"
+        env = os.getenv("ENV", "development").lower()
 
-        # Extra check: warn if default markers are detected
-        _DEFAULT_MARKERS = ("dev-only", "change-in-production")
-        if any(m in access for m in _DEFAULT_MARKERS) or any(m in refresh for m in _DEFAULT_MARKERS):
-            warnings.warn(
-                "⚠️ 检测到 JWT 密钥包含默认值标记，生产环境请更换为随机字符串！",
-                stacklevel=2,
-            )
+        if env == "production":
+            if not access or not refresh:
+                raise RuntimeError(
+                    "JWT_SECRET_KEY and JWT_REFRESH_SECRET_KEY must be set in production!"
+                )
+            _DEFAULT_MARKERS = ("dev-only", "change-in-production")
+            if any(m in access for m in _DEFAULT_MARKERS) or any(m in refresh for m in _DEFAULT_MARKERS):
+                raise RuntimeError(
+                    "JWT secrets contain default markers — replace them for production!"
+                )
+            return access, refresh
+
+        # Development fallback
+        if not access:
+            access = "sonicai-access-secret-dev-only-change-in-production"
+        if not refresh:
+            refresh = "sonicai-refresh-secret-dev-only-change-in-production"
 
         return access, refresh
 

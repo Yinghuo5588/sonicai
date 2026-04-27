@@ -89,6 +89,7 @@ class SystemSettings(Base):
     match_threshold = Column(Numeric(4, 3), default=0.75)  # Pool sizing
     candidate_pool_multiplier_min = Column(Numeric(4, 1), default=2.0)
     candidate_pool_multiplier_max = Column(Numeric(4, 1), default=10.0)
+    search_concurrency = Column(Integer, default=5)  # Navidrome concurrent search limit (1-20)
 
     # Scheduler
     cron_enabled = Column(Boolean, default=False)

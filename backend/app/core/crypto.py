@@ -38,5 +38,5 @@ def decrypt_value(cipher_text: str) -> str:
     try:
         return _get_fernet().decrypt(cipher_text.encode()).decode()
     except Exception:
-        # Backward compatibility: treat plaintext as plaintext
-        return cipher_text
+        logger.warning("Decryption failed — returning empty string instead of ciphertext")
+        return ""
