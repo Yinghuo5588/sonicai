@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 
@@ -46,11 +46,11 @@ export default function WebhooksPage() {
               <tr><td colSpan={6} className="p-4 text-slate-400 text-center">暂无记录</td></tr>
             )}
             {batches.map((b: any) => (
-              <>
-                <tr key={b.id} className="border-t border-slate-100 hover:bg-slate-50">
+              <Fragment key={b.id}>
+                <tr className="border-t border-slate-100 hover:bg-slate-50">
                   <td className="p-3 text-slate-800">{b.id}</td>
                   <td className="p-3 text-slate-600">{b.playlist_type}</td>
-                  <td className="p-3">
+                  <td className="p-3 text-slate-600">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                       b.status === 'success' ? 'bg-green-100 text-green-700' :
                       b.status === 'failed' ? 'bg-red-100 text-red-700' :
@@ -77,17 +77,51 @@ export default function WebhooksPage() {
                   </td>
                 </tr>
                 {expanded === b.id && (
-                  <tr key={`${b.id}-detail`}>
+                  <tr>
                     <td colSpan={6} className="p-3 bg-slate-50 border-t border-slate-100">
                       <BatchPreview batchId={b.id} />
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+
+function BatchPreview({ batchId }: { batchId: number }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['webhook-batch', batchId],
+    queryFn: () => fetchBatchDetail(batchId),
+  })
+
+  if (isLoading) return <div className="text-sm text-slate-400 py-2">加载中...</div>
+  if (error) return <div className="text-sm text-red-500 py-2">加载失败</div>
+  if (!data) return null
+
+  const items = (data as any).items || []
+  return (
+    <div className="space-y-2">
+      <div className="text-xs text-slate-500">
+        共 {items.length} 首 · 状态: {(data as any).status}
+        {(data as any).response_code && ` · HTTP ${(data as any).response_code}`}
+      </div>
+      {items.length > 0 && (
+        <ul className="text-xs text-slate-600 space-y-0.5 max-h-40 overflow-y-auto">
+          {items.slice(0, 20).map((item: any) => (
+            <li key={item.id}>
+              <span className="font-medium">{item.track}</span> — {item.artist}
+            </li>
+          ))}
+          {items.length > 20 && (
+            <li className="text-slate-400">...还有 {items.length - 20} 首</li>
+          )}
+        </ul>
+      )}
     </div>
   )
 }

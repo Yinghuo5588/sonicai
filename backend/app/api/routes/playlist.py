@@ -1,7 +1,6 @@
 """Third-party playlist sync routes."""
 
 import logging
-import asyncio
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,7 +8,8 @@ from sqlalchemy import select
 from app.db.session import get_db
 from app.db.models import RecommendationRun
 from app.api.deps import CurrentUser
-from app.services.playlist_sync import run_playlist_sync
+from app.core.task_registry import create_background_task
+from app.services.playlist_sync import run_playlist_sync, run_text_sync
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/playlist", tags=["playlist"])
@@ -65,14 +65,15 @@ async def sync_playlist(
     await db.commit()
 
     logger.info(f"[playlist] queued run_id={run_id} url={url} user_id={current_user.id}")
-    asyncio.create_task(
+    create_background_task(
         run_playlist_sync(
             run_id=run_id,
             url=url.strip(),
             match_threshold=match_threshold,
             playlist_name=playlist_name,
             overwrite=overwrite,
-        )
+        ),
+        name=f"playlist-sync-{run_id}",
     )
 
     return {
@@ -177,15 +178,15 @@ async def sync_text_playlist(
     )
 
     # 7. Start background task
-    from app.services.playlist_sync import run_text_sync
-    asyncio.create_task(
+    create_background_task(
         run_text_sync(
             run_id=run_id,
             text_content=text_content,
             match_threshold=match_threshold,
             playlist_name=playlist_name,
             overwrite=overwrite,
-        )
+        ),
+        name=f"text-sync-{run_id}",
     )
 
     return {

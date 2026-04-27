@@ -15,10 +15,10 @@ async function stopJob(runId: number) {
   return apiFetch(`/jobs/${runId}/stop`, { method: 'POST' })
 }
 
-function StatCard({ label, value }: { label: string; value: number | string; color?: string }) {
+function StatCard({ label, value, color = 'text-slate-800' }: { label: string; value: number | string; color?: string }) {
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-4 text-center">
-      <div className={`text-2xl font-bold ${color || 'text-slate-800'}`}>{value}</div>
+      <div className={`text-2xl font-bold ${color}`}>{value}</div>
       <div className="text-xs text-slate-500 mt-1">{label}</div>
     </div>
   )

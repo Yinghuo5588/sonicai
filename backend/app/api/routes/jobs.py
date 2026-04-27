@@ -9,6 +9,7 @@ from sqlalchemy import select, and_
 from app.db.session import get_db
 from app.db.models import SystemSettings, RecommendationRun
 from app.api.deps import CurrentUser
+from app.core.task_registry import create_background_task
 from app.services.recommendation_service import (
     run_full_recommendation,
     run_similar_tracks_only,
@@ -57,43 +58,37 @@ async def _create_pending_run(
 
 @router.post("/run-all")
 async def run_all(current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
-    import asyncio
-
     if await _has_conflicting_job(db, ["full", "similar_tracks", "similar_artists"]):
         raise HTTPException(status_code=409, detail="Another recommendation job is already running")
 
     logger.info(f"[jobs] queue run_type=full user_id={current_user.id}")
     run_id = await _create_pending_run(db, "full", current_user.id, trigger_type="manual")
     logger.info(f"[jobs] queued run_type=full run_id={run_id} user_id={current_user.id}")
-    asyncio.create_task(run_full_recommendation(run_id=run_id, trigger_type="manual"))
+    create_background_task(run_full_recommendation(run_id=run_id, trigger_type="manual"), name=f"full-recommendation-{run_id}")
     return {"message": "Job queued", "type": "full", "run_id": run_id}
 
 
 @router.post("/run-similar-tracks")
 async def run_similar_tracks(current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
-    import asyncio
-
     if await _has_conflicting_job(db, ["full", "similar_tracks"]):
         raise HTTPException(status_code=409, detail="A similar-tracks related job is already running")
 
     logger.info(f"[jobs] queue run_type=similar_tracks user_id={current_user.id}")
     run_id = await _create_pending_run(db, "similar_tracks", current_user.id, trigger_type="manual")
     logger.info(f"[jobs] queued run_type=similar_tracks run_id={run_id} user_id={current_user.id}")
-    asyncio.create_task(run_similar_tracks_only(run_id=run_id, trigger_type="manual"))
+    create_background_task(run_similar_tracks_only(run_id=run_id, trigger_type="manual"), name=f"similar-tracks-{run_id}")
     return {"message": "Job queued", "type": "similar_tracks", "run_id": run_id}
 
 
 @router.post("/run-similar-artists")
 async def run_similar_artists(current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
-    import asyncio
-
     if await _has_conflicting_job(db, ["full", "similar_artists"]):
         raise HTTPException(status_code=409, detail="A similar-artists related job is already running")
 
     logger.info(f"[jobs] queue run_type=similar_artists user_id={current_user.id}")
     run_id = await _create_pending_run(db, "similar_artists", current_user.id, trigger_type="manual")
     logger.info(f"[jobs] queued run_type=similar_artists run_id={run_id} user_id={current_user.id}")
-    asyncio.create_task(run_similar_artists_only(run_id=run_id, trigger_type="manual"))
+    create_background_task(run_similar_artists_only(run_id=run_id, trigger_type="manual"), name=f"similar-artists-{run_id}")
     return {"message": "Job queued", "type": "similar_artists", "run_id": run_id}
 
 

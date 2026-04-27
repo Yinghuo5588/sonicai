@@ -196,15 +196,43 @@ async def navidrome_create_playlist(name: str) -> str | None:
 
 
 async def navidrome_add_to_playlist(playlist_id: str, song_ids: list[str]) -> bool:
-    """Add songs to a playlist by ID."""
+    """Add songs to a playlist by ID. Supports batch via multiple songIdToAdd params."""
     if not song_ids:
         return True
-    # Build songIdToAdd as multiple params
-    params = {"playlistId": playlist_id}
+
+    config = await _navidrome_config()
+    if not config:
+        return False
+
+    username = config["username"]
+    password = config["password"]
+    if not username or not password:
+        return False
+
+    auth_params = _subsonic_params(username, password)
+    url = f"{config['url']}/rest/updatePlaylist.view"
+
+    # Use list[tuple] to ensure multiple same-named keys are encoded correctly
+    param_list: list[tuple[str, str]] = list(auth_params.items())
+    param_list.append(("playlistId", playlist_id))
     for sid in song_ids:
-        params.setdefault("songIdToAdd", []).append(sid)
-    result = await _nd_get("updatePlaylist.view", params)
-    return result is not None
+        param_list.append(("songIdToAdd", sid))
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url, params=param_list)
+            if response.status_code != 200:
+                logger.warning(f"[navidrome] add_to_playlist HTTP {response.status_code}")
+                return False
+            data = response.json()
+            resp = data.get("subsonic-response", data)
+            if resp.get("status") == "failed":
+                logger.warning(f"[navidrome] add_to_playlist error: {resp}")
+                return False
+            return True
+    except Exception:
+        logger.exception("[navidrome] add_to_playlist request failed")
+        return False
 
 
 async def navidrome_delete_playlist(playlist_id: str) -> bool:

@@ -107,12 +107,8 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     if not matched_session:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh session invalid or revoked")
 
-    # Revoke old sessions
-    await db.execute(
-        AuthSession.__table__.update()
-        .where(AuthSession.user_id == user_id)
-        .values(revoked_at=datetime.now(timezone.utc))
-    )
+    # Revoke only the current session, not all user sessions
+    matched_session.revoked_at = datetime.now(timezone.utc)
 
     access_token = create_access_token({"sub": str(user.id)})
     new_refresh = create_refresh_token({"sub": str(user.id)})

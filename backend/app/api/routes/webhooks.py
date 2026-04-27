@@ -74,10 +74,10 @@ async def get_batch(batch_id: int, current_user: CurrentUser, db: AsyncSessionLo
 async def retry_batch(batch_id: int, current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
     from app.services.webhook_service import send_webhook_batch
     from app.db.models import WebhookBatch
-    import asyncio
+    from app.core.task_registry import create_background_task
     result = await db.execute(select(WebhookBatch).where(WebhookBatch.id == batch_id))
     batch = result.scalar_one_or_none()
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
-    asyncio.create_task(send_webhook_batch(batch_id))
+    create_background_task(send_webhook_batch(batch_id), name=f"webhook-retry-{batch_id}")
     return {"message": "Retry scheduled", "batch_id": batch_id}

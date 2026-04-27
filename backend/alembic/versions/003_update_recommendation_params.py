@@ -25,12 +25,9 @@ def upgrade() -> None:
 
     # Remove duplicate field
     op.drop_column('system_settings', 'similar_artist_per_seed_limit')
-
-    # Add missing column to recommendation_runs
-    op.add_column('recommendation_runs', sa.Column('error_message', sa.Text(), nullable=True))
+    # NOTE: error_message column already exists in recommendation_runs from 001_initial.py
 
 def downgrade() -> None:
-    op.drop_column('recommendation_runs', 'error_message')
     op.add_column('system_settings', sa.Column('similar_artist_per_seed_limit', sa.Integer(), default=5, nullable=True))
     op.drop_column('system_settings', 'candidate_pool_multiplier_max')
     op.drop_column('system_settings', 'candidate_pool_multiplier_min')

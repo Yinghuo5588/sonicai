@@ -1,7 +1,6 @@
 """Hotboard sync routes."""
 
 import logging
-import asyncio
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -79,15 +78,17 @@ async def sync_hotboard(
     run_id = run.id
     await db.commit()
 
+    from app.core.task_registry import create_background_task
     logger.info(f"[hotboard] queued run_id={run_id} user_id={current_user.id}")
-    asyncio.create_task(
+    create_background_task(
         run_hotboard_sync(
             run_id=run_id,
             limit=limit,
             match_threshold=match_threshold,
             playlist_name=playlist_name,
             overwrite=overwrite,
-        )
+        ),
+        name=f"hotboard-sync-{run_id}",
     )
 
     return {
