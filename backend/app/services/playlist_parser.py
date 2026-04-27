@@ -1,1 +1,168 @@
-IiIiVGhpcmQtcGFydHkgcGxheWxpc3QgcGFyc2VyIHZpYSBjb25maWd1cmFibGUgZXh0ZXJuYWwgQVBJIChlLmcuIHVubWV0YS5jbikuIiIiCgppbXBvcnQgcmUKaW1wb3J0IGxvZ2dpbmcKaW1wb3J0IGh0dHB4CmltcG9ydCB1cmxsaWIucGFyc2UKCmxvZ2dlciA9IGxvZ2dpbmcuZ2V0TG9nZ2VyKF9fbmFtZV9fKQoKIyBNYXRjaCBhIGZ1bGwgVVJMIChzY2hlbWUgKyBldmVyeXRoaW5nIHVwIHRvIHdoaXRlc3BhY2UpClVSTF9SRSA9IHJlLmNvbXBpbGUociJodHRwcz86Ly9bXlxzXSsiKQoKIyBQbGF0Zm9ybXMgdGhhdCBuZWVkIHRoZSBpZC1vbmx5IFVSTCAoc3RyaXAgZXh0cmEgcGFyYW1zIGxpa2UgY3JlYXRvcklkKQpORVRFQVNFX0NMRUFOX1BBUkFNUyA9IHsiaWQifQoKCmFzeW5jIGRlZiBwYXJzZV9wbGF5bGlzdF91cmwodXJsOiBzdHIsIGFwaV9iYXNlOiBzdHIpIC0+IHR1cGxlW3N0ciwgc3RyLCBsaXN0W2RpY3RdXToKICAgICIiIgogICAgUGFyc2UgYW55IHN1cHBvcnRlZCBwbGF5bGlzdCBVUkwgdXNpbmcgdGhlIGdpdmVuIGV4dGVybmFsIEFQSS4KICAgIGFwaV9iYXNlOiBmdWxsIFVSTCBvZiB0aGUgcGFyc2VyIGVuZHBvaW50LCBlLmcuIGh0dHBzOi8vc3NzLnVubWV0YS5jbi9zb25nbGlzdAogICAgUmV0dXJucyAocGxheWxpc3RfbmFtZSwgcGxhdGZvcm0sIHNvbmdzKQogICAgcGxhdGZvcm06ICduZXRlYXNlJyAoYWx3YXlzICduZXRlYXNlJyB3aGVuIHVzaW5nIGV4dGVybmFsIEFQSSkKICAgIFJhaXNlcyBWYWx1ZUVycm9yIGlmIGFwaV9iYXNlIGlzIGVtcHR5IG9yIHRoZSBBUEkgY2FsbCBmYWlscy4KICAgICIiIgogICAgaWYgbm90IGFwaV9iYXNlOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoCiAgICAgICAgICAgICJQbGF5bGlzdCBBUEkg5pyq6YWN572u77yM6K+35Zyo6K6+572u6YeM5aGr5YaZIFBsYXlsaXN0IEFQSSDlnLDlnYDjgIIiCiAgICAgICAgICAgICLkvos6IGh0dHBzOi8vc3NzLnVubWV0YS5jbi9zb25nbGlzdCIKICAgICAgICApCgogICAgdXJscyA9IFVSTF9SRS5maW5kYWxsKHVybCkKICAgIGlmIG5vdCB1cmxzOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoInVucmVjb2duaXplZCB1cmwgZm9ybWF0OiAiICsgdXJsKQogICAgcmF3X3VybCA9IHVybHNbMF0KCiAgICAjIE5vcm1hbGl6ZTogZXh0cmFjdCBvbmx5IHRoZSBgaWRgIHBhcmFtIGZvciBuZXRlYXNlIFVSTHMgKHJlbW92ZSBjcmVhdG9ySWQgZXRjLikKICAgIGNsZWFuX3VybCA9IF9ub3JtYWxpemVfdXJsKHJhd191cmwpCgogICAgIyBCdWlsZCBBUEkgVVJMIHdpdGggcXVlcnkgcGFyYW1zCiAgICBwYXJzZWQgPSB1cmxsaWIucGFyc2UudXJscGFyc2UoYXBpX2Jhc2UpCiAgICBleGlzdGluZyA9IGRpY3QodXJsbGliLnBhcnNlLnBhcnNlX3FzbChwYXJzZWQucXVlcnkpKQogICAgcXVlcnlfcGFydHMgPSBbCiAgICAgICAgKCJkZXRhaWxlZCIsIGV4aXN0aW5nLmdldCgiZGV0YWlsZWQiLCAiZmFsc2UiKSksCiAgICAgICAgKCJmb3JtYXQiLCBleGlzdGluZy5nZXQoImZvcm1hdCIsICJzb25nLXNpbmdlciIpKSwKICAgICAgICAoIm9yZGVyIiwgZXhpc3RpbmcuZ2V0KCJvcmRlciIsICJub3JtYWwiKSksCiAgICBdCiAgICBhcGlfdXJsID0gZiJ7cGFyc2VkLnNjaGVtZX06Ly97cGFyc2VkLm5ldGxvY317cGFyc2VkLnBhdGh9P3t1cmxsaWIucGFyc2UudXJsZW5jb2RlKHF1ZXJ5X3BhcnRzKX0iCgogICAgbG9nZ2VyLmluZm8oZiJbcGFyc2VyXSBBUEkgVVJMOiB7YXBpX3VybH0iKQogICAgbG9nZ2VyLmluZm8oZiJbcGFyc2VyXSBzZW5kaW5nIFVSTDoge2NsZWFuX3VybH0iKQoKICAgIHRyeToKICAgICAgICBhc3luYyB3aXRoIGh0dHB4LkFzeW5jQ2xpZW50KHRpbWVvdXQ9MjAuMCwgZm9sbG93X3JlZGlyZWN0cz1UcnVlKSBhcyBjbGllbnQ6CiAgICAgICAgICAgIHJlc3AgPSBhd2FpdCBjbGllbnQucG9zdCgKICAgICAgICAgICAgICAgIGFwaV91cmwsCiAgICAgICAgICAgICAgICBkYXRhPXsidXJsIjogY2xlYW5fdXJsfSwKICAgICAgICAgICAgICAgIGhlYWRlcnM9ewogICAgICAgICAgICAgICAgICAgICJBY2NlcHQiOiAiYXBwbGljYXRpb24vanNvbiwgdGV4dC9wbGFpbiwgKi8qIiwKICAgICAgICAgICAgICAgICAgICAiVXNlci1BZ2VudCI6ICJNb3ppbGxhLzUuMCAoV2luZG93cyBOVCAxMC4wOyBXaW42NDsgeDY0KSBBcHBsZVdlYktpdC81MzcuMzYiLAogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgKQogICAgICAgICAgICByZXNwLnJhaXNlX2Zvcl9zdGF0dXMoKQogICAgICAgICAgICBkYXRhID0gcmVzcC5qc29uKCkKICAgIGV4Y2VwdCBodHRweC5UaW1lb3V0RXhjZXB0aW9uOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoZiJQbGF5bGlzdCBBUEkg6K+35rGC6LaF5pe277yM6K+35qOA5p+l5Zyw5Z2A5piv5ZCm5q2j56GuOiB7YXBpX2Jhc2V9IikKICAgIGV4Y2VwdCBodHRweC5IVFRQU3RhdHVzRXJyb3IgYXMgZToKICAgICAgICBzdGF0dXMgPSBlLnJlc3BvbnNlLnN0YXR1c19jb2RlCiAgICAgICAgaWYgc3RhdHVzID09IDUwMzoKICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcihmIlBsYXlsaXN0IEFQSSDmnI3liqHmmoLml7bkuI3lj6/nlKjvvIhIVFRQIDUwM++8ie+8jOWPr+iDveaYr+acjeWKoee7tOaKpOS4re+8jOivt+eojeWQjumHjeivleOAguWcsOWdgDoge2FwaV9iYXNlfSIpCiAgICAgICAgcmFpc2UgVmFsdWVFcnJvcihmIlBsYXlsaXN0IEFQSSDov5Tlm57plJnor68gSFRUUCB7c3RhdHVzfToge2FwaV9iYXNlfSIpCiAgICBleGNlcHQgaHR0cHguUmVxdWVzdEVycm9yIGFzIGU6CiAgICAgICAgcmFpc2UgVmFsdWVFcnJvcihmIlBsYXlsaXN0IEFQSSDov57mjqXlpLHotKU6IHtlfeOAguivt+ajgOafpeWcsOWdgOaYr+WQpuWPr+iuv+mXrjoge2FwaV9iYXNlfSIpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgcmFpc2UgVmFsdWVFcnJvcihmIlBsYXlsaXN0IEFQSSDor7fmsYLlpLHotKU6IHtlfSIpCgogICAgaWYgZGF0YS5nZXQoImNvZGUiKSA9PSAxIGFuZCBkYXRhLmdldCgiZGF0YSIpOgogICAgICAgIG5hbWUgPSBkYXRhWyJkYXRhIl0uZ2V0KCJuYW1lIiwgIuesrOS4ieaWueatjOWNlSIpCiAgICAgICAgc29uZ3NfcmF3ID0gZGF0YVsiZGF0YSJdLmdldCgic29uZ3MiLCBbXSkKICAgICAgICBzb25nc19jb3VudCA9IGRhdGFbImRhdGEiXS5nZXQoInNvbmdzX2NvdW50IiwgbGVuKHNvbmdzX3JhdykpCiAgICAgICAgbG9nZ2VyLmluZm8oZiJbcGFyc2VyXSBnb3QgcGxheWxpc3QgJ3tuYW1lfScgd2l0aCB7c29uZ3NfY291bnR9IHNvbmdzIikKICAgICAgICBzb25ncyA9IFtdCiAgICAgICAgZm9yIHMgaW4gc29uZ3NfcmF3OgogICAgICAgICAgICB0ZXh0ID0gcyBpZiBpc2luc3RhbmNlKHMsIHN0cikgZWxzZSBzdHIocykKICAgICAgICAgICAgaWYgIiAtICIgaW4gdGV4dDoKICAgICAgICAgICAgICAgIHRpdGxlLCByZXN0ID0gdGV4dC5zcGxpdCgiIC0gIiwgMSkKICAgICAgICAgICAgICAgIGFydGlzdCA9IHJlc3QucmVwbGFjZSgiIC8gIiwgIi8iKS5zdHJpcCgpCiAgICAgICAgICAgIGVsc2U6CiAgICAgICAgICAgICAgICB0aXRsZSA9IHRleHQuc3RyaXAoKQogICAgICAgICAgICAgICAgYXJ0aXN0ID0gIiIKICAgICAgICAgICAgc29uZ3MuYXBwZW5kKHsidGl0bGUiOiB0aXRsZS5zdHJpcCgpLCAiYXJ0aXN0IjogYXJ0aXN0LCAiYWxidW0iOiAiIn0pCiAgICAgICAgcmV0dXJuIG5hbWUsICJuZXRlYXNlIiwgc29uZ3MKICAgIGVsc2U6CiAgICAgICAgbXNnID0gZGF0YS5nZXQoIm1zZyIsICJ1bmtub3duIGVycm9yIikKICAgICAgICByYWlzZSBWYWx1ZUVycm9yKAogICAgICAgICAgICBmIlBsYXlsaXN0IEFQSSDov5Tlm57lvILluLg6IGNvZGU9e2RhdGEuZ2V0KCdjb2RlJyl9IG1zZz17bXNnfeOAgiIKICAgICAgICAgICAgIuivt+ajgOafpeatjOWNlemTvuaOpeaYr+WQpuacieaViO+8iOengeWvhuatjOWNleaXoOazleino+aekO+8ie+8jOaIlueojeWQjumHjeivleOAgiIKICAgICAgICApCgoKZGVmIF9ub3JtYWxpemVfdXJsKHVybDogc3RyKSAtPiBzdHI6CiAgICAiIiIKICAgIFN0cmlwIHBsYXRmb3JtLXNwZWNpZmljIGV4dHJhIHBhcmFtcyBmcm9tIHRoZSBVUkwuCiAgICBFLmcuIGh0dHBzOi8vbXVzaWMuMTYzLmNvbS9tL3BsYXlsaXN0P2lkPTE0MTk5NzU3ODc1JmNyZWF0b3JJZD14eHgKICAgIOKGkiBodHRwczovL211c2ljLjE2My5jb20vcGxheWxpc3Q/aWQ9MTQxOTk3NTc4NzUKICAgIEFsc28gcHJlZmVyIHRoZSBkZXNrdG9wIC9wbGF5bGlzdCBwYXRoIG92ZXIgL20vcGxheWxpc3QuCiAgICAiIiIKICAgIHBhcnNlZCA9IHVybGxpYi5wYXJzZS51cmxwYXJzZSh1cmwpCiAgICBxdWVyeSA9IHVybGxpYi5wYXJzZS5wYXJzZV9xc2wocGFyc2VkLnF1ZXJ5KQoKICAgICMgTm9ybWFsaXplIHBhdGg6IC9tL3BsYXlsaXN0IOKGkiAvcGxheWxpc3QgZm9yIG5ldGVhc2UKICAgIHBhdGggPSBwYXJzZWQucGF0aC5yc3RyaXAoIi8iKQogICAgaWYgcGF0aC5lbmRzd2l0aCgiL20vcGxheWxpc3QiKToKICAgICAgICBwYXRoID0gcGF0aFs6LTZdICsgIi9wbGF5bGlzdCIgICMgL20vcGxheWxpc3Qg4oaSIC9wbGF5bGlzdAoKICAgICMgS2VlcCBvbmx5IGBpZGAgKHN0cmlwIGNyZWF0b3JJZCwgdWluLCBldGMuKQogICAgaWRfcGFyYW1zID0gWyhrLCB2KSBmb3IgaywgdiBpbiBxdWVyeSBpZiBrID09ICJpZCJdCiAgICBpZiBub3QgaWRfcGFyYW1zOgogICAgICAgICMgTm90aGluZyB0byBzdHJpcCwgcmV0dXJuIGFzLWlzCiAgICAgICAgcmV0dXJuIHVybAoKICAgIG5vcm1hbGl6ZWRfcXVlcnkgPSB1cmxsaWIucGFyc2UudXJsZW5jb2RlKGlkX3BhcmFtcykKICAgIHJldHVybiBmIntwYXJzZWQuc2NoZW1lfTovL3twYXJzZWQubmV0bG9jfXtwYXRofT97bm9ybWFsaXplZF9xdWVyeX0iCgoKIyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKIyBUZXh0IHBsYXlsaXN0IHBhcnNlcgojIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAoKX0RBU0hfTk9STUFMSVpFID0gcmUuY29tcGlsZShyJ1xzKlvvvI3igJTigJNdXHMqJykKCgpkZWYgcGFyc2VfdGV4dF9zb25ncyh0ZXh0X2NvbnRlbnQ6IHN0cikgLT4gdHVwbGVbc3RyLCBzdHIsIGxpc3RbZGljdF1dOgogICAgIiIiCiAgICBQYXJzZSBwbGFpbiB0ZXh0IGNvbnRlbnQgd2hlcmUgZWFjaCBsaW5lIGlzOiB0aXRsZSAtIGFydGlzdAogICAgU3VwcG9ydHMgYW55IGxhbmd1YWdlIChDaGluZXNlLCBKYXBhbmVzZSwgS29yZWFuLCBFbmdsaXNoLCBldGMuKQoKICAgIExpbmVzIHN0YXJ0aW5nIHdpdGggIyBhcmUgdHJlYXRlZCBhcyBjb21tZW50cyBhbmQgc2tpcHBlZC4KICAgIEVtcHR5IGxpbmVzIGFyZSBza2lwcGVkLgoKICAgIFJldHVybnMgKHBsYXlsaXN0X25hbWUsIHBsYXRmb3JtLCBzb25ncykKICAgICIiIgogICAgc29uZ3MgPSBbXQogICAgZm9yIGxpbmUgaW4gdGV4dF9jb250ZW50LnN0cmlwKCkuc3BsaXRsaW5lcygpOgogICAgICAgIGxpbmUgPSBsaW5lLnN0cmlwKCkKICAgICAgICBpZiBub3QgbGluZSBvciBsaW5lLnN0YXJ0c3dpdGgoIiMiKToKICAgICAgICAgICAgY29udGludWUKCiAgICAgICAgIyBOb3JtYWxpemUgdmFyaW91cyBkYXNoIGNoYXJhY3RlcnMgdG8gc3RhbmRhcmQgIiAtICIKICAgICAgICBsaW5lID0gX0RBU0hfTk9STUFMSVpFLnN1YignIC0gJywgbGluZSkKCiAgICAgICAgaWYgIiAtICIgaW4gbGluZToKICAgICAgICAgICAgdGl0bGUsIGFydGlzdCA9IGxpbmUuc3BsaXQoIiAtICIsIDEpCiAgICAgICAgICAgIHRpdGxlID0gdGl0bGUuc3RyaXAoKQogICAgICAgICAgICBhcnRpc3QgPSBhcnRpc3Quc3RyaXAoKQogICAgICAgICAgICBpZiB0aXRsZSBhbmQgYXJ0aXN0OgogICAgICAgICAgICAgICAgc29uZ3MuYXBwZW5kKHsidGl0bGUiOiB0aXRsZSwgImFydGlzdCI6IGFydGlzdCwgImFsYnVtIjogIiJ9KQogICAgICAgICAgICBlbHNlOgogICAgICAgICAgICAgICAgIyB0aXRsZSBvbmx5IOKAlCBzdGlsbCBhY2NlcHRlZCBidXQgbWF0Y2ggcmF0ZSB3aWxsIGJlIGxvd2VyCiAgICAgICAgICAgICAgICB0aXRsZSA9IGxpbmUuc3RyaXAoKQogICAgICAgICAgICAgICAgaWYgdGl0bGU6CiAgICAgICAgICAgICAgICAgICAgc29uZ3MuYXBwZW5kKHsidGl0bGUiOiB0aXRsZSwgImFydGlzdCI6ICIiLCAiYWxidW0iOiAiIn0pCiAgICAgICAgZWxzZToKICAgICAgICAgICAgdGl0bGUgPSBsaW5lLnN0cmlwKCkKICAgICAgICAgICAgaWYgdGl0bGU6CiAgICAgICAgICAgICAgICBzb25ncy5hcHBlbmQoeyJ0aXRsZSI6IHRpdGxlLCAiYXJ0aXN0IjogIiIsICJhbGJ1bSI6ICIifSkKCiAgICBsb2dnZXIuaW5mbyhmIlt0ZXh0X3BhcnNlcl0gcGFyc2VkIHtsZW4oc29uZ3MpfSBzb25ncyBmcm9tIHRleHQgaW5wdXQiKQogICAgcmV0dXJuICLmlofmnKzmrYzljZUiLCAidGV4dCIsIHNvbmdzCg==
+"""Third-party playlist parser via configurable external API (e.g. unmeta.cn)."""
+
+import re
+import logging
+import httpx
+import urllib.parse
+
+logger = logging.getLogger(__name__)
+
+# Match a full URL (scheme + everything up to whitespace)
+URL_RE = re.compile(r"https?://[^\s]+")
+
+# Platforms that need the id-only URL (strip extra params like creatorId)
+NETEASE_CLEAN_PARAMS = {"id"}
+
+
+async def parse_playlist_url(url: str, api_base: str) -> tuple[str, str, list[dict]]:
+    """
+    Parse any supported playlist URL using the given external API.
+    api_base: full URL of the parser endpoint, e.g. https://sss.unmeta.cn/songlist
+    Returns (playlist_name, platform, songs)
+    platform: 'netease' (always 'netease' when using external API)
+    Raises ValueError if api_base is empty or the API call fails.
+    """
+    if not api_base:
+        raise ValueError(
+            "Playlist API 未配置，请在设置里填写 Playlist API 地址。"
+            "例: https://sss.unmeta.cn/songlist"
+        )
+
+    urls = URL_RE.findall(url)
+    if not urls:
+        raise ValueError("unrecognized url format: " + url)
+    raw_url = urls[0]
+
+    # Normalize: extract only the `id` param for netease URLs (remove creatorId etc.)
+    clean_url = _normalize_url(raw_url)
+
+    # Build API URL with query params
+    parsed = urllib.parse.urlparse(api_base)
+    existing = dict(urllib.parse.parse_qsl(parsed.query))
+    query_parts = [
+        ("detailed", existing.get("detailed", "false")),
+        ("format", existing.get("format", "song-singer")),
+        ("order", existing.get("order", "normal")),
+    ]
+    api_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{urllib.parse.urlencode(query_parts)}"
+
+    logger.info(f"[parser] API URL: {api_url}")
+    logger.info(f"[parser] sending URL: {clean_url}")
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            resp = await client.post(
+                api_url,
+                data={"url": clean_url},
+                headers={
+                    "Accept": "application/json, text/plain, */*",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.TimeoutException:
+        raise ValueError(f"Playlist API 请求超时，请检查地址是否正确: {api_base}")
+    except httpx.HTTPStatusError as e:
+        status = e.response.status_code
+        if status == 503:
+            raise ValueError(f"Playlist API 服务暂时不可用（HTTP 503），可能是服务维护中，请稍后重试。地址: {api_base}")
+        raise ValueError(f"Playlist API 返回错误 HTTP {status}: {api_base}")
+    except httpx.RequestError as e:
+        raise ValueError(f"Playlist API 连接失败: {e}。请检查地址是否可访问: {api_base}")
+    except Exception as e:
+        raise ValueError(f"Playlist API 请求失败: {e}")
+
+    if data.get("code") == 1 and data.get("data"):
+        name = data["data"].get("name", "第三方歌单")
+        songs_raw = data["data"].get("songs", [])
+        songs_count = data["data"].get("songs_count", len(songs_raw))
+        logger.info(f"[parser] got playlist '{name}' with {songs_count} songs")
+        songs = []
+        for s in songs_raw:
+            text = s if isinstance(s, str) else str(s)
+            if " - " in text:
+                title, rest = text.split(" - ", 1)
+                artist = rest.replace(" / ", "/").strip()
+            else:
+                title = text.strip()
+                artist = ""
+            songs.append({"title": title.strip(), "artist": artist, "album": ""})
+        return name, "netease", songs
+    else:
+        msg = data.get("msg", "unknown error")
+        raise ValueError(
+            f"Playlist API 返回异常: code={data.get('code')} msg={msg}。"
+            "请检查歌单链接是否有效（私密歌单无法解析），或稍后重试。"
+        )
+
+
+def _normalize_url(url: str) -> str:
+    """
+    Strip platform-specific extra params from the URL.
+    E.g. https://music.163.com/m/playlist?id=14199757875&creatorId=xxx
+    → https://music.163.com/playlist?id=14199757875
+    Also prefer the desktop /playlist path over /m/playlist.
+    """
+    parsed = urllib.parse.urlparse(url)
+    query = urllib.parse.parse_qsl(parsed.query)
+
+    # Normalize path: /m/playlist → /playlist for netease
+    path = parsed.path.rstrip("/")
+    if path.endswith("/m/playlist"):
+        path = path[:-6] + "/playlist"  # /m/playlist → /playlist
+
+    # Keep only `id` (strip creatorId, uin, etc.)
+    id_params = [(k, v) for k, v in query if k == "id"]
+    if not id_params:
+        # Nothing to strip, return as-is
+        return url
+
+    normalized_query = urllib.parse.urlencode(id_params)
+    return f"{parsed.scheme}://{parsed.netloc}{path}?{normalized_query}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Text playlist parser
+# ─────────────────────────────────────────────────────────────────────────────
+
+_DASH_NORMALIZE = re.compile(r'\s*[－—–]\s*')
+
+
+def parse_text_songs(text_content: str) -> tuple[str, str, list[dict]]:
+    """
+    Parse plain text content where each line is: title - artist
+    Supports any language (Chinese, Japanese, Korean, English, etc.)
+
+    Lines starting with # are treated as comments and skipped.
+    Empty lines are skipped.
+
+    Returns (playlist_name, platform, songs)
+    """
+    songs = []
+    for line in text_content.strip().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        # Normalize various dash characters to standard " - "
+        line = _DASH_NORMALIZE.sub(' - ', line)
+
+        if " - " in line:
+            title, artist = line.split(" - ", 1)
+            title = title.strip()
+            artist = artist.strip()
+            if title and artist:
+                songs.append({"title": title, "artist": artist, "album": ""})
+            else:
+                # title only — still accepted but match rate will be lower
+                title = line.strip()
+                if title:
+                    songs.append({"title": title, "artist": "", "album": ""})
+        else:
+            title = line.strip()
+            if title:
+                songs.append({"title": title, "artist": "", "album": ""})
+
+    logger.info(f"[text_parser] parsed {len(songs)} songs from text input")
+    return "文本歌单", "text", songs
