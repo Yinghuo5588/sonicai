@@ -1,5 +1,12 @@
 // API response type definitions
 
+export interface RunProgress {
+  total_candidates: number
+  matched: number
+  missing: number
+  percent: number
+}
+
 export interface Run {
   id: number
   run_type: string
@@ -9,6 +16,7 @@ export interface Run {
   finished_at: string | null
   error_message: string | null
   created_at: string | null
+  progress?: RunProgress
 }
 
 export interface Playlist {

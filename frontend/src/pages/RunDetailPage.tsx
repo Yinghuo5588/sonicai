@@ -46,6 +46,10 @@ export default function RunDetailPage() {
   const { data: run, isLoading: runLoading, error: runError } = useQuery({
     queryKey: ['run', rid],
     queryFn: () => fetchRunDetail(rid),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      return status === 'running' ? 3000 : false
+    },
   })
 
   const { data: playlists, isLoading: playlistsLoading, error: playlistsError } = useQuery({
@@ -108,6 +112,27 @@ export default function RunDetailPage() {
           <p className="text-xs text-red-500 mt-2 bg-red-50 rounded p-2">{run.error_message}</p>
         )}
       </div>
+
+      {/* Progress bar */}
+      {run.progress && (
+        <div className="bg-white rounded-lg p-4 border border-slate-200 mb-4">
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-slate-500">匹配进度</span>
+            <span className="text-slate-700">
+              {run.progress.matched} / {run.progress.total_candidates}
+            </span>
+          </div>
+          <div className="w-full bg-slate-200 rounded-full h-2">
+            <div
+              className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${run.progress.percent}%` }}
+            />
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            {run.status === 'running' ? '正在匹配中...' : run.status === 'success' ? '已完成' : run.status === 'failed' ? '失败' : run.status === 'stopped' ? '已停止' : '准备中'}
+          </p>
+        </div>
+      )}
 
       {/* Playlists */}
       <div>

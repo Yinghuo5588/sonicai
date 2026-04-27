@@ -160,6 +160,17 @@ async def get_run(
     run = result.scalar_one_or_none()
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
+
+    # 聚合该 run 下所有歌单的进度
+    playlists_result = await db.execute(
+        select(GeneratedPlaylist).where(GeneratedPlaylist.run_id == run_id)
+    )
+    playlists = playlists_result.scalars().all()
+
+    total_candidates = sum(p.total_candidates or 0 for p in playlists)
+    total_matched = sum(p.matched_count or 0 for p in playlists)
+    total_missing = sum(p.missing_count or 0 for p in playlists)
+
     return {
         "id": run.id,
         "run_type": run.run_type,
@@ -168,6 +179,12 @@ async def get_run(
         "created_at": run.created_at.isoformat() if run.created_at else None,
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+        "progress": {
+            "total_candidates": total_candidates,
+            "matched": total_matched,
+            "missing": total_missing,
+            "percent": round((total_matched / total_candidates * 100) if total_candidates > 0 else 0, 1),
+        },
     }
 
 
