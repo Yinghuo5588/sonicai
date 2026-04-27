@@ -54,7 +54,7 @@ async def run_playlist_sync(
     try:
         # 1. Parse the third-party playlist
         try:
-            api_base = settings.playlist_api if settings else None
+            api_base = settings.playlist_api_url if settings else None
             parsed_name, platform, songs = await parse_playlist_url(url, api_base=api_base)
         except Exception as e:
             async with AsyncSessionLocal() as db:

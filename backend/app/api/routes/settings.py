@@ -24,7 +24,7 @@ class SettingsResponse(BaseModel):
     webhook_timeout_seconds: int
     webhook_retry_count: int
     playlist_keep_days: int
-    playlist_api: str | None
+    playlist_api_url: str | None
     library_mode_default: str
     duplicate_avoid_days: int
     top_track_seed_limit: int
@@ -66,7 +66,7 @@ class SettingsUpdate(BaseModel):
     webhook_timeout_seconds: int | None = Field(default=None, ge=1, le=120)
     webhook_retry_count: int | None = Field(default=None, ge=0, le=10)
     playlist_keep_days: int | None = Field(default=None, ge=0, le=365)
-    playlist_api: str | None = None
+    playlist_api_url: str | None = None
     library_mode_default: str | None = None
     duplicate_avoid_days: int | None = Field(default=None, ge=0, le=365)
     top_track_seed_limit: int | None = Field(default=None, ge=1, le=200)
