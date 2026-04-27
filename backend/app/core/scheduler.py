@@ -23,7 +23,7 @@ def get_scheduler() -> AsyncIOScheduler:
 async def load_cron_schedule(db: AsyncSession):
     """Load cron expression from DB and reschedule the recommendation job."""
     from app.db.models import SystemSettings
-    from app.tasks.recommendation_tasks import run_recommendation_job, retry_pending_webhooks
+    from app.tasks.recommendation_tasks import run_recommendation_job, retry_pending_webhooks, cleanup_expired_cache
 
     result = await db.execute(select(SystemSettings))
     config = result.scalar_one_or_none()
@@ -71,6 +71,8 @@ async def load_cron_schedule(db: AsyncSession):
         )
         logger.info("Webhook retry job registered (every 2 min)")
 
+    _register_cache_cleanup(sched)
+
 
 def start_scheduler():
     global _scheduler
@@ -86,3 +88,18 @@ def shutdown_scheduler():
         _scheduler.shutdown()
         _scheduler = None
         logger.info("Scheduler stopped")
+
+# Register cache cleanup job (every 6 hours) — appended at end of load_cron_schedule
+# This is handled at the end of the function
+def _register_cache_cleanup(sched):
+    from apscheduler.triggers.interval import IntervalTrigger
+    existing = [j for j in sched.get_jobs() if j.id == "cache_cleanup"]
+    if not existing:
+        sched.add_job(
+            cleanup_expired_cache,
+            IntervalTrigger(hours=6),
+            id="cache_cleanup",
+            replace_existing=True,
+            misfire_grace_time=60,
+        )
+        logger.info("Cache cleanup job registered (every 6 hours)")

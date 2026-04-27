@@ -85,6 +85,23 @@ async def retry_pending_webhooks():
                 logger.warning(f"[webhook-retry] failed batch_id={batch.id}: {e}")
 
 
+async def cleanup_expired_cache():
+    """Clean up expired Last.fm cache entries."""
+    from datetime import datetime, timezone
+    from sqlalchemy import delete
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import LastfmCache
+
+    logger.info("[cache-cleanup] scanning for expired entries")
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            delete(LastfmCache).where(LastfmCache.expires_at < datetime.now(timezone.utc))
+        )
+        deleted = result.rowcount
+        await db.commit()
+        logger.info(f"[cache-cleanup] deleted {deleted} expired cache entries")
+
+
 def cleanup_old_playlists():
     """Cleanup task (synchronous APScheduler entry)."""
     from sqlalchemy import select

@@ -1,5 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/hooks/useAuth'
+import { useQuery } from '@tanstack/react-query'
+import apiFetch from '@/lib/api'
 
 const navItems = [
   { to: '/', label: '仪表盘', icon: '📊' },
@@ -12,6 +14,12 @@ const navItems = [
 export default function Layout() {
   const navigate = useNavigate()
   const { logout } = useAuthStore()
+
+  const { data: user } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => apiFetch('/auth/me'),
+    staleTime: 5 * 60 * 1000,
+  })
 
   const handleLogout = () => {
     logout()
@@ -45,6 +53,11 @@ export default function Layout() {
           ))}
         </nav>
         <div className="p-3 border-t border-slate-100">
+          {user && (
+            <div className="px-3 py-2 text-xs text-slate-400 truncate mb-1">
+              👤 {(user as any).username}
+            </div>
+          )}
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg"
