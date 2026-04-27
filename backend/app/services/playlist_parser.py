@@ -28,9 +28,29 @@ async def parse_playlist_url(url: str, api_base: str) -> tuple[str, str, list[di
         raise ValueError("unrecognized url format: " + url)
     clean_url = urls[0]
 
+    # Replicate exact browser request: POST with query params + form-urlencoded body
+    import urllib.parse
+    parsed = urllib.parse.urlparse(api_base)
+    existing = dict(urllib.parse.parse_qsl(parsed.query))
+    # Build query string: fixed params first, url last (browser order)
+    query_parts = [
+        ("detailed", existing.get("detailed", "false")),
+        ("format", existing.get("format", "song-singer")),
+        ("order", existing.get("order", "normal")),
+        ("url", clean_url),
+    ]
+    full_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{urllib.parse.urlencode(query_parts)}"
+
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.post(api_base, data={"url": clean_url})
+            resp = await client.post(
+                full_url,
+                headers={
+                    "Accept": "application/json, text/plain, */*",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                content=urllib.parse.urlencode({"url": clean_url}),
+            )
             resp.raise_for_status()
             data = resp.json()
     except httpx.TimeoutException:
