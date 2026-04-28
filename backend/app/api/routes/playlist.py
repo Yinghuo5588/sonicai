@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.db.session import get_db
 from app.db.models import RecommendationRun
 from app.api.deps import CurrentUser
+from app.services.job_run_service import create_pending_run
 from app.core.task_registry import create_background_task
 from app.services.playlist_sync import run_playlist_sync, run_text_sync
 
@@ -19,7 +20,6 @@ router = APIRouter(prefix="/playlist", tags=["playlist"])
 async def sync_playlist(
     url: str,
     current_user: CurrentUser,
-    db: AsyncSession = Depends(get_db),
     match_threshold: float = 0.75,
     playlist_name: str | None = None,
     overwrite: bool = False,
@@ -27,48 +27,14 @@ async def sync_playlist(
     if not url or not url.strip():
         raise HTTPException(status_code=400, detail="url is required")
 
-    from datetime import datetime, timezone, timedelta
-    stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
-
-    async with db.begin_nested():
-        # Clean stale running jobs
-        stale_result = await db.execute(
-            select(RecommendationRun).where(
-                RecommendationRun.status == "running",
-                RecommendationRun.run_type == "playlist",
-                RecommendationRun.started_at < stale_cutoff,
-            )
-        )
-        stale_rows = stale_result.scalars().all()
-        if stale_rows:
-            for row in stale_rows:
-                row.status = "failed"
-                row.error_message = "Stale job cleaned - auto-marked failed"
-                row.finished_at = datetime.now(timezone.utc)
-
-        # Atomic conflict check with row lock
-        conflict = await db.execute(
-            select(RecommendationRun.id).where(
-                RecommendationRun.status.in_(["pending", "running"]),
-                RecommendationRun.run_type == "playlist",
-            )
-            .with_for_update()
-            .limit(1)
-        )
-        if conflict.scalar_one_or_none() is not None:
-            raise HTTPException(status_code=409, detail="A playlist sync is already running")
-
-        run = RecommendationRun(
-            run_type="playlist",
-            trigger_type="manual",
-            status="pending",
-            created_by_user_id=current_user.id,
-        )
-        db.add(run)
-        await db.flush()
-        run_id = run.id
-
-    await db.commit()
+    run_id = await create_pending_run(
+        run_type="playlist",
+        current_user_id=current_user.id,
+        trigger_type="manual",
+        conflict_types=["playlist"],
+        lock_scope="playlist",
+        stale_after_minutes=10,
+    )
 
     logger.info(f"[playlist] queued run_id={run_id} url={url} user_id={current_user.id}")
     create_background_task(
@@ -96,7 +62,6 @@ async def sync_playlist(
 async def sync_text_playlist(
     current_user: CurrentUser,
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
     match_threshold: float = 0.75,
     playlist_name: str | None = None,
     overwrite: bool = False,
@@ -135,58 +100,21 @@ async def sync_text_playlist(
     if len(lines) > 500:
         raise HTTPException(status_code=400, detail="单次最多支持 500 首歌曲")
 
-    # 4. Clean stale running jobs and atomically check conflict
-    from datetime import datetime, timezone, timedelta
-    stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
-
-    async with db.begin_nested():
-        stale_result = await db.execute(
-            select(RecommendationRun).where(
-                RecommendationRun.status == "running",
-                RecommendationRun.run_type == "playlist",
-                RecommendationRun.started_at < stale_cutoff,
-            )
-        )
-        stale_rows = stale_result.scalars().all()
-        if stale_rows:
-            for row in stale_rows:
-                row.status = "failed"
-                row.error_message = "Stale job cleaned - auto-marked failed"
-                row.finished_at = datetime.now(timezone.utc)
-
-        # Atomic conflict check with row lock
-        conflict = await db.execute(
-            select(RecommendationRun.id).where(
-                RecommendationRun.status.in_(["pending", "running"]),
-                RecommendationRun.run_type == "playlist",
-            )
-            .with_for_update()
-            .limit(1)
-        )
-        if conflict.scalar_one_or_none() is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="A playlist sync is already running"
-            )
-
-        run = RecommendationRun(
-            run_type="playlist",
-            trigger_type="manual",
-            status="pending",
-            created_by_user_id=current_user.id,
-        )
-        db.add(run)
-        await db.flush()
-        run_id = run.id
-
-    await db.commit()
+    run_id = await create_pending_run(
+        run_type="playlist",
+        current_user_id=current_user.id,
+        trigger_type="manual",
+        conflict_types=["playlist"],
+        lock_scope="playlist",
+        stale_after_minutes=10,
+    )
 
     logger.info(
         f"[text_sync] queued run_id={run_id} "
         f"lines={len(lines)} user_id={current_user.id}"
     )
 
-    # 5. Start background task
+    # 4. Start background task
     create_background_task(
         run_text_sync(
             run_id=run_id,

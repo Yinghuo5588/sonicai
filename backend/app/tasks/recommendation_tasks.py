@@ -6,30 +6,38 @@ logger = logging.getLogger(__name__)
 
 
 async def run_recommendation_job(run_type: str = "full"):
-    """Async entry for APScheduler — creates pending run first, then executes (avoids race)."""
-    from datetime import datetime, timezone
-    from app.db.session import AsyncSessionLocal
-    from app.db.models import RecommendationRun
-
-    async with AsyncSessionLocal() as db:
-        run = RecommendationRun(
-            run_type=run_type,
-            trigger_type="scheduled",
-            status="pending",
-            started_at=None,
-            finished_at=None,
-            created_by_user_id=None,
-        )
-        db.add(run)
-        await db.flush()
-        run_id = run.id
-        await db.commit()
-
+    """Async entry for APScheduler — creates pending run first, then executes."""
+    from fastapi import HTTPException
+    from app.services.job_run_service import create_pending_run
     from app.services.recommendation_service import (
         run_full_recommendation,
         run_similar_tracks_only,
         run_similar_artists_only,
     )
+
+    if run_type == "full":
+        conflict_types = ["full", "similar_tracks", "similar_artists"]
+    elif run_type == "similar_tracks":
+        conflict_types = ["full", "similar_tracks"]
+    elif run_type == "similar_artists":
+        conflict_types = ["full", "similar_artists"]
+    else:
+        logger.warning(f"[scheduler] unknown run_type={run_type}")
+        return
+
+    try:
+        run_id = await create_pending_run(
+            run_type=run_type,
+            current_user_id=None,
+            trigger_type="scheduled",
+            conflict_types=conflict_types,
+            lock_scope="recommendation",
+        )
+    except HTTPException as e:
+        if e.status_code == 409:
+            logger.info(f"[scheduler] skip recommendation job run_type={run_type}: {e.detail}")
+            return
+        raise
 
     logger.info(f"[scheduler] dispatch recommendation job run_type={run_type} run_id={run_id}")
 
@@ -39,15 +47,6 @@ async def run_recommendation_job(run_type: str = "full"):
         await run_similar_tracks_only(run_id=run_id, trigger_type="scheduled")
     elif run_type == "similar_artists":
         await run_similar_artists_only(run_id=run_id, trigger_type="scheduled")
-    else:
-        logger.warning(f"[scheduler] unknown run_type={run_type} run_id={run_id}")
-        async with AsyncSessionLocal() as db:
-            run_row = await db.get(RecommendationRun, run_id)
-            if run_row:
-                run_row.status = "failed"
-                run_row.error_message = f"Unknown scheduled run_type: {run_type}"
-                run_row.finished_at = datetime.now(timezone.utc)
-                await db.commit()
 
 
 async def retry_pending_webhooks():
@@ -101,13 +100,13 @@ async def cleanup_expired_cache():
         logger.info(f"[cache-cleanup] deleted {deleted} expired cache entries")
 
 
-
 async def run_hotboard_cron_job():
     """Cron-triggered hotboard sync task."""
-    from datetime import datetime, timezone
+    from fastapi import HTTPException
     from sqlalchemy import select
     from app.db.session import AsyncSessionLocal
-    from app.db.models import SystemSettings, RecommendationRun
+    from app.db.models import SystemSettings
+    from app.services.job_run_service import create_pending_run
     from app.services.hotboard_recommend import run_hotboard_sync
 
     async with AsyncSessionLocal() as db:
@@ -116,18 +115,20 @@ async def run_hotboard_cron_job():
         if not settings or not settings.hotboard_cron_enabled:
             return
 
-        run = RecommendationRun(
+    try:
+        run_id = await create_pending_run(
             run_type="hotboard",
+            current_user_id=None,
             trigger_type="scheduled",
-            status="pending",
-            started_at=None,
-            finished_at=None,
-            created_by_user_id=None,
+            conflict_types=["hotboard"],
+            lock_scope="hotboard",
+            stale_after_minutes=10,
         )
-        db.add(run)
-        await db.flush()
-        run_id = run.id
-        await db.commit()
+    except HTTPException as e:
+        if e.status_code == 409:
+            logger.info(f"[scheduler] skip hotboard sync: {e.detail}")
+            return
+        raise
 
     logger.info(f"[scheduler] dispatch hotboard sync run_id={run_id}")
 
@@ -143,10 +144,11 @@ async def run_hotboard_cron_job():
 
 async def run_playlist_sync_cron_job():
     """Cron-triggered playlist incremental sync task."""
-    from datetime import datetime, timezone
+    from fastapi import HTTPException
     from sqlalchemy import select
     from app.db.session import AsyncSessionLocal
-    from app.db.models import SystemSettings, RecommendationRun
+    from app.db.models import SystemSettings
+    from app.services.job_run_service import create_pending_run
     from app.services.playlist_incremental import run_incremental_playlist_sync
 
     async with AsyncSessionLocal() as db:
@@ -158,18 +160,20 @@ async def run_playlist_sync_cron_job():
             logger.warning("[scheduler] playlist_sync_cron enabled but no URL configured, skipping")
             return
 
-        run = RecommendationRun(
+    try:
+        run_id = await create_pending_run(
             run_type="playlist",
+            current_user_id=None,
             trigger_type="scheduled",
-            status="pending",
-            started_at=None,
-            finished_at=None,
-            created_by_user_id=None,
+            conflict_types=["playlist"],
+            lock_scope="playlist",
+            stale_after_minutes=10,
         )
-        db.add(run)
-        await db.flush()
-        run_id = run.id
-        await db.commit()
+    except HTTPException as e:
+        if e.status_code == 409:
+            logger.info(f"[scheduler] skip playlist sync: {e.detail}")
+            return
+        raise
 
     logger.info(f"[scheduler] dispatch playlist sync run_id={run_id}")
 
