@@ -17,13 +17,18 @@ async def get_playlist_items(
     db: AsyncSession,
     limit: int,
     offset: int,
+    current_user_id: int | None = None,
 ):
     """Return playlist + items, used by all playlist-item endpoints."""
-    pl_result = await db.execute(
+    query = (
         select(GeneratedPlaylist)
+        .join(RecommendationRun, RecommendationRun.id == GeneratedPlaylist.run_id)
         .where(GeneratedPlaylist.id == playlist_id)
         .where(GeneratedPlaylist.run_id == run_id)
     )
+    if current_user_id is not None:
+        query = query.where(RecommendationRun.created_by_user_id == current_user_id)
+    pl_result = await db.execute(query)
     playlist = pl_result.scalar_one_or_none()
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
@@ -76,8 +81,11 @@ async def get_playlist_items(
     return {
         "playlist": {
             "id": playlist.id,
+            "run_id": playlist.run_id,
             "name": playlist.playlist_name,
+            "playlist_name": playlist.playlist_name,
             "playlist_type": playlist.playlist_type,
+            "playlist_date": playlist.playlist_date,
             "status": playlist.status,
             "matched_count": playlist.matched_count,
             "missing_count": playlist.missing_count,
@@ -105,12 +113,15 @@ async def get_playlist_items_by_id(
 ):
     """Get items by playlist_id alone (used by PlaylistDetailPage)."""
     pl_result = await db.execute(
-        select(GeneratedPlaylist).where(GeneratedPlaylist.id == playlist_id)
+        select(GeneratedPlaylist)
+        .join(RecommendationRun, RecommendationRun.id == GeneratedPlaylist.run_id)
+        .where(GeneratedPlaylist.id == playlist_id)
+        .where(RecommendationRun.created_by_user_id == current_user.id)
     )
     playlist = pl_result.scalar_one_or_none()
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
-    return await get_playlist_items(playlist.run_id, playlist_id, db, limit, offset)
+    return await get_playlist_items(playlist.run_id, playlist_id, db, limit, offset, current_user.id)
 
 
 @router.get("/{run_id}/playlists/{playlist_id}/items")
@@ -123,7 +134,7 @@ async def get_playlist_items_by_run_and_playlist(
     offset: int = 0,
 ):
     """Get items scoped to run+playlist."""
-    return await get_playlist_items(run_id, playlist_id, db, limit, offset)
+    return await get_playlist_items(run_id, playlist_id, db, limit, offset, current_user.id)
 
 
 # ── Runs ─────────────────────────────────────────────────────────────────────

@@ -61,10 +61,13 @@ export default function RunDetailPage() {
     },
   })
 
+  const isActiveRun = run?.status === 'pending' || run?.status === 'running'
+
   const { data: playlists, isLoading: playlistsLoading, error: playlistsError } = useQuery({
     queryKey: ['run-playlists', rid],
     queryFn: () => fetchRunPlaylists(rid),
     enabled: !!run,
+    refetchInterval: isActiveRun ? 3000 : false,
   })
 
   const stopMutation = useMutation({
