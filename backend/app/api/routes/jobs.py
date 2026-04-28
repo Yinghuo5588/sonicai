@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select
 
 from app.db.session import get_db
 from app.db.models import SystemSettings, RecommendationRun
@@ -21,39 +21,39 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
-async def _has_conflicting_job(db: AsyncSession, run_types: list[str]) -> bool:
-    """Return True if there's a pending or running job of any of the given run_types."""
-    result = await db.execute(
-        select(RecommendationRun.id).where(
-            and_(
-                RecommendationRun.status.in_(["pending", "running"]),
-                RecommendationRun.run_type.in_(run_types),
-            )
-        ).limit(1)
-    )
-    return result.scalar_one_or_none() is not None
-
-
 async def _create_pending_run(
     db: AsyncSession,
     run_type: str,
     current_user_id: int | None,
     trigger_type: str = "manual",
+    conflict_types: list[str] | None = None,
 ) -> int:
-    """Atomically check for conflicts and create a pending run within a single transaction."""
+    """
+    Atomically check for conflicts and create a pending run within a single transaction.
+
+    Args:
+        conflict_types: list of run_types that are considered conflicting.
+                        Defaults to [run_type] (only same type conflicts).
+    """
+    if conflict_types is None:
+        conflict_types = [run_type]
+
     async with db.begin():
-        # Lock existing pending/running rows of the same type to prevent race
+        # Lock all potentially conflicting rows to prevent race conditions
         result = await db.execute(
             select(RecommendationRun.id)
             .where(
                 RecommendationRun.status.in_(["pending", "running"]),
-                RecommendationRun.run_type == run_type,
+                RecommendationRun.run_type.in_(conflict_types),
             )
             .with_for_update()
             .limit(1)
         )
         if result.scalar_one_or_none() is not None:
-            raise HTTPException(status_code=409, detail=f"A {run_type} job is already pending or running")
+            raise HTTPException(
+                status_code=409,
+                detail=f"A job of type(s) {', '.join(conflict_types)} is already pending or running",
+            )
 
         run = RecommendationRun(
             run_type=run_type,
@@ -72,11 +72,14 @@ async def _create_pending_run(
 
 @router.post("/run-all")
 async def run_all(current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
-    if await _has_conflicting_job(db, ["full", "similar_tracks", "similar_artists"]):
-        raise HTTPException(status_code=409, detail="Another recommendation job is already running")
-
     logger.info(f"[jobs] queue run_type=full user_id={current_user.id}")
-    run_id = await _create_pending_run(db, "full", current_user.id, trigger_type="manual")
+    run_id = await _create_pending_run(
+        db,
+        "full",
+        current_user.id,
+        trigger_type="manual",
+        conflict_types=["full", "similar_tracks", "similar_artists"],
+    )
     logger.info(f"[jobs] queued run_type=full run_id={run_id} user_id={current_user.id}")
     create_background_task(run_full_recommendation(run_id=run_id, trigger_type="manual"), name=f"full-recommendation-{run_id}")
     return {"message": "Job queued", "type": "full", "run_id": run_id}
@@ -84,11 +87,14 @@ async def run_all(current_user: CurrentUser, db: AsyncSession = Depends(get_db))
 
 @router.post("/run-similar-tracks")
 async def run_similar_tracks(current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
-    if await _has_conflicting_job(db, ["full", "similar_tracks"]):
-        raise HTTPException(status_code=409, detail="A similar-tracks related job is already running")
-
     logger.info(f"[jobs] queue run_type=similar_tracks user_id={current_user.id}")
-    run_id = await _create_pending_run(db, "similar_tracks", current_user.id, trigger_type="manual")
+    run_id = await _create_pending_run(
+        db,
+        "similar_tracks",
+        current_user.id,
+        trigger_type="manual",
+        conflict_types=["full", "similar_tracks"],
+    )
     logger.info(f"[jobs] queued run_type=similar_tracks run_id={run_id} user_id={current_user.id}")
     create_background_task(run_similar_tracks_only(run_id=run_id, trigger_type="manual"), name=f"similar-tracks-{run_id}")
     return {"message": "Job queued", "type": "similar_tracks", "run_id": run_id}
@@ -96,11 +102,14 @@ async def run_similar_tracks(current_user: CurrentUser, db: AsyncSession = Depen
 
 @router.post("/run-similar-artists")
 async def run_similar_artists(current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
-    if await _has_conflicting_job(db, ["full", "similar_artists"]):
-        raise HTTPException(status_code=409, detail="A similar-artists related job is already running")
-
     logger.info(f"[jobs] queue run_type=similar_artists user_id={current_user.id}")
-    run_id = await _create_pending_run(db, "similar_artists", current_user.id, trigger_type="manual")
+    run_id = await _create_pending_run(
+        db,
+        "similar_artists",
+        current_user.id,
+        trigger_type="manual",
+        conflict_types=["full", "similar_artists"],
+    )
     logger.info(f"[jobs] queued run_type=similar_artists run_id={run_id} user_id={current_user.id}")
     create_background_task(run_similar_artists_only(run_id=run_id, trigger_type="manual"), name=f"similar-artists-{run_id}")
     return {"message": "Job queued", "type": "similar_artists", "run_id": run_id}
