@@ -47,19 +47,19 @@ class SettingsResponse(BaseModel):
     cron_enabled: bool
     cron_expression: str | None
     # Hotboard scheduled sync
-    hotboard_cron_enabled: bool = False
+    hotboard_cron_enabled: bool | None = False
     hotboard_cron_expression: str | None = None
-    hotboard_limit: int = 50
+    hotboard_limit: int | None = 50
     hotboard_match_threshold: float | None = None
     hotboard_playlist_name: str | None = None
-    hotboard_overwrite: bool = True
+    hotboard_overwrite: bool | None = True
     # Playlist URL scheduled sync
-    playlist_sync_cron_enabled: bool = False
+    playlist_sync_cron_enabled: bool | None = False
     playlist_sync_cron_expression: str | None = None
     playlist_sync_url: str | None = None
     playlist_sync_threshold: float | None = None
     playlist_sync_name: str | None = None
-    playlist_sync_overwrite: bool = False
+    playlist_sync_overwrite: bool | None = False
 
     class Config:
         from_attributes = True
