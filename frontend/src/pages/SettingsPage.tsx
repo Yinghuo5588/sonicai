@@ -27,6 +27,7 @@ async function testWebhook() {
 // ── Field metadata ───────────────────────────────────────────────────────────────
 
 const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: string }> = {
+  // ── 推荐核心参数 ──
   library_mode_default: {
     label: '推荐模式',
     type: 'select',
@@ -98,6 +99,8 @@ const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: stri
       ' 默认：14  推荐：7 - 30\n' +
       ' 0 = 不去重，可能连续出现重复',
   },
+
+  // ── 种子策略 ──
   seed_source_mode: {
     label: '种子来源模式',
     type: 'select',
@@ -127,6 +130,8 @@ const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: stri
       ' 默认：70  推荐：50 - 80\n' +
       ' 70 → 70% 来自最近播放，30% 来自历史排行',
   },
+
+  // ── 匹配与候选池 ──
   match_threshold: {
     label: '匹配阈值',
     type: 'slider',
@@ -141,6 +146,8 @@ const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: stri
       ' 默认：5  推荐：3 - 10\n' +
       ' 太高可能被 Navidrome 限流，注意服务器负载',
   },
+
+  // ── 其他 ──
   playlist_keep_days: {
     label: '歌单保留天数',
     type: 'number',
@@ -181,21 +188,32 @@ const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: stri
 
 function Tooltip({ text }: { text: string }) {
   const [open, setOpen] = useState(false)
+
   if (!text) return null
+
   const lines = text.split('\n')
+
   return (
     <span className="relative inline-block ml-1.5 align-middle">
       <button
         type="button"
         className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600 text-[10px] font-bold flex items-center justify-center transition-colors"
-        onClick={(e) => { e.stopPropagation(); setOpen(v => !v) }}
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpen(v => !v)
+        }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         title={text}
-      >?</button>
+      >
+        ?
+      </button>
+
       {open && (
         <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-white text-slate-700 text-xs rounded-lg p-3 shadow-lg border border-slate-200 pointer-events-auto">
           <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-white" />
-          {lines.map((line, i) => (<p key={i} className="leading-relaxed">{line || <br />}</p>))}
+          {lines.map((line, i) => (
+            <p key={i} className="leading-relaxed">{line || <br />}</p>
+          ))}
         </div>
       )}
     </span>
@@ -205,6 +223,7 @@ function Tooltip({ text }: { text: string }) {
 function FieldInput({ fieldKey, value, onChange }: { fieldKey: string; value: unknown; onChange: (v: unknown) => void }) {
   const meta = FIELD_LABELS[fieldKey]
   if (!meta) return null
+
   if (meta.type === 'select') {
     const options: Record<string, string[]> = {
       library_mode_default: ['library_only', 'allow_missing'],
@@ -214,14 +233,20 @@ function FieldInput({ fieldKey, value, onChange }: { fieldKey: string; value: un
     const opts = options[fieldKey] || []
     return (
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">{meta.label}<Tooltip text={meta.tooltip || ''} /></label>
-        <select value={String(value ?? '')} onChange={e => onChange(e.target.value)}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
+          {meta.label}<Tooltip text={meta.tooltip || ''} />
+        </label>
+        <select
+          value={String(value ?? '')}
+          onChange={e => onChange(e.target.value)}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        >
           {opts.map(opt => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       </div>
     )
   }
+
   if (meta.type === 'slider') {
     const numVal = Number(value ?? 55)
     return (
@@ -231,21 +256,32 @@ function FieldInput({ fieldKey, value, onChange }: { fieldKey: string; value: un
           <span className="font-medium text-slate-700">{meta.label}：{numVal}</span>
           <span>探索</span>
         </div>
-        <input type="range" min="0" max="100" value={numVal}
+        <input
+          type="range" min="0" max="100"
+          value={numVal}
           onChange={e => onChange(Number(e.target.value))}
-          className="w-full accent-orange-500" />
+          className="w-full accent-orange-500"
+        />
       </div>
     )
   }
+
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1">{meta.label}<Tooltip text={meta.tooltip || ''} /></label>
-      <input type={meta.type || 'text'} value={String(value ?? '')}
+      <label className="block text-sm font-medium text-slate-700 mb-1">
+        {meta.label}<Tooltip text={meta.tooltip || ''} />
+      </label>
+      <input
+        type={meta.type || 'text'}
+        value={String(value ?? '')}
         onChange={e => onChange(meta.type === 'number' ? Number(e.target.value) : e.target.value)}
-        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+      />
     </div>
   )
 }
+
+// ── Section card ────────────────────────────────────────────────────────────────
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -256,19 +292,34 @@ function SectionCard({ title, children }: { title: string; children: React.React
   )
 }
 
-function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+// ── Collapsible section ────────────────────────────────────────────────────────
+
+function CollapsibleSection({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="border border-slate-200 rounded-lg">
-      <button type="button" onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+      >
         <span className="text-sm font-medium text-slate-700">{title}</span>
-        <span className="text-slate-400 text-xs">{open ? '收起' : '展开'}</span>
+        <span className="text-slate-400 text-xs">{open ? '收起 ▲' : '展开 ▼'}</span>
       </button>
       {open && <div className="p-4 space-y-4">{children}</div>}
     </div>
   )
 }
+
+// ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const queryClient = useQueryClient()
@@ -277,11 +328,16 @@ export default function SettingsPage() {
     mutationFn: updateSettings,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
   })
+
   const [form, setForm] = useState<Record<string, unknown>>({})
+
+  // Connection tab state
   const [navidromeResult, setNavidromeResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [navidromeLoading, setNavidromeLoading] = useState(false)
   const [webhookResult, setWebhookResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [webhookLoading, setWebhookLoading] = useState(false)
+
+  // Account tab state
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordLoading, setPasswordLoading] = useState(false)
@@ -289,8 +345,14 @@ export default function SettingsPage() {
   const [importResult, setImportResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
+
   const s = { ...data, ...form }
-  const handleChange = (key: string, value: unknown) => { setForm(prev => ({ ...prev, [key]: value })) }
+
+  const handleChange = (key: string, value: unknown) => {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  // ── Test handlers ─────────────────────────────────────────────────────────────
 
   const handleTestNavidrome = async () => {
     setNavidromeLoading(true)
@@ -298,8 +360,11 @@ export default function SettingsPage() {
     try {
       const result = await testNavidrome()
       setNavidromeResult({ ok: true, msg: result.message || '连接成功' })
-    } catch (err: any) { setNavidromeResult({ ok: false, msg: err.message }) }
-    finally { setNavidromeLoading(false) }
+    } catch (err: any) {
+      setNavidromeResult({ ok: false, msg: err.message })
+    } finally {
+      setNavidromeLoading(false)
+    }
   }
 
   const handleTestWebhook = async () => {
@@ -308,9 +373,14 @@ export default function SettingsPage() {
     try {
       const result = await testWebhook()
       setWebhookResult({ ok: true, msg: result.message || '连接成功' })
-    } catch (err: any) { setWebhookResult({ ok: false, msg: err.message }) }
-    finally { setWebhookLoading(false) }
+    } catch (err: any) {
+      setWebhookResult({ ok: false, msg: err.message })
+    } finally {
+      setWebhookLoading(false)
+    }
   }
+
+  // ── Password & backup handlers ────────────────────────────────────────────────
 
   const handleChangePassword = async () => {
     setPasswordLoading(true)
@@ -324,13 +394,19 @@ export default function SettingsPage() {
     try {
       await apiFetch('/auth/change-password', {
         method: 'POST',
-        body: JSON.stringify({ old_password: validation.data.oldPassword, new_password: validation.data.newPassword }),
+        body: JSON.stringify({
+          old_password: validation.data.oldPassword,
+          new_password: validation.data.newPassword,
+        }),
       })
       setPasswordResult({ ok: true, msg: '密码修改成功' })
       setOldPassword('')
       setNewPassword('')
-    } catch (err: any) { setPasswordResult({ ok: false, msg: err.message }) }
-    finally { setPasswordLoading(false) }
+    } catch (err: any) {
+      setPasswordResult({ ok: false, msg: err.message })
+    } finally {
+      setPasswordLoading(false)
+    }
   }
 
   const handleExport = async () => {
@@ -343,7 +419,9 @@ export default function SettingsPage() {
       a.download = `sonicai-config-${new Date().toISOString().slice(0, 10)}.json`
       a.click()
       URL.revokeObjectURL(url)
-    } catch (err: any) { alert('导出失败: ' + (err.message || '未知错误')) }
+    } catch (err: any) {
+      alert('导出失败: ' + (err.message || '未知错误'))
+    }
   }
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -360,16 +438,21 @@ export default function SettingsPage() {
       })
       setImportResult({ ok: true, msg: `导入成功，更新了 ${result.updated_fields.length} 个字段` })
       queryClient.invalidateQueries({ queryKey: ['settings'] })
-    } catch (err: any) { setImportResult({ ok: false, msg: '导入失败: ' + (err.message || '未知错误') }) }
-    finally { e.target.value = '' }
+    } catch (err: any) {
+      setImportResult({ ok: false, msg: '导入失败: ' + (err.message || '未知错误') })
+    } finally {
+      e.target.value = ''
+    }
   }
 
   return (
     <div className="p-4 md:p-6 max-w-2xl space-y-4">
       <h1 className="text-xl md:text-2xl font-bold text-slate-800">系统配置</h1>
 
+      {/* ========== 服务连接 ========== */}
       <CollapsibleSection title="服务连接" defaultOpen={true}>
         <div className="space-y-4">
+          {/* Last.fm */}
           <SectionCard title="Last.fm">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -385,6 +468,7 @@ export default function SettingsPage() {
             </div>
           </SectionCard>
 
+          {/* Navidrome */}
           <SectionCard title="Navidrome">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs text-slate-400">测试与 Navidrome 服务器的连通性</span>
@@ -419,6 +503,7 @@ export default function SettingsPage() {
             </div>
           </SectionCard>
 
+          {/* Webhook */}
           <SectionCard title="Webhook">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs text-slate-400">测试 Webhook URL 连通性</span>
@@ -452,12 +537,14 @@ export default function SettingsPage() {
             </div>
           </SectionCard>
 
+          {/* Playlist API */}
           <SectionCard title="歌单解析">
             <FieldInput fieldKey="playlist_api_url" value={s.playlist_api_url} onChange={v => handleChange('playlist_api_url', v)} />
           </SectionCard>
         </div>
       </CollapsibleSection>
 
+      {/* ========== 推荐源 (Last.fm) ========== */}
       <CollapsibleSection title="推荐源 (Last.fm 抓取策略)" defaultOpen={false}>
         <div className="space-y-4">
           <SectionCard title="种子抓取策略">
@@ -474,6 +561,7 @@ export default function SettingsPage() {
               )}
             </div>
           </SectionCard>
+
           <SectionCard title="获取数量控制">
             <div className="grid grid-cols-2 gap-3">
               <FieldInput fieldKey="top_track_seed_limit" value={s.top_track_seed_limit} onChange={v => handleChange('top_track_seed_limit', v)} />
@@ -486,6 +574,7 @@ export default function SettingsPage() {
         </div>
       </CollapsibleSection>
 
+      {/* ========== 歌单匹配 (Navidrome) ========== */}
       <CollapsibleSection title="歌单匹配 (Navidrome 生成与匹配)" defaultOpen={false}>
         <div className="space-y-4">
           <SectionCard title="歌单规模">
@@ -494,6 +583,7 @@ export default function SettingsPage() {
               <FieldInput fieldKey="artist_playlist_size" value={s.artist_playlist_size} onChange={v => handleChange('artist_playlist_size', v)} />
             </div>
           </SectionCard>
+
           <SectionCard title="推荐平衡与预览">
             <FieldInput fieldKey="recommendation_balance" value={s.recommendation_balance} onChange={v => handleChange('recommendation_balance', v)} />
             <RecommendPreview
@@ -504,6 +594,7 @@ export default function SettingsPage() {
               threshold={Number(s.match_threshold) || 0.75}
             />
           </SectionCard>
+
           <SectionCard title="匹配与搜索">
             <div className="space-y-3">
               <FieldInput fieldKey="match_threshold" value={s.match_threshold} onChange={v => handleChange('match_threshold', v)} />
@@ -515,6 +606,7 @@ export default function SettingsPage() {
         </div>
       </CollapsibleSection>
 
+      {/* ========== 调度设置 ========== */}
       <CollapsibleSection title="调度设置" defaultOpen={false}>
         <div className="space-y-4">
           <SectionCard title="推荐定时任务">
@@ -625,6 +717,7 @@ export default function SettingsPage() {
         </div>
       </CollapsibleSection>
 
+      {/* ========== 账户与备份 ========== */}
       <CollapsibleSection title="账户与备份" defaultOpen={false}>
         <div className="space-y-4">
           <SectionCard title="修改密码">
@@ -677,12 +770,20 @@ export default function SettingsPage() {
         </div>
       </CollapsibleSection>
 
-      <button onClick={() => mutation.mutate(form)} disabled={mutation.isPending}
-        className="bg-blue-500 text-white px-6 py-2.5 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm font-medium">
+      {/* Save button */}
+      <button
+        onClick={() => mutation.mutate(form)}
+        disabled={mutation.isPending}
+        className="bg-blue-500 text-white px-6 py-2.5 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm font-medium"
+      >
         {mutation.isPending ? '保存中...' : '保存配置'}
       </button>
-      {mutation.isSuccess && <p className="text-green-600 text-sm"><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />已保存</p>}
-      {mutation.isError && <p className="text-red-500 text-sm">保存失败</p>}
+      {mutation.isSuccess && (
+        <p className="text-green-600 text-sm"><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />已保存</p>
+      )}
+      {mutation.isError && (
+        <p className="text-red-500 text-sm">保存失败</p>
+      )}
     </div>
   )
 }
