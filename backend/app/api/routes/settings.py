@@ -104,19 +104,19 @@ class SettingsUpdate(BaseModel):
     cron_enabled: bool | None = None
     cron_expression: str | None = None
     # Hotboard scheduled sync
-    hotboard_cron_enabled: bool | None = None
+    hotboard_cron_enabled: bool | None = False
     hotboard_cron_expression: str | None = None
-    hotboard_limit: int | None = Field(default=None, ge=1, le=200)
-    hotboard_match_threshold: float | None = Field(default=None, ge=0.5, le=0.95)
+    hotboard_limit: int | None = 50
+    hotboard_match_threshold: float | None = None
     hotboard_playlist_name: str | None = None
-    hotboard_overwrite: bool | None = None
+    hotboard_overwrite: bool | None = True
     # Playlist URL scheduled sync
-    playlist_sync_cron_enabled: bool | None = None
+    playlist_sync_cron_enabled: bool | None = False
     playlist_sync_cron_expression: str | None = None
     playlist_sync_url: str | None = None
-    playlist_sync_threshold: float | None = Field(default=None, ge=0.5, le=0.95)
+    playlist_sync_threshold: float | None = None
     playlist_sync_name: str | None = None
-    playlist_sync_overwrite: bool | None = None
+    playlist_sync_overwrite: bool | None = False
 
 
 async def get_settings_session(db: AsyncSessionLocal):
