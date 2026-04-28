@@ -40,19 +40,33 @@ async def _create_pending_run(
     current_user_id: int | None,
     trigger_type: str = "manual",
 ) -> int:
-    """Create a pending run in DB first, then hand off to async task (avoids race)."""
-    run = RecommendationRun(
-        run_type=run_type,
-        trigger_type=trigger_type,
-        status="pending",
-        started_at=None,
-        finished_at=None,
-        created_by_user_id=current_user_id,
-    )
-    db.add(run)
-    await db.flush()
-    run_id = run.id
-    await db.commit()
+    """Atomically check for conflicts and create a pending run within a single transaction."""
+    async with db.begin():
+        # Lock existing pending/running rows of the same type to prevent race
+        result = await db.execute(
+            select(RecommendationRun.id)
+            .where(
+                RecommendationRun.status.in_(["pending", "running"]),
+                RecommendationRun.run_type == run_type,
+            )
+            .with_for_update()
+            .limit(1)
+        )
+        if result.scalar_one_or_none() is not None:
+            raise HTTPException(status_code=409, detail=f"A {run_type} job is already pending or running")
+
+        run = RecommendationRun(
+            run_type=run_type,
+            trigger_type=trigger_type,
+            status="pending",
+            started_at=None,
+            finished_at=None,
+            created_by_user_id=current_user_id,
+        )
+        db.add(run)
+        await db.flush()
+        run_id = run.id
+
     return run_id
 
 

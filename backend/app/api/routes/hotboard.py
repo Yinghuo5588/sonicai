@@ -37,46 +37,48 @@ async def sync_hotboard(
     if not (0.0 < match_threshold <= 1.0):
         raise HTTPException(status_code=400, detail="match_threshold must be between 0 and 1")
 
-    # Clean up any stale hotboard jobs stuck in "running" state (≥10 min)
+    # Atomically clean stale jobs and check for running ones to prevent race
     from datetime import datetime, timezone, timedelta
     stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
-    stale_result = await db.execute(
-        select(RecommendationRun)
-        .where(
-            RecommendationRun.status == "running",
-            RecommendationRun.run_type == "hotboard",
-            RecommendationRun.started_at < stale_cutoff,
+
+    async with db.begin():
+        stale_result = await db.execute(
+            select(RecommendationRun)
+            .where(
+                RecommendationRun.status == "running",
+                RecommendationRun.run_type == "hotboard",
+                RecommendationRun.started_at < stale_cutoff,
+            )
         )
-    )
-    stale_rows = stale_result.scalars().all()
-    if stale_rows:
-        logger.info(f"[hotboard] cleaning {len(stale_rows)} stale stuck hotboard runs")
-        for row in stale_rows:
-            row.status = "failed"
-            row.error_message = "Stale job cleaned — auto-marked failed"
-            row.finished_at = datetime.now(timezone.utc)
-        await db.commit()
+        stale_rows = stale_result.scalars().all()
+        if stale_rows:
+            logger.info(f"[hotboard] cleaning {len(stale_rows)} stale stuck hotboard runs")
+            for row in stale_rows:
+                row.status = "failed"
+                row.error_message = "Stale job cleaned — auto-marked failed"
+                row.finished_at = datetime.now(timezone.utc)
 
-    # Check for currently running jobs
-    result = await db.execute(
-        select(RecommendationRun.id).where(
-            RecommendationRun.status.in_(["pending", "running"]),
-            RecommendationRun.run_type == "hotboard",
-        ).limit(1)
-    )
-    if result.scalar_one_or_none() is not None:
-        raise HTTPException(status_code=409, detail="A hotboard sync is already running")
+        conflict = await db.execute(
+            select(RecommendationRun.id)
+            .where(
+                RecommendationRun.status.in_(["pending", "running"]),
+                RecommendationRun.run_type == "hotboard",
+            )
+            .with_for_update()
+            .limit(1)
+        )
+        if conflict.scalar_one_or_none() is not None:
+            raise HTTPException(status_code=409, detail="A hotboard sync is already running")
 
-    run = RecommendationRun(
-        run_type="hotboard",
-        trigger_type="manual",
-        status="pending",
-        created_by_user_id=current_user.id,
-    )
-    db.add(run)
-    await db.flush()
-    run_id = run.id
-    await db.commit()
+        run = RecommendationRun(
+            run_type="hotboard",
+            trigger_type="manual",
+            status="pending",
+            created_by_user_id=current_user.id,
+        )
+        db.add(run)
+        await db.flush()
+        run_id = run.id
 
     from app.core.task_registry import create_background_task
     logger.info(f"[hotboard] queued run_id={run_id} user_id={current_user.id}")

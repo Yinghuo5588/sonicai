@@ -36,7 +36,9 @@ async def load_cron_schedule(db: AsyncSession):
 
     sched = get_scheduler()
 
-    # Remove existing jobs if any
+    # Remove existing cron jobs if any
+    # APScheduler handles running jobs gracefully — removal waits for the
+    # currently-executing instance to yield at an await point before removing
     for job in sched.get_jobs():
         if job.id in ("recommendation_cron", "hotboard_cron", "playlist_sync_cron"):
             job.remove()
@@ -143,8 +145,7 @@ def shutdown_scheduler():
         _scheduler = None
         logger.info("Scheduler stopped")
 
-# Register cache cleanup job (every 6 hours) — appended at end of load_cron_schedule
-# This is handled at the end of the function
+
 def _register_cache_cleanup(sched):
     from app.tasks.recommendation_tasks import cleanup_expired_cache
     from apscheduler.triggers.interval import IntervalTrigger
