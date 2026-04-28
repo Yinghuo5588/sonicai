@@ -21,7 +21,12 @@ export default function Layout() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await apiFetch('/auth/logout', { method: 'POST' })
+    } catch {
+      // 即使后端返回错误，客户端仍需退出
+    }
     logout()
     navigate('/login')
   }

@@ -19,7 +19,7 @@ from app.services.lastfm_service import (
     get_similar_tracks, get_similar_artists, get_artist_top_tracks,
 )
 from app.services.navidrome_service import navidrome_search, navidrome_create_playlist, navidrome_add_to_playlist, navidrome_delete_playlist
-from app.utils.text_normalizer import normalize_title, normalize_artist, dedup_key
+from app.utils.text_normalizer import dedup_key
 
 logger = logging.getLogger(__name__)
 
@@ -473,7 +473,8 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
     recent_seed_artists = [{"name": a[0].title(), "play_count": a[1]} for a in sorted_recent_artists[:settings.top_artist_seed_limit]]
 
     if len(recent_seed_artists) < settings.top_artist_seed_limit:
-        top_artists = await get_user_top_artists(settings.lastfm_username, limit=settings.top_artist_seed_limit, period="1month")
+        period = getattr(settings, 'top_period', '1month') or '1month'
+        top_artists = await get_user_top_artists(settings.lastfm_username, limit=settings.top_artist_seed_limit, period=period)
         existing = {a["name"].lower() for a in recent_seed_artists}
         for a in top_artists:
             name = a.get("name", "")
@@ -618,7 +619,6 @@ async def _filter_recent(db: AsyncSession, candidates: list[dict], avoid_days: i
 
 async def _match_to_navidrome(db: AsyncSession, item_data: dict, settings) -> dict | None:
     from app.utils.text_normalizer import score_candidate, make_search_queries
-    logger = logging.getLogger(__name__)
     title = item_data["title"]
     artist = item_data["artist"]
     queries = make_search_queries(title, artist)

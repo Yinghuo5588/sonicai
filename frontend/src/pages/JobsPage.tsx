@@ -3,7 +3,8 @@ import { useMutation } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 
 async function triggerJob(type: string) {
-  return apiFetch(`/jobs/run-${type}`, { method: 'POST' })
+  const endpoint = type === 'full' ? 'all' : type
+  return apiFetch(`/jobs/run-${endpoint}`, { method: 'POST' })
 }
 
 async function triggerHotboard(limit: number, threshold: number, playlistName: string, overwrite: boolean) {
@@ -27,7 +28,7 @@ async function triggerPlaylistSync(url: string, threshold: number, playlistName:
 
 
 export default function JobsPage() {
-  const allMutation = useMutation({ mutationFn: () => triggerJob('full') })
+  const allMutation = useMutation({ mutationFn: () => triggerJob('all') })
   const tracksMutation = useMutation({ mutationFn: () => triggerJob('similar-tracks') })
   const artistsMutation = useMutation({ mutationFn: () => triggerJob('similar-artists') })
 

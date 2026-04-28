@@ -10,16 +10,9 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.56.2",
-    "@tanstack/react-table": "^8.20.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-hook-form": "^7.53.0",
     "react-router-dom": "^6.26.2",
-    "recharts": "^2.12.7",
-    "zod": "^3.23.8",
-    "date-fns": "^3.6.0",
-    "lucide-react": "^0.441.0",
-    "clsx": "^2.1.1",
     "zustand": "^4.5.4"
   },
   "devDependencies": {

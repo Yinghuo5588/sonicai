@@ -1,7 +1,6 @@
 """Recommendation task — calls the recommendation service."""
 
 import logging
-import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -101,23 +100,6 @@ async def cleanup_expired_cache():
         await db.commit()
         logger.info(f"[cache-cleanup] deleted {deleted} expired cache entries")
 
-
-def cleanup_old_playlists():
-    """Cleanup task (synchronous APScheduler entry)."""
-    from sqlalchemy import select
-    from app.db.session import AsyncSessionLocal
-    from app.db.models import SystemSettings
-
-    async def _do():
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(SystemSettings))
-            settings = result.scalar_one_or_none()
-        if not settings:
-            return
-        from app.services.recommendation_service import _cleanup_old_playlists
-        await _cleanup_old_playlists(settings)
-
-    asyncio.run(_do())
 
 
 async def run_hotboard_cron_job():

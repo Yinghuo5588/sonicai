@@ -19,7 +19,6 @@ from app.services.navidrome_service import (
     navidrome_delete_playlist,
     navidrome_list_playlists,
 )
-from app.services.matching_service import pick_best_match
 from app.utils.text_normalizer import dedup_key
 from app.services.webhook_service import send_webhook_batch
 

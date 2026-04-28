@@ -44,14 +44,3 @@ def pick_best_match(
         "score": best_score,
     }
 
-
-async def search_and_match(
-    title: str,
-    artist: str,
-    threshold: float = 0.75,
-) -> dict | None:
-    """
-    Convenience: run multi-strategy Navidrome search + pick_best_match in one call.
-    """
-    nav_results = await navidrome_multi_search(title, artist)
-    return pick_best_match(title, artist, nav_results, threshold)

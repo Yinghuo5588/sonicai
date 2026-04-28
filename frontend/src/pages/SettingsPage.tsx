@@ -271,7 +271,10 @@ export default function SettingsPage() {
   const [webhookLoading, setWebhookLoading] = useState(false)
 
   const [advancedOpen, setAdvancedOpen] = useState(false)
-
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [passwordLoading, setPasswordLoading] = useState(false)
+  const [passwordResult, setPasswordResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
 
   if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
@@ -340,6 +343,24 @@ export default function SettingsPage() {
 
   }
 
+
+  const handleChangePassword = async () => {
+    setPasswordLoading(true)
+    setPasswordResult(null)
+    try {
+      const result = await apiFetch('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+      })
+      setPasswordResult({ ok: true, msg: '密码修改成功' })
+      setOldPassword('')
+      setNewPassword('')
+    } catch (err: any) {
+      setPasswordResult({ ok: false, msg: err.message })
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
 
 
   return (
@@ -454,7 +475,42 @@ export default function SettingsPage() {
 
       </section>
 
-
+      {/* 修改密码 */}
+      <section className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
+        <h2 className="font-medium text-slate-700 text-sm">修改密码</h2>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">旧密码</label>
+            <input
+              type="password"
+              value={oldPassword}
+              onChange={e => setOldPassword(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">新密码（至少6位）</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            />
+          </div>
+          <button
+            onClick={handleChangePassword}
+            disabled={!oldPassword || newPassword.length < 6 || passwordLoading}
+            className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-600 disabled:opacity-50"
+          >
+            {passwordLoading ? '修改中...' : '修改密码'}
+          </button>
+          {passwordResult && (
+            <p className={`text-sm ${passwordResult.ok ? 'text-green-600' : 'text-red-500'}`}>
+              {passwordResult.ok ? 'ok ' : 'err '}{passwordResult.msg}
+            </p>
+          )}
+        </div>
+      </section>
 
       {/* Webhook */}
 
