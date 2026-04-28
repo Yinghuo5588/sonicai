@@ -28,33 +28,175 @@ type Tab = typeof TABS[number]
 
 // ── Field metadata ───────────────────────────────────────────────────────────────
 
-const FIELD_LABELS: Record<string, { label: string; type?: string; help?: string }> = {
-  // Recommendation params
-  library_mode_default: { label: '推荐模式', type: 'select', help: 'library_only=仅推荐库内曲目，allow_missing=允许缺失发Webhook' },
-  top_track_seed_limit: { label: '种子曲目数', type: 'number', help: '相似曲目歌单从多少首种子歌出发' },
-  top_artist_seed_limit: { label: '种子艺术家数', type: 'number', help: '相邻艺术家歌单从多少个种子艺人出发' },
-  similar_track_limit: { label: '每曲相似曲目数', type: 'number', help: '每首种子歌曲获取多少首相似曲目' },
-  similar_artist_limit: { label: '每种子取相似艺术家数', type: 'number', help: '每个种子艺人获取多少个相似艺人' },
-  artist_top_track_limit: { label: '每相似艺术家热门歌曲', type: 'number', help: '每个相似艺人取多少首热门歌曲' },
-  similar_playlist_size: { label: '相似曲目歌单大小', type: 'number', help: '相似曲目歌单最终保留多少首歌' },
-  artist_playlist_size: { label: '相邻艺术家歌单大小', type: 'number', help: '相邻艺术家歌单最终保留多少首歌' },
-  duplicate_avoid_days: { label: '去重天数', type: 'number', help: '最近多少天推荐过的歌不再重复推荐，0=关闭' },
-  recommendation_balance: { label: '推荐平衡', type: 'slider', help: '0=更保守，100=更探索' },
-  seed_source_mode: { label: '种子来源模式', type: 'select', help: 'recent_only=只用最近播放，top_only=只用历史排行，recent_plus_top=混合' },
-  recent_tracks_limit: { label: 'Recent Tracks 抓取条数', type: 'number', help: 'recent种子统计窗口大小' },
-  top_period: { label: 'Top 数据周期', type: 'select', help: 'user.getTopTracks 的 period 参数' },
-  recent_top_mix_ratio: { label: 'Recent/Top 混合比例', type: 'slider', help: '种子中 recent 的占比，70=70% recent 30% top' },
-  match_threshold: { label: '匹配阈值', type: 'slider', help: 'Navidrome 搜索结果接受的最小分数，0.5-0.95' },
-  candidate_pool_multiplier_min: { label: '候选池最小倍数', type: 'number', help: '候选池 = 推荐数量 × 倍数' },
-  candidate_pool_multiplier_max: { label: '候选池最大倍数', type: 'number', help: '候选池上限，平衡质量与覆盖' },
-  search_concurrency: { label: '搜索并发数', type: 'number', help: 'Navidrome 并发搜索数，1-20，默认5' },
-  // Scheduler
-  playlist_keep_days: { label: '歌单保留天数', type: 'number', help: '推荐歌单在 Navidrome 中保留几天' },
-  max_concurrent_tasks: { label: '任务并发数', type: 'number', help: '全局后台任务最大同时运行数，1-5，默认2' },
-  // Connection
-  playlist_api_url: { label: 'Playlist API 地址', type: 'text', help: '第三方歌单解析 API。例: https://sss.unmeta.cn/songlist' },
-  webhook_retry_count: { label: 'Webhook 重试次数', type: 'number', help: '缺失歌曲 webhook 失败后自动重试次数' },
-  webhook_timeout_seconds: { label: 'Webhook 超时时间', type: 'number', help: 'Webhook 请求超时秒数' },
+const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: string }> = {
+  // ── 推荐核心参数 ──
+  library_mode_default: {
+    label: '推荐模式',
+    type: 'select',
+    tooltip: '▸ 控制缺失歌曲的处理方式\n' +
+      ' 默认：library_only  可选：allow_missing\n' +
+      ' · library_only — 只保留库内能匹配的歌曲\n' +
+      ' · allow_missing — 无法匹配的通过 Webhook 通知',
+  },
+  recommendation_balance: {
+    label: '推荐平衡',
+    type: 'slider',
+    tooltip: '▸ 探索新歌 vs 保守听熟曲的程度\n' +
+      ' 默认：55  推荐：40 - 70\n' +
+      ' 0 → 极致保守（命中率最高）\n' +
+      ' 100 → 极致探索（缺失可能增加）',
+  },
+  top_track_seed_limit: {
+    label: '种子曲目数',
+    type: 'number',
+    tooltip: '▸ 从 Last.fm 热门中取多少首作为种子\n' +
+      ' 默认：30  推荐：15 - 50\n' +
+      ' 数量越多歌单越多样，但执行更慢',
+  },
+  top_artist_seed_limit: {
+    label: '种子艺术家数',
+    type: 'number',
+    tooltip: '▸ 相邻艺术家歌单的种子艺人数量\n' +
+      ' 默认：30  推荐：10 - 40\n' +
+      ' 越多越多样，API 调用也更多',
+  },
+  similar_track_limit: {
+    label: '每曲相似曲目数',
+    type: 'number',
+    tooltip: '▸ 每个种子从 Last.fm 获取多少相似歌曲\n' +
+      ' 默认：30  推荐：20 - 50\n' +
+      ' 数值越大候选池越大，但相关性可能下降',
+  },
+  similar_artist_limit: {
+    label: '每种子取相似艺术家数',
+    type: 'number',
+    tooltip: '▸ 每个种子艺人获取多少位相似艺人\n' +
+      ' 默认：30  推荐：10 - 30\n' +
+      ' 影响相邻艺术家歌单的多样性',
+  },
+  artist_top_track_limit: {
+    label: '每相似艺术家热门歌曲',
+    type: 'number',
+    tooltip: '▸ 每个相似艺人取多少首热门歌\n' +
+      ' 默认：2  推荐：1 - 5\n' +
+      ' 值小 → 更精准；值大 → 更丰富但可能跑偏',
+  },
+  similar_playlist_size: {
+    label: '相似曲目歌单大小',
+    type: 'number',
+    tooltip: '▸ 最终相似曲目歌单的最大歌曲数\n' +
+      ' 默认：30  推荐：30 - 100\n' +
+      ' 实际命中数受你的 Navidrome 库存影响',
+  },
+  artist_playlist_size: {
+    label: '相邻艺术家歌单大小',
+    type: 'number',
+    tooltip: '▸ 最终相邻艺术家歌单的最大歌曲数\n' +
+      ' 默认：30  推荐：30 - 100',
+  },
+  duplicate_avoid_days: {
+    label: '去重天数',
+    type: 'number',
+    tooltip: '▸ 同一首歌多少天内不会再次推荐\n' +
+      ' 默认：14  推荐：7 - 30\n' +
+      ' 0 = 不去重，可能连续出现重复',
+  },
+
+  // ── 种子策略 ──
+  seed_source_mode: {
+    label: '种子来源模式',
+    type: 'select',
+    tooltip: '▸ 从哪里选取推荐种子\n' +
+      ' 默认：recent_plus_top（建议保持）\n' +
+      ' · recent_only — 仅最近播放\n' +
+      ' · top_only — 仅历史排行\n' +
+      ' · recent_plus_top — 两者混合',
+  },
+  top_period: {
+    label: 'Top 数据周期',
+    type: 'select',
+    tooltip: '▸ Last.fm 历史排行榜的统计周期\n' +
+      ' 默认：1month  推荐：1month - 3month\n' +
+      ' 周期越长口味越稳定，短期变化不敏感',
+  },
+  recent_tracks_limit: {
+    label: 'Recent Tracks 抓取条数',
+    type: 'number',
+    tooltip: '▸ 抓取最近播放记录的数量（仅影响统计窗口）\n' +
+      ' 默认：100  推荐：100 - 500',
+  },
+  recent_top_mix_ratio: {
+    label: 'Recent/Top 混合比例',
+    type: 'slider',
+    tooltip: '▸ 种子中「最近播放」的占比\n' +
+      ' 默认：70  推荐：50 - 80\n' +
+      ' 70 → 70% 来自最近播放，30% 来自历史排行',
+  },
+
+  // ── 匹配与候选池 ──
+  match_threshold: {
+    label: '匹配阈值',
+    type: 'slider',
+    tooltip: '▸ 匹配 Navidrome 歌曲的最低相似度\n' +
+      ' 默认：0.75  推荐：0.70 - 0.85\n' +
+      ' 太低 → 可能匹配错误；太高 → 命中减少',
+  },
+  candidate_pool_multiplier_min: {
+    label: '候选池最小倍数',
+    type: 'number',
+    tooltip: '▸ 候选池 = 歌单大小 × 倍数（保守端）\n' +
+      ' 默认：2.0  建议保留默认\n' +
+      ' 推荐平衡滑块会自动在此范围内调整',
+  },
+  candidate_pool_multiplier_max: {
+    label: '候选池最大倍数',
+    type: 'number',
+    tooltip: '▸ 候选池 = 歌单大小 × 倍数（探索端）\n' +
+      ' 默认：10.0  建议保留默认',
+  },
+  search_concurrency: {
+    label: '搜索并发数',
+    type: 'number',
+    tooltip: '▸ 同时向 Navidrome 发起的搜索请求数\n' +
+      ' 默认：5  推荐：3 - 10\n' +
+      ' 太高可能被 Navidrome 限流，注意服务器负载',
+  },
+
+  // ── 其他 ──
+  playlist_keep_days: {
+    label: '歌单保留天数',
+    type: 'number',
+    tooltip: '▸ 推荐歌单在 Navidrome 中保留多少天\n' +
+      ' 默认：3  推荐：3 - 30\n' +
+      ' 超期后自动删除，0 = 永不过期（慎用）',
+  },
+  max_concurrent_tasks: {
+    label: '任务并发数',
+    type: 'number',
+    tooltip: '▸ 同时允许的后台任务数量\n' +
+      ' 默认：2  推荐：1 - 3\n' +
+      ' 过高可能造成 API 压力',
+  },
+  webhook_timeout_seconds: {
+    label: 'Webhook 超时时间',
+    type: 'number',
+    tooltip: '▸ 缺失通知 Webhook 的超时秒数\n' +
+      ' 默认：10  推荐：5 - 30',
+  },
+  webhook_retry_count: {
+    label: 'Webhook 重试次数',
+    type: 'number',
+    tooltip: '▸ Webhook 失败后自动重试的次数\n' +
+      ' 默认：3  推荐：1 - 5\n' +
+      ' 间隔逐渐延长（1分钟/5分钟/15分钟）',
+  },
+  playlist_api_url: {
+    label: 'Playlist API 地址',
+    type: 'text',
+    tooltip: '▸ 第三方歌单解析服务的地址\n' +
+      ' 推荐：https://sss.unmeta.cn/songlist\n' +
+      ' 配置后可导入网易云、QQ 音乐等平台歌单',
+  },
 }
 
 // ── Field groups per tab ────────────────────────────────────────────────────────
@@ -80,8 +222,37 @@ const SCHEDULER_FIELDS = [
 // ── UI helpers ─────────────────────────────────────────────────────────────────
 
 function Tooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+
   if (!text) return null
-  return <span className="ml-1 text-slate-400 cursor-help text-xs" title={text}>?</span>
+
+  const lines = text.split('\n')
+
+  return (
+    <span className="relative inline-block ml-1.5 align-middle">
+      <button
+        type="button"
+        className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600 text-[10px] font-bold flex items-center justify-center transition-colors"
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpen(v => !v)
+        }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        title={text} // desktop: native tooltip on hover
+      >
+        ?
+      </button>
+
+      {open && (
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-white text-slate-700 text-xs rounded-lg p-3 shadow-lg border border-slate-200 pointer-events-auto">
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-white" />
+          {lines.map((line, i) => (
+            <p key={i} className="leading-relaxed">{line || <br />}</p>
+          ))}
+        </div>
+      )}
+    </span>
+  )
 }
 
 function FieldInput({ fieldKey, value, onChange }: { fieldKey: string; value: unknown; onChange: (v: unknown) => void }) {
@@ -98,7 +269,7 @@ function FieldInput({ fieldKey, value, onChange }: { fieldKey: string; value: un
     return (
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">
-          {meta.label}<Tooltip text={meta.help || ''} />
+          {meta.label}<Tooltip text={meta.tooltip || ''} />
         </label>
         <select
           value={String(value ?? '')}
@@ -133,7 +304,7 @@ function FieldInput({ fieldKey, value, onChange }: { fieldKey: string; value: un
   return (
     <div>
       <label className="block text-sm font-medium text-slate-700 mb-1">
-        {meta.label}<Tooltip text={meta.help || ''} />
+        {meta.label}<Tooltip text={meta.tooltip || ''} />
       </label>
       <input
         type={meta.type || 'text'}
