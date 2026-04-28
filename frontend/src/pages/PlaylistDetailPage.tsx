@@ -1,24 +1,47 @@
+import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
 import apiFetch from '@/lib/api'
 
+const PAGE_SIZE = 50
+
 async function fetchPlaylistItems(playlistId: number, offset = 0) {
-  return apiFetch(`/runs/playlists/${playlistId}/items?limit=50&offset=${offset}`)
+  return apiFetch(`/runs/playlists/${playlistId}/items?limit=${PAGE_SIZE}&offset=${offset}`)
 }
 
 export default function PlaylistDetailPage() {
   const { playlist_id } = useParams<{ playlist_id: string }>()
   const pid = Number(playlist_id)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['playlist', pid],
-    queryFn: () => fetchPlaylistItems(pid),
+  const offsetRef = useRef(0)
+  const allItemsRef = useRef<Record<string, unknown>[]>([])
+  const [, forceRender] = useState(0)
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['playlist', pid, offsetRef.current],
+    queryFn: () => fetchPlaylistItems(pid, offsetRef.current),
+    onSuccess: (newData) => {
+      if (offsetRef.current === 0) {
+        allItemsRef.current = newData.items || []
+      } else {
+        allItemsRef.current = [...allItemsRef.current, ...(newData.items || [])]
+      }
+      // Trigger re-render to show accumulated items
+      forceRender(n => n + 1)
+    },
   })
 
   if (isLoading) return <div className="p-6 text-slate-500">加载中...</div>
   if (!data) return <div className="p-6 text-red-500">未找到歌单</div>
 
-  const { playlist, items, total } = data
+  const { playlist, total = 0 } = data
+  const items = allItemsRef.current
+  const hasMore = items.length < total
+
+  const handleLoadMore = () => {
+    offsetRef.current = offsetRef.current + PAGE_SIZE
+    forceRender(n => n + 1)
+  }
 
   const typeLabel = playlist.playlist_type === 'similar_tracks' ? '相似曲目' : '相邻艺术家'
 
@@ -115,15 +138,28 @@ export default function PlaylistDetailPage() {
                   </span>
                 </td>
                 <td className="p-3 text-slate-400 text-xs">
-                  {item.confidence_score != null ? `${(item.confidence_score * 100).toFixed(0)}%` : '-'}
+                  {item.confidence_score != null ? `${(Number(item.confidence_score) * 100).toFixed(0)}%` : '-'}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {total > 50 && (
-          <div className="p-3 text-center text-sm text-slate-400 border-t border-slate-100">
-            共 {total} 首，显示前 {items.length} 首
+
+        {/* Load more */}
+        {total > PAGE_SIZE && (
+          <div className="p-3 text-center border-t border-slate-100">
+            {isFetching ? (
+              <span className="text-sm text-slate-400">加载中...</span>
+            ) : hasMore ? (
+              <button
+                onClick={handleLoadMore}
+                className="text-sm text-blue-500 hover:text-blue-600 font-medium"
+              >
+                加载更多 ({items.length}/{total})
+              </button>
+            ) : (
+              <span className="text-sm text-slate-400">已显示全部 {items.length} 首</span>
+            )}
           </div>
         )}
       </div>

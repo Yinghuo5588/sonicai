@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { formatRelativeTime } from '@/lib/date'
 
-async function fetchRuns() {
-  return apiFetch('/runs')
+const PAGE_SIZE = 15
+
+async function fetchRuns(limit: number, offset: number) {
+  return apiFetch(`/runs?limit=${limit}&offset=${offset}`)
 }
 
 function runTypeLabel(type: string) {
@@ -20,7 +23,12 @@ function statusBadge(status: string) {
 }
 
 export default function HistoryPage() {
-  const { data, isLoading, error } = useQuery({ queryKey: ['runs'], queryFn: fetchRuns })
+  const [page, setPage] = useState(1)
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['runs', page],
+    queryFn: () => fetchRuns(PAGE_SIZE, (page - 1) * PAGE_SIZE),
+  })
 
   if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
   if (error) return (
@@ -30,7 +38,8 @@ export default function HistoryPage() {
     </div>
   )
 
-  const runs = data || []
+  const { runs = [], total = 0 } = data || {}
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -57,6 +66,29 @@ export default function HistoryPage() {
           </Link>
         ))}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1 text-sm border border-slate-300 rounded-lg disabled:opacity-40 hover:bg-slate-50"
+          >
+            ← 上一页
+          </button>
+          <span className="text-sm text-slate-500 px-2">
+            第 {page} / {totalPages} 页，共 {total} 条
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-3 py-1 text-sm border border-slate-300 rounded-lg disabled:opacity-40 hover:bg-slate-50"
+          >
+            下一页 →
+          </button>
+        </div>
+      )}
     </div>
   )
 }
