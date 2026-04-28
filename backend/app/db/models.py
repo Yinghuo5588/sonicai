@@ -95,6 +95,23 @@ class SystemSettings(Base):
     cron_enabled = Column(Boolean, default=False)
     cron_expression = Column(String(100), nullable=True)
 
+    # Hotboard scheduled sync
+    hotboard_cron_enabled = Column(Boolean, default=False)
+    hotboard_cron_expression = Column(String(100), nullable=True)
+    hotboard_limit = Column(Integer, default=50)
+    hotboard_match_threshold = Column(Numeric(4, 3), default=0.75)
+    hotboard_playlist_name = Column(String(255), nullable=True)
+    hotboard_overwrite = Column(Boolean, default=True)
+
+    # Playlist URL scheduled sync
+    playlist_sync_cron_enabled = Column(Boolean, default=False)
+    playlist_sync_cron_expression = Column(String(100), nullable=True)
+    playlist_sync_url = Column(String(1000), nullable=True)
+    playlist_sync_threshold = Column(Numeric(4, 3), default=0.75)
+    playlist_sync_name = Column(String(255), nullable=True)
+    playlist_sync_overwrite = Column(Boolean, default=False)
+    playlist_sync_last_hash = Column(String(64), nullable=True)
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

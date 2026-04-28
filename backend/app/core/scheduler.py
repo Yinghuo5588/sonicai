@@ -23,16 +23,22 @@ def get_scheduler() -> AsyncIOScheduler:
 async def load_cron_schedule(db: AsyncSession):
     """Load cron expression from DB and reschedule the recommendation job."""
     from app.db.models import SystemSettings
-    from app.tasks.recommendation_tasks import run_recommendation_job, retry_pending_webhooks, cleanup_expired_cache
+    from app.tasks.recommendation_tasks import (
+        run_recommendation_job,
+        retry_pending_webhooks,
+        cleanup_expired_cache,
+        run_hotboard_cron_job,
+        run_playlist_sync_cron_job,
+    )
 
     result = await db.execute(select(SystemSettings))
     config = result.scalar_one_or_none()
 
     sched = get_scheduler()
 
-    # Remove existing job if any
+    # Remove existing jobs if any
     for job in sched.get_jobs():
-        if job.id == "recommendation_cron":
+        if job.id in ("recommendation_cron", "hotboard_cron", "playlist_sync_cron"):
             job.remove()
 
     if config and config.cron_enabled and config.cron_expression:
@@ -54,9 +60,57 @@ async def load_cron_schedule(db: AsyncSession):
                     replace_existing=True,
                     misfire_grace_time=60,
                 )
-                logger.info(f"Cron schedule loaded: {config.cron_expression}")
+                logger.info(f"Recommendation cron loaded: {config.cron_expression}")
         except Exception as e:
             logger.warning(f"Invalid cron expression '{config.cron_expression}': {e}")
+
+    # ===== Hotboard scheduled sync =====
+    if config and config.hotboard_cron_enabled and config.hotboard_cron_expression:
+        try:
+            parts = config.hotboard_cron_expression.split()
+            if len(parts) >= 5:
+                tz = config.timezone if config and config.timezone else settings.app_timezone
+                sched.add_job(
+                    run_hotboard_cron_job,
+                    CronTrigger(
+                        minute=parts[0],
+                        hour=parts[1],
+                        day=parts[2],
+                        month=parts[3],
+                        day_of_week=parts[4],
+                        timezone=tz,
+                    ),
+                    id="hotboard_cron",
+                    replace_existing=True,
+                    misfire_grace_time=120,
+                )
+                logger.info(f"Hotboard cron loaded: {config.hotboard_cron_expression}")
+        except Exception as e:
+            logger.warning(f"Invalid hotboard cron: {e}")
+
+    # ===== Playlist URL scheduled sync =====
+    if config and config.playlist_sync_cron_enabled and config.playlist_sync_cron_expression:
+        try:
+            parts = config.playlist_sync_cron_expression.split()
+            if len(parts) >= 5:
+                tz = config.timezone if config and config.timezone else settings.app_timezone
+                sched.add_job(
+                    run_playlist_sync_cron_job,
+                    CronTrigger(
+                        minute=parts[0],
+                        hour=parts[1],
+                        day=parts[2],
+                        month=parts[3],
+                        day_of_week=parts[4],
+                        timezone=tz,
+                    ),
+                    id="playlist_sync_cron",
+                    replace_existing=True,
+                    misfire_grace_time=120,
+                )
+                logger.info(f"Playlist sync cron loaded: {config.playlist_sync_cron_expression}")
+        except Exception as e:
+            logger.warning(f"Invalid playlist sync cron: {e}")
 
     # Register webhook retry job (every 2 minutes)
     from apscheduler.triggers.interval import IntervalTrigger

@@ -630,30 +630,152 @@ export default function SettingsPage() {
 
         </div>
 
+            </section>
+
+      {/* Hotboard Scheduled Sync */}
+      <section className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
+        <h2 className="font-medium text-slate-700 text-sm">举 热榜定时同步</h2>
+        <p className="text-xs text-slate-400">
+          定时从网通云抓取最新热榜并同步到 Navidrome（建议每天一次，阶昏执行）
+        </p>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={!!s.hotboard_cron_enabled}
+            onChange={e => handleChange('hotboard_cron_enabled', e.target.checked)}
+            className="w-4 h-4"
+          />
+          <span className="text-sm">启用热榜定时同步</span>
+        </label>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Cron 表达式 (分 时 日 月 周)</label>
+          <input
+            type="text"
+            value={String(s.hotboard_cron_expression ?? '')}
+            onChange={e => handleChange('hotboard_cron_expression', e.target.value)}
+            placeholder="0 3 * * * (每天阶来3点)"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">抓取数量</label>
+            <input
+              type="number" min={1} max={200}
+              value={Number(s.hotboard_limit ?? 50)}
+              onChange={e => handleChange('hotboard_limit', Number(e.target.value))}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">匹配阈值</label>
+            <input
+              type="range" min={50} max={95}
+              value={Number((s.hotboard_match_threshold ?? 0.75) * 100)}
+              onChange={e => handleChange('hotboard_match_threshold', Number(e.target.value) / 100)}
+              className="w-full accent-orange-500"
+            />
+            <span className="text-xs text-slate-400">{Math.round((s.hotboard_match_threshold ?? 0.75) * 100)}%</span>
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs text-slate-500 mb-1">歌单名称（留空自动生成日期）</label>
+          <input
+            type="text"
+            value={String(s.hotboard_playlist_name ?? '')}
+            onChange={e => handleChange('hotboard_playlist_name', e.target.value)}
+            placeholder="网通云热榜"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+          />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!s.hotboard_overwrite}
+            onChange={e => handleChange('hotboard_overwrite', e.target.checked)}
+            className="w-4 h-4 accent-blue-500"
+          />
+          覆盖同名歌单（每日全量替换）
+        </label>
       </section>
 
-
+      {/* Playlist URL Scheduled Sync */}
+      <section className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
+        <h2 className="font-medium text-slate-700 text-sm">➌ 歌单链接定时同步</h2>
+        <p className="text-xs text-slate-400">
+          监控指定歌单链接，当歌单内容变化时自动增量同步新歌曲到 Navidrome
+        </p>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={!!s.playlist_sync_cron_enabled}
+            onChange={e => handleChange('playlist_sync_cron_enabled', e.target.checked)}
+            className="w-4 h-4"
+          />
+          <span className="text-sm">启用歌单定时同步</span>
+        </label>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Cron 表达式 (分 时 日 月 周)</label>
+          <input
+            type="text"
+            value={String(s.playlist_sync_cron_expression ?? '')}
+            onChange={e => handleChange('playlist_sync_cron_expression', e.target.value)}
+            placeholder="0 */6 * * * (每6小时)"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">歌单链接</label>
+          <input
+            type="text"
+            value={String(s.playlist_sync_url ?? '')}
+            onChange={e => handleChange('playlist_sync_url', e.target.value)}
+            placeholder="https://music.163.com/playlist?id=xxx"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">匹配阈值</label>
+            <input
+              type="range" min={50} max={95}
+              value={Number((s.playlist_sync_threshold ?? 0.75) * 100)}
+              onChange={e => handleChange('playlist_sync_threshold', Number(e.target.value) / 100)}
+              className="w-full accent-orange-500"
+            />
+            <span className="text-xs text-slate-400">{Math.round((s.playlist_sync_threshold ?? 0.75) * 100)}%</span>
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">歌单名称（留空自动）</label>
+            <input
+              type="text"
+              value={String(s.playlist_sync_name ?? '')}
+              onChange={e => handleChange('playlist_sync_name', e.target.value)}
+              placeholder="我的收藏"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            />
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!s.playlist_sync_overwrite}
+            onChange={e => handleChange('playlist_sync_overwrite', e.target.checked)}
+            className="w-4 h-4 accent-blue-500"
+          />
+          每次全量覆盖（默讨不勲选，仅增量连加新歌）
+        </label>
+      </section>
 
       <button
-
         onClick={() => mutation.mutate(form)}
-
         disabled={mutation.isPending}
-
         className="bg-blue-500 text-white px-6 py-2.5 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm font-medium"
-
       >
-
         {mutation.isPending ? '保存中...' : '保存配置'}
-
       </button>
-
       {mutation.isSuccess && <p className="text-green-600 text-sm">✅ 已保存</p>}
-
       {mutation.isError && <p className="text-red-500 text-sm">保存失败</p>}
-
     </div>
-
   )
-
 }

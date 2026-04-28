@@ -103,4 +103,18 @@ export interface Settings {
   search_concurrency: number | null
   cron_enabled: boolean
   cron_expression: string | null
+  // Hotboard scheduled sync
+  hotboard_cron_enabled: boolean
+  hotboard_cron_expression: string | null
+  hotboard_limit: number
+  hotboard_match_threshold: number | null
+  hotboard_playlist_name: string | null
+  hotboard_overwrite: boolean
+  // Playlist URL scheduled sync
+  playlist_sync_cron_enabled: boolean
+  playlist_sync_cron_expression: string | null
+  playlist_sync_url: string | null
+  playlist_sync_threshold: number | null
+  playlist_sync_name: string | null
+  playlist_sync_overwrite: boolean
 }

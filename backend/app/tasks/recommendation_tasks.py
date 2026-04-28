@@ -118,3 +118,83 @@ def cleanup_old_playlists():
         await _cleanup_old_playlists(settings)
 
     asyncio.run(_do())
+
+
+async def run_hotboard_cron_job():
+    """Cron-triggered hotboard sync task."""
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import SystemSettings, RecommendationRun
+    from app.services.hotboard_recommend import run_hotboard_sync
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(SystemSettings))
+        settings = result.scalar_one_or_none()
+        if not settings or not settings.hotboard_cron_enabled:
+            return
+
+        run = RecommendationRun(
+            run_type="hotboard",
+            trigger_type="scheduled",
+            status="pending",
+            started_at=None,
+            finished_at=None,
+            created_by_user_id=None,
+        )
+        db.add(run)
+        await db.flush()
+        run_id = run.id
+        await db.commit()
+
+    logger.info(f"[scheduler] dispatch hotboard sync run_id={run_id}")
+
+    await run_hotboard_sync(
+        run_id=run_id,
+        limit=settings.hotboard_limit or 50,
+        match_threshold=float(settings.hotboard_match_threshold or 0.75),
+        playlist_name=settings.hotboard_playlist_name,
+        overwrite=settings.hotboard_overwrite if settings.hotboard_overwrite is not None else True,
+        trigger_type="scheduled",
+    )
+
+
+async def run_playlist_sync_cron_job():
+    """Cron-triggered playlist incremental sync task."""
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import SystemSettings, RecommendationRun
+    from app.services.playlist_incremental import run_incremental_playlist_sync
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(SystemSettings))
+        settings = result.scalar_one_or_none()
+        if not settings or not settings.playlist_sync_cron_enabled:
+            return
+        if not settings.playlist_sync_url:
+            logger.warning("[scheduler] playlist_sync_cron enabled but no URL configured, skipping")
+            return
+
+        run = RecommendationRun(
+            run_type="playlist",
+            trigger_type="scheduled",
+            status="pending",
+            started_at=None,
+            finished_at=None,
+            created_by_user_id=None,
+        )
+        db.add(run)
+        await db.flush()
+        run_id = run.id
+        await db.commit()
+
+    logger.info(f"[scheduler] dispatch playlist sync run_id={run_id}")
+
+    await run_incremental_playlist_sync(
+        run_id=run_id,
+        url=settings.playlist_sync_url,
+        match_threshold=float(settings.playlist_sync_threshold or 0.75),
+        playlist_name=settings.playlist_sync_name,
+        overwrite=settings.playlist_sync_overwrite or False,
+    )

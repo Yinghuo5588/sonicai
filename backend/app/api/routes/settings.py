@@ -46,6 +46,20 @@ class SettingsResponse(BaseModel):
     search_concurrency: int | None = None
     cron_enabled: bool
     cron_expression: str | None
+    # Hotboard scheduled sync
+    hotboard_cron_enabled: bool = False
+    hotboard_cron_expression: str | None = None
+    hotboard_limit: int = 50
+    hotboard_match_threshold: float | None = None
+    hotboard_playlist_name: str | None = None
+    hotboard_overwrite: bool = True
+    # Playlist URL scheduled sync
+    playlist_sync_cron_enabled: bool = False
+    playlist_sync_cron_expression: str | None = None
+    playlist_sync_url: str | None = None
+    playlist_sync_threshold: float | None = None
+    playlist_sync_name: str | None = None
+    playlist_sync_overwrite: bool = False
 
     class Config:
         from_attributes = True
@@ -89,6 +103,20 @@ class SettingsUpdate(BaseModel):
     search_concurrency: int | None = Field(default=None, ge=1, le=20)
     cron_enabled: bool | None = None
     cron_expression: str | None = None
+    # Hotboard scheduled sync
+    hotboard_cron_enabled: bool | None = None
+    hotboard_cron_expression: str | None = None
+    hotboard_limit: int | None = Field(default=None, ge=1, le=200)
+    hotboard_match_threshold: float | None = Field(default=None, ge=0.5, le=0.95)
+    hotboard_playlist_name: str | None = None
+    hotboard_overwrite: bool | None = None
+    # Playlist URL scheduled sync
+    playlist_sync_cron_enabled: bool | None = None
+    playlist_sync_cron_expression: str | None = None
+    playlist_sync_url: str | None = None
+    playlist_sync_threshold: float | None = Field(default=None, ge=0.5, le=0.95)
+    playlist_sync_name: str | None = None
+    playlist_sync_overwrite: bool | None = None
 
 
 async def get_settings_session(db: AsyncSessionLocal):
@@ -132,7 +160,7 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
     await db.commit()
     await db.refresh(s)
 
-    # Reload cron schedule after config change
+    # Reload full cron schedule (all three: recommendation + hotboard + playlist_sync)
     from app.core.scheduler import load_cron_schedule
     await load_cron_schedule(db)
 

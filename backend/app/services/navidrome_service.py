@@ -239,3 +239,25 @@ async def navidrome_delete_playlist(playlist_id: str) -> bool:
     """Delete a playlist by ID."""
     result = await _nd_get("deletePlaylist.view", {"id": playlist_id})
     return result is not None
+
+
+async def navidrome_get_playlist_songs(playlist_id: str) -> list[dict]:
+    """Get all songs in a playlist."""
+    result = await _nd_get("getPlaylist.view", {"id": playlist_id})
+    if not result:
+        return []
+    playlist = result.get("playlist", {})
+    entries = playlist.get("entry", [])
+    if isinstance(entries, dict):
+        entries = [entries]
+    return [
+        {
+            "id": e.get("id"),
+            "title": e.get("title"),
+            "artist": e.get("artist"),
+            "album": e.get("album"),
+            "duration": e.get("duration"),
+        }
+        for e in entries
+        if e.get("id")
+    ]
