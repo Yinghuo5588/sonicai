@@ -30,7 +30,7 @@ async def sync_playlist(
     from datetime import datetime, timezone, timedelta
     stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
 
-    async with db.begin():
+    async with db.begin_nested():
         # Clean stale running jobs
         stale_result = await db.execute(
             select(RecommendationRun).where(
@@ -67,6 +67,8 @@ async def sync_playlist(
         db.add(run)
         await db.flush()
         run_id = run.id
+
+    await db.commit()
 
     logger.info(f"[playlist] queued run_id={run_id} url={url} user_id={current_user.id}")
     create_background_task(
@@ -137,7 +139,7 @@ async def sync_text_playlist(
     from datetime import datetime, timezone, timedelta
     stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
 
-    async with db.begin():
+    async with db.begin_nested():
         stale_result = await db.execute(
             select(RecommendationRun).where(
                 RecommendationRun.status == "running",
@@ -176,6 +178,8 @@ async def sync_text_playlist(
         db.add(run)
         await db.flush()
         run_id = run.id
+
+    await db.commit()
 
     logger.info(
         f"[text_sync] queued run_id={run_id} "

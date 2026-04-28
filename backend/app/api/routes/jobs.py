@@ -38,7 +38,7 @@ async def _create_pending_run(
     if conflict_types is None:
         conflict_types = [run_type]
 
-    async with db.begin():
+    async with db.begin_nested():
         # Lock all potentially conflicting rows to prevent race conditions
         result = await db.execute(
             select(RecommendationRun.id)
@@ -81,6 +81,7 @@ async def run_all(current_user: CurrentUser, db: AsyncSession = Depends(get_db))
         conflict_types=["full", "similar_tracks", "similar_artists"],
     )
     logger.info(f"[jobs] queued run_type=full run_id={run_id} user_id={current_user.id}")
+    await db.commit()
     create_background_task(run_full_recommendation(run_id=run_id, trigger_type="manual"), name=f"full-recommendation-{run_id}")
     return {"message": "Job queued", "type": "full", "run_id": run_id}
 
@@ -96,6 +97,7 @@ async def run_similar_tracks(current_user: CurrentUser, db: AsyncSession = Depen
         conflict_types=["full", "similar_tracks"],
     )
     logger.info(f"[jobs] queued run_type=similar_tracks run_id={run_id} user_id={current_user.id}")
+    await db.commit()
     create_background_task(run_similar_tracks_only(run_id=run_id, trigger_type="manual"), name=f"similar-tracks-{run_id}")
     return {"message": "Job queued", "type": "similar_tracks", "run_id": run_id}
 
@@ -111,6 +113,7 @@ async def run_similar_artists(current_user: CurrentUser, db: AsyncSession = Depe
         conflict_types=["full", "similar_artists"],
     )
     logger.info(f"[jobs] queued run_type=similar_artists run_id={run_id} user_id={current_user.id}")
+    await db.commit()
     create_background_task(run_similar_artists_only(run_id=run_id, trigger_type="manual"), name=f"similar-artists-{run_id}")
     return {"message": "Job queued", "type": "similar_artists", "run_id": run_id}
 

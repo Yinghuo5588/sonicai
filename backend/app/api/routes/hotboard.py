@@ -41,7 +41,7 @@ async def sync_hotboard(
     from datetime import datetime, timezone, timedelta
     stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
 
-    async with db.begin():
+    async with db.begin_nested():
         stale_result = await db.execute(
             select(RecommendationRun)
             .where(
@@ -79,6 +79,8 @@ async def sync_hotboard(
         db.add(run)
         await db.flush()
         run_id = run.id
+
+    await db.commit()
 
     from app.core.task_registry import create_background_task
     logger.info(f"[hotboard] queued run_id={run_id} user_id={current_user.id}")
