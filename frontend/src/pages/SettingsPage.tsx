@@ -3,6 +3,7 @@ import apiFetch from '@/lib/api'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, XCircle } from 'lucide-react'
 import { changePasswordSchema } from '@/lib/validators'
+import RecommendPreview from '@/components/RecommendPreview'
 
 async function fetchSettings() {
   return apiFetch('/settings')
@@ -23,13 +24,9 @@ async function testWebhook() {
   return apiFetch('/settings/test-webhook', { method: 'POST' })
 }
 
-const TABS = ['服务连接', '推荐参数', '调度设置', '账户与备份'] as const
-type Tab = typeof TABS[number]
-
 // ── Field metadata ───────────────────────────────────────────────────────────────
 
 const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: string }> = {
-  // ── 推荐核心参数 ──
   library_mode_default: {
     label: '推荐模式',
     type: 'select',
@@ -101,8 +98,6 @@ const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: stri
       ' 默认：14  推荐：7 - 30\n' +
       ' 0 = 不去重，可能连续出现重复',
   },
-
-  // ── 种子策略 ──
   seed_source_mode: {
     label: '种子来源模式',
     type: 'select',
@@ -132,27 +127,12 @@ const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: stri
       ' 默认：70  推荐：50 - 80\n' +
       ' 70 → 70% 来自最近播放，30% 来自历史排行',
   },
-
-  // ── 匹配与候选池 ──
   match_threshold: {
     label: '匹配阈值',
     type: 'slider',
     tooltip: '▸ 匹配 Navidrome 歌曲的最低相似度\n' +
       ' 默认：0.75  推荐：0.70 - 0.85\n' +
       ' 太低 → 可能匹配错误；太高 → 命中减少',
-  },
-  candidate_pool_multiplier_min: {
-    label: '候选池最小倍数',
-    type: 'number',
-    tooltip: '▸ 候选池 = 歌单大小 × 倍数（保守端）\n' +
-      ' 默认：2.0  建议保留默认\n' +
-      ' 推荐平衡滑块会自动在此范围内调整',
-  },
-  candidate_pool_multiplier_max: {
-    label: '候选池最大倍数',
-    type: 'number',
-    tooltip: '▸ 候选池 = 歌单大小 × 倍数（探索端）\n' +
-      ' 默认：10.0  建议保留默认',
   },
   search_concurrency: {
     label: '搜索并发数',
@@ -161,8 +141,6 @@ const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: stri
       ' 默认：5  推荐：3 - 10\n' +
       ' 太高可能被 Navidrome 限流，注意服务器负载',
   },
-
-  // ── 其他 ──
   playlist_keep_days: {
     label: '歌单保留天数',
     type: 'number',
@@ -199,56 +177,25 @@ const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: stri
   },
 }
 
-// ── Field groups per tab ────────────────────────────────────────────────────────
-
-const RECOMMEND_FIELDS = [
-  'library_mode_default',
-  'top_track_seed_limit', 'top_artist_seed_limit',
-  'similar_track_limit', 'similar_artist_limit',
-  'artist_top_track_limit',
-  'similar_playlist_size', 'artist_playlist_size',
-  'duplicate_avoid_days', 'recommendation_balance',
-  'seed_source_mode', 'recent_tracks_limit',
-  'top_period', 'recent_top_mix_ratio',
-  'match_threshold',
-  'candidate_pool_multiplier_min', 'candidate_pool_multiplier_max',
-  'search_concurrency',
-]
-
-const SCHEDULER_FIELDS = [
-  'playlist_keep_days', 'max_concurrent_tasks',
-]
-
 // ── UI helpers ─────────────────────────────────────────────────────────────────
 
 function Tooltip({ text }: { text: string }) {
   const [open, setOpen] = useState(false)
-
   if (!text) return null
-
   const lines = text.split('\n')
-
   return (
     <span className="relative inline-block ml-1.5 align-middle">
       <button
         type="button"
         className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600 text-[10px] font-bold flex items-center justify-center transition-colors"
-        onClick={(e) => {
-          e.stopPropagation()
-          setOpen(v => !v)
-        }}
+        onClick={(e) => { e.stopPropagation(); setOpen(v => !v) }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        title={text} // desktop: native tooltip on hover
-      >
-        ?
-      </button>
-
+        title={text}
+      >?</button>
       {open && (
         <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-white text-slate-700 text-xs rounded-lg p-3 shadow-lg border border-slate-200 pointer-events-auto">
           <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-white" />
-          {lines.map((line, i) => (
-            <p key={i} className="leading-relaxed">{line || <br />}</p>
-          ))}
+          {lines.map((line, i) => (<p key={i} className="leading-relaxed">{line || <br />}</p>))}
         </div>
       )}
     </span>
@@ -258,7 +205,6 @@ function Tooltip({ text }: { text: string }) {
 function FieldInput({ fieldKey, value, onChange }: { fieldKey: string; value: unknown; onChange: (v: unknown) => void }) {
   const meta = FIELD_LABELS[fieldKey]
   if (!meta) return null
-
   if (meta.type === 'select') {
     const options: Record<string, string[]> = {
       library_mode_default: ['library_only', 'allow_missing'],
@@ -268,69 +214,36 @@ function FieldInput({ fieldKey, value, onChange }: { fieldKey: string; value: un
     const opts = options[fieldKey] || []
     return (
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-          {meta.label}<Tooltip text={meta.tooltip || ''} />
-        </label>
-        <select
-          value={String(value ?? '')}
-          onChange={e => onChange(e.target.value)}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-        >
+        <label className="block text-sm font-medium text-slate-700 mb-1">{meta.label}<Tooltip text={meta.tooltip || ''} /></label>
+        <select value={String(value ?? '')} onChange={e => onChange(e.target.value)}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
           {opts.map(opt => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       </div>
     )
   }
-
   if (meta.type === 'slider') {
-    const numVal = Number(value ?? (fieldKey === 'recommendation_balance' ? 55 : 70))
+    const numVal = Number(value ?? 55)
     return (
       <div className="space-y-1">
         <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>{fieldKey === 'recent_top_mix_ratio' ? '更偏Recent' : '更稳'}</span>
+          <span>保守</span>
           <span className="font-medium text-slate-700">{meta.label}：{numVal}</span>
-          <span>{fieldKey === 'recent_top_mix_ratio' ? '更偏Top' : '更探索'}</span>
+          <span>探索</span>
         </div>
-        <input
-          type="range" min="0" max="100"
-          value={numVal}
+        <input type="range" min="0" max="100" value={numVal}
           onChange={e => onChange(Number(e.target.value))}
-          className="w-full accent-orange-500"
-        />
+          className="w-full accent-orange-500" />
       </div>
     )
   }
-
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1">
-        {meta.label}<Tooltip text={meta.tooltip || ''} />
-      </label>
-      <input
-        type={meta.type || 'text'}
-        value={String(value ?? '')}
+      <label className="block text-sm font-medium text-slate-700 mb-1">{meta.label}<Tooltip text={meta.tooltip || ''} /></label>
+      <input type={meta.type || 'text'} value={String(value ?? '')}
         onChange={e => onChange(meta.type === 'number' ? Number(e.target.value) : e.target.value)}
-        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-      />
+        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
     </div>
-  )
-}
-
-// ── Tab sections ────────────────────────────────────────────────────────────────
-
-function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-        active
-          ? 'border-blue-500 text-blue-600 bg-white'
-          : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-      }`}
-    >
-      {label}
-    </button>
   )
 }
 
@@ -343,6 +256,20 @@ function SectionCard({ title, children }: { title: string; children: React.React
   )
 }
 
+function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="border border-slate-200 rounded-lg">
+      <button type="button" onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
+        <span className="text-sm font-medium text-slate-700">{title}</span>
+        <span className="text-slate-400 text-xs">{open ? '收起' : '展开'}</span>
+      </button>
+      {open && <div className="p-4 space-y-4">{children}</div>}
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['settings'], queryFn: fetchSettings })
@@ -350,17 +277,11 @@ export default function SettingsPage() {
     mutationFn: updateSettings,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
   })
-
-  const [activeTab, setActiveTab] = useState<Tab>('服务连接')
   const [form, setForm] = useState<Record<string, unknown>>({})
-
-  // Connection tab state
   const [navidromeResult, setNavidromeResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [navidromeLoading, setNavidromeLoading] = useState(false)
   const [webhookResult, setWebhookResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [webhookLoading, setWebhookLoading] = useState(false)
-
-  // Account tab state
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordLoading, setPasswordLoading] = useState(false)
@@ -368,14 +289,8 @@ export default function SettingsPage() {
   const [importResult, setImportResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
-
   const s = { ...data, ...form }
-
-  const handleChange = (key: string, value: unknown) => {
-    setForm(prev => ({ ...prev, [key]: value }))
-  }
-
-  // ── Test handlers ─────────────────────────────────────────────────────────────
+  const handleChange = (key: string, value: unknown) => { setForm(prev => ({ ...prev, [key]: value })) }
 
   const handleTestNavidrome = async () => {
     setNavidromeLoading(true)
@@ -383,11 +298,8 @@ export default function SettingsPage() {
     try {
       const result = await testNavidrome()
       setNavidromeResult({ ok: true, msg: result.message || '连接成功' })
-    } catch (err: any) {
-      setNavidromeResult({ ok: false, msg: err.message })
-    } finally {
-      setNavidromeLoading(false)
-    }
+    } catch (err: any) { setNavidromeResult({ ok: false, msg: err.message }) }
+    finally { setNavidromeLoading(false) }
   }
 
   const handleTestWebhook = async () => {
@@ -396,14 +308,9 @@ export default function SettingsPage() {
     try {
       const result = await testWebhook()
       setWebhookResult({ ok: true, msg: result.message || '连接成功' })
-    } catch (err: any) {
-      setWebhookResult({ ok: false, msg: err.message })
-    } finally {
-      setWebhookLoading(false)
-    }
+    } catch (err: any) { setWebhookResult({ ok: false, msg: err.message }) }
+    finally { setWebhookLoading(false) }
   }
-
-  // ── Password & backup handlers ────────────────────────────────────────────────
 
   const handleChangePassword = async () => {
     setPasswordLoading(true)
@@ -417,19 +324,13 @@ export default function SettingsPage() {
     try {
       await apiFetch('/auth/change-password', {
         method: 'POST',
-        body: JSON.stringify({
-          old_password: validation.data.oldPassword,
-          new_password: validation.data.newPassword,
-        }),
+        body: JSON.stringify({ old_password: validation.data.oldPassword, new_password: validation.data.newPassword }),
       })
       setPasswordResult({ ok: true, msg: '密码修改成功' })
       setOldPassword('')
       setNewPassword('')
-    } catch (err: any) {
-      setPasswordResult({ ok: false, msg: err.message })
-    } finally {
-      setPasswordLoading(false)
-    }
+    } catch (err: any) { setPasswordResult({ ok: false, msg: err.message }) }
+    finally { setPasswordLoading(false) }
   }
 
   const handleExport = async () => {
@@ -442,9 +343,7 @@ export default function SettingsPage() {
       a.download = `sonicai-config-${new Date().toISOString().slice(0, 10)}.json`
       a.click()
       URL.revokeObjectURL(url)
-    } catch (err: any) {
-      alert('导出失败: ' + (err.message || '未知错误'))
-    }
+    } catch (err: any) { alert('导出失败: ' + (err.message || '未知错误')) }
   }
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -461,346 +360,329 @@ export default function SettingsPage() {
       })
       setImportResult({ ok: true, msg: `导入成功，更新了 ${result.updated_fields.length} 个字段` })
       queryClient.invalidateQueries({ queryKey: ['settings'] })
-    } catch (err: any) {
-      setImportResult({ ok: false, msg: '导入失败: ' + (err.message || '未知错误') })
-    } finally {
-      e.target.value = ''
-    }
-  }
-
-  // ── Tab content ───────────────────────────────────────────────────────────────
-
-  const renderTabContent = () => {
-    if (activeTab === '服务连接') return (
-      <div className="space-y-4">
-        {/* Last.fm */}
-        <SectionCard title="Last.fm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">API Key<Tooltip text="Last.fm API Key" /></label>
-              <input type="text" value={String(s.lastfm_api_key ?? '')} onChange={e => handleChange('lastfm_api_key', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">用户名<Tooltip text="Last.fm 用户名" /></label>
-              <input type="text" value={String(s.lastfm_username ?? '')} onChange={e => handleChange('lastfm_username', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-            </div>
-          </div>
-        </SectionCard>
-
-        {/* Navidrome */}
-        <SectionCard title="Navidrome">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-slate-400">测试与 Navidrome 服务器的连通性</span>
-            <button onClick={handleTestNavidrome} disabled={navidromeLoading || !s.navidrome_url}
-              className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg disabled:opacity-50 transition-colors">
-              {navidromeLoading ? '检测中...' : '检测连通性'}
-            </button>
-          </div>
-          {navidromeResult && (
-            <p className={`text-xs px-3 py-2 rounded-lg mb-3 ${navidromeResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-              {navidromeResult.ok
-                ? <><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />{navidromeResult.msg}</>
-                : <><XCircle className="inline w-4 h-4 text-red-500 mr-1" />{navidromeResult.msg}</>}
-            </p>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">地址<Tooltip text="Navidrome 服务器地址，含 http/https" /></label>
-              <input type="text" value={String(s.navidrome_url ?? '')} onChange={e => handleChange('navidrome_url', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">用户名</label>
-              <input type="text" value={String(s.navidrome_username ?? '')} onChange={e => handleChange('navidrome_username', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">密码</label>
-              <input type="password" value={String(s.navidrome_password ?? '')} onChange={e => handleChange('navidrome_password', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-            </div>
-          </div>
-        </SectionCard>
-
-        {/* Webhook */}
-        <SectionCard title="Webhook">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-slate-400">测试 Webhook URL 连通性</span>
-            <button onClick={handleTestWebhook} disabled={webhookLoading || !s.webhook_url}
-              className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg disabled:opacity-50 transition-colors">
-              {webhookLoading ? '检测中...' : '检测连通性'}
-            </button>
-          </div>
-          {webhookResult && (
-            <p className={`text-xs px-3 py-2 rounded-lg mb-3 ${webhookResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-              {webhookResult.ok
-                ? <><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />{webhookResult.msg}</>
-                : <><XCircle className="inline w-4 h-4 text-red-500 mr-1" />{webhookResult.msg}</>}
-            </p>
-          )}
-          <div className="grid grid-cols-1 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Webhook URL<Tooltip text="接收缺失曲目通知的 URL" /></label>
-              <input type="text" value={String(s.webhook_url ?? '')} onChange={e => handleChange('webhook_url', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Headers (JSON)<Tooltip text="Webhook 请求头，JSON 格式" /></label>
-              <input type="text" value={String(s.webhook_headers_json ?? '')} onChange={e => handleChange('webhook_headers_json', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 mt-3">
-            <FieldInput fieldKey="webhook_timeout_seconds" value={s.webhook_timeout_seconds} onChange={v => handleChange('webhook_timeout_seconds', v)} />
-            <FieldInput fieldKey="webhook_retry_count" value={s.webhook_retry_count} onChange={v => handleChange('webhook_retry_count', v)} />
-          </div>
-        </SectionCard>
-
-        {/* Playlist API */}
-        <SectionCard title="歌单解析">
-          <FieldInput fieldKey="playlist_api_url" value={s.playlist_api_url} onChange={v => handleChange('playlist_api_url', v)} />
-        </SectionCard>
-      </div>
-    )
-
-    if (activeTab === '推荐参数') return (
-      <div className="space-y-4">
-        <SectionCard title="推荐核心">
-          <div className="grid grid-cols-2 gap-3">
-            <FieldInput fieldKey="library_mode_default" value={s.library_mode_default} onChange={v => handleChange('library_mode_default', v)} />
-            <FieldInput fieldKey="recommendation_balance" value={s.recommendation_balance} onChange={v => handleChange('recommendation_balance', v)} />
-            <FieldInput fieldKey="top_track_seed_limit" value={s.top_track_seed_limit} onChange={v => handleChange('top_track_seed_limit', v)} />
-            <FieldInput fieldKey="top_artist_seed_limit" value={s.top_artist_seed_limit} onChange={v => handleChange('top_artist_seed_limit', v)} />
-            <FieldInput fieldKey="similar_track_limit" value={s.similar_track_limit} onChange={v => handleChange('similar_track_limit', v)} />
-            <FieldInput fieldKey="similar_artist_limit" value={s.similar_artist_limit} onChange={v => handleChange('similar_artist_limit', v)} />
-            <FieldInput fieldKey="artist_top_track_limit" value={s.artist_top_track_limit} onChange={v => handleChange('artist_top_track_limit', v)} />
-            <FieldInput fieldKey="similar_playlist_size" value={s.similar_playlist_size} onChange={v => handleChange('similar_playlist_size', v)} />
-            <FieldInput fieldKey="artist_playlist_size" value={s.artist_playlist_size} onChange={v => handleChange('artist_playlist_size', v)} />
-            <FieldInput fieldKey="duplicate_avoid_days" value={s.duplicate_avoid_days} onChange={v => handleChange('duplicate_avoid_days', v)} />
-          </div>
-        </SectionCard>
-
-        <SectionCard title="种子策略">
-          <div className="grid grid-cols-2 gap-3">
-            <FieldInput fieldKey="seed_source_mode" value={s.seed_source_mode} onChange={v => handleChange('seed_source_mode', v)} />
-            <FieldInput fieldKey="top_period" value={s.top_period} onChange={v => handleChange('top_period', v)} />
-            <FieldInput fieldKey="recent_tracks_limit" value={s.recent_tracks_limit} onChange={v => handleChange('recent_tracks_limit', v)} />
-            <FieldInput fieldKey="recent_top_mix_ratio" value={s.recent_top_mix_ratio} onChange={v => handleChange('recent_top_mix_ratio', v)} />
-          </div>
-        </SectionCard>
-
-        <SectionCard title="匹配与候选池">
-          <div className="space-y-3">
-            <FieldInput fieldKey="match_threshold" value={s.match_threshold} onChange={v => handleChange('match_threshold', v)} />
-            <div className="grid grid-cols-2 gap-3">
-              <FieldInput fieldKey="candidate_pool_multiplier_min" value={s.candidate_pool_multiplier_min} onChange={v => handleChange('candidate_pool_multiplier_min', v)} />
-              <FieldInput fieldKey="candidate_pool_multiplier_max" value={s.candidate_pool_multiplier_max} onChange={v => handleChange('candidate_pool_multiplier_max', v)} />
-            </div>
-            <FieldInput fieldKey="search_concurrency" value={s.search_concurrency} onChange={v => handleChange('search_concurrency', v)} />
-          </div>
-        </SectionCard>
-      </div>
-    )
-
-    if (activeTab === '调度设置') return (
-      <div className="space-y-4">
-        <SectionCard title="推荐定时任务">
-          <label className="flex items-center gap-2 mb-3">
-            <input type="checkbox" checked={!!s.cron_enabled} onChange={e => handleChange('cron_enabled', e.target.checked)} className="w-4 h-4" />
-            <span className="text-sm">启用定时推荐</span>
-          </label>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Cron 表达式<Tooltip text="分 时 日 月 周" /></label>
-            <input type="text" value={String(s.cron_expression ?? '')} onChange={e => handleChange('cron_expression', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
-          </div>
-        </SectionCard>
-
-        <SectionCard title="网易云热榜定时同步">
-          <p className="text-xs text-slate-400 mb-3">定时从网易云抓取热榜并同步到 Navidrome</p>
-          <label className="flex items-center gap-2 mb-3">
-            <input type="checkbox" checked={!!s.hotboard_cron_enabled} onChange={e => handleChange('hotboard_cron_enabled', e.target.checked)} className="w-4 h-4" />
-            <span className="text-sm">启用热榜定时同步</span>
-          </label>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Cron 表达式</label>
-              <input type="text" value={String(s.hotboard_cron_expression ?? '')} onChange={e => handleChange('hotboard_cron_expression', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">抓取数量</label>
-              <input type="number" min={1} max={200} value={Number(s.hotboard_limit ?? 50)}
-                onChange={e => handleChange('hotboard_limit', Number(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-            </div>
-          </div>
-          <div className="space-y-2 mb-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500">匹配阈值</span>
-              <span className="text-xs font-medium">{Math.round((s.hotboard_match_threshold ?? 0.75) * 100)}%</span>
-            </div>
-            <input type="range" min={50} max={95}
-              value={Number((s.hotboard_match_threshold ?? 0.75) * 100)}
-              onChange={e => handleChange('hotboard_match_threshold', Number(e.target.value) / 100)}
-              className="w-full accent-orange-500" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <input type="text" placeholder="歌单名称（留空自动）" value={String(s.hotboard_playlist_name ?? '')}
-              onChange={e => handleChange('hotboard_playlist_name', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-            <label className="flex items-center gap-2 text-sm text-slate-600">
-              <input type="checkbox" checked={!!s.hotboard_overwrite}
-                onChange={e => handleChange('hotboard_overwrite', e.target.checked)} className="w-4 h-4 accent-blue-500" />
-              覆盖同名歌单
-            </label>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="歌单链接定时同步">
-          <p className="text-xs text-slate-400 mb-3">监控指定歌单链接，变化时自动增量同步到 Navidrome</p>
-          <label className="flex items-center gap-2 mb-3">
-            <input type="checkbox" checked={!!s.playlist_sync_cron_enabled}
-              onChange={e => handleChange('playlist_sync_cron_enabled', e.target.checked)} className="w-4 h-4" />
-            <span className="text-sm">启用歌单定时同步</span>
-          </label>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Cron 表达式</label>
-              <input type="text" placeholder="0 */6 * * * (每6小时)" value={String(s.playlist_sync_cron_expression ?? '')}
-                onChange={e => handleChange('playlist_sync_cron_expression', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">歌单链接</label>
-              <input type="text" placeholder="https://music.163.com/playlist?id=xxx" value={String(s.playlist_sync_url ?? '')}
-                onChange={e => handleChange('playlist_sync_url', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500">匹配阈值</span>
-                  <span className="text-xs font-medium">{Math.round((s.playlist_sync_threshold ?? 0.75) * 100)}%</span>
-                </div>
-                <input type="range" min={50} max={95}
-                  value={Number((s.playlist_sync_threshold ?? 0.75) * 100)}
-                  onChange={e => handleChange('playlist_sync_threshold', Number(e.target.value) / 100)}
-                  className="w-full accent-orange-500" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">歌单名称</label>
-                <input type="text" placeholder="留空自动" value={String(s.playlist_sync_name ?? '')}
-                  onChange={e => handleChange('playlist_sync_name', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-slate-600">
-              <input type="checkbox" checked={!!s.playlist_sync_overwrite}
-                onChange={e => handleChange('playlist_sync_overwrite', e.target.checked)} className="w-4 h-4 accent-blue-500" />
-              每次全量覆盖（默认增量追加新歌）
-            </label>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="任务管理">
-          <div className="grid grid-cols-2 gap-3">
-            <FieldInput fieldKey="playlist_keep_days" value={s.playlist_keep_days} onChange={v => handleChange('playlist_keep_days', v)} />
-            <FieldInput fieldKey="max_concurrent_tasks" value={s.max_concurrent_tasks} onChange={v => handleChange('max_concurrent_tasks', v)} />
-          </div>
-        </SectionCard>
-      </div>
-    )
-
-    // 账户与备份
-    return (
-      <div className="space-y-4">
-        <SectionCard title="修改密码">
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">旧密码</label>
-              <input type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">新密码（至少6位）</label>
-              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
-            </div>
-            <button onClick={handleChangePassword}
-              disabled={!oldPassword || newPassword.length < 6 || passwordLoading}
-              className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-600 disabled:opacity-50">
-              {passwordLoading ? '修改中...' : '修改密码'}
-            </button>
-            {passwordResult && (
-              <p className={`text-sm ${passwordResult.ok ? 'text-green-600' : 'text-red-500'}`}>
-                {passwordResult.ok
-                  ? <><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />密码修改成功</>
-                  : <><XCircle className="inline w-4 h-4 text-red-500 mr-1" />{passwordResult.msg}</>}
-              </p>
-            )}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="配置备份">
-          <p className="text-xs text-slate-400 mb-3">
-            导出或导入全部配置（JSON格式）。迁移时请注意备份 .env 中的 JWT_SECRET_KEY，否则密码无法解密。
-          </p>
-          <div className="flex gap-3">
-            <button onClick={handleExport}
-              className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm hover:bg-slate-200 transition-colors">
-              📥 导出配置
-            </button>
-            <label className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm hover:bg-slate-200 cursor-pointer transition-colors">
-              📤 导入配置
-              <input type="file" accept=".json" onChange={handleImport} className="hidden" />
-            </label>
-          </div>
-          {importResult && (
-            <p className={`text-sm ${importResult.ok ? 'text-green-600' : 'text-red-500'}`}>
-              {importResult.msg}
-            </p>
-          )}
-        </SectionCard>
-      </div>
-    )
+    } catch (err: any) { setImportResult({ ok: false, msg: '导入失败: ' + (err.message || '未知错误') }) }
+    finally { e.target.value = '' }
   }
 
   return (
     <div className="p-4 md:p-6 max-w-2xl space-y-4">
       <h1 className="text-xl md:text-2xl font-bold text-slate-800">系统配置</h1>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 border-b border-slate-200">
-        {TABS.map(tab => (
-          <TabButton
-            key={tab}
-            label={tab}
-            active={activeTab === tab}
-            onClick={() => setActiveTab(tab)}
-          />
-        ))}
-      </div>
+      <CollapsibleSection title="服务连接" defaultOpen={true}>
+        <div className="space-y-4">
+          <SectionCard title="Last.fm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">API Key<Tooltip text="Last.fm API Key" /></label>
+                <input type="text" value={String(s.lastfm_api_key ?? '')} onChange={e => handleChange('lastfm_api_key', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">用户名<Tooltip text="Last.fm 用户名" /></label>
+                <input type="text" value={String(s.lastfm_username ?? '')} onChange={e => handleChange('lastfm_username', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              </div>
+            </div>
+          </SectionCard>
 
-      {/* Tab content */}
-      {renderTabContent()}
+          <SectionCard title="Navidrome">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-slate-400">测试与 Navidrome 服务器的连通性</span>
+              <button onClick={handleTestNavidrome} disabled={navidromeLoading || !s.navidrome_url}
+                className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg disabled:opacity-50 transition-colors">
+                {navidromeLoading ? '检测中...' : '检测连通性'}
+              </button>
+            </div>
+            {navidromeResult && (
+              <p className={`text-xs px-3 py-2 rounded-lg mb-3 ${navidromeResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                {navidromeResult.ok
+                  ? <><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />{navidromeResult.msg}</>
+                  : <><XCircle className="inline w-4 h-4 text-red-500 mr-1" />{navidromeResult.msg}</>}
+              </p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">地址<Tooltip text="Navidrome 服务器地址，含 http/https" /></label>
+                <input type="text" value={String(s.navidrome_url ?? '')} onChange={e => handleChange('navidrome_url', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">用户名</label>
+                <input type="text" value={String(s.navidrome_username ?? '')} onChange={e => handleChange('navidrome_username', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">密码</label>
+                <input type="password" value={String(s.navidrome_password ?? '')} onChange={e => handleChange('navidrome_password', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              </div>
+            </div>
+          </SectionCard>
 
-      {/* Save button — always visible */}
-      <button
-        onClick={() => mutation.mutate(form)}
-        disabled={mutation.isPending}
-        className="bg-blue-500 text-white px-6 py-2.5 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm font-medium"
-      >
+          <SectionCard title="Webhook">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-slate-400">测试 Webhook URL 连通性</span>
+              <button onClick={handleTestWebhook} disabled={webhookLoading || !s.webhook_url}
+                className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg disabled:opacity-50 transition-colors">
+                {webhookLoading ? '检测中...' : '检测连通性'}
+              </button>
+            </div>
+            {webhookResult && (
+              <p className={`text-xs px-3 py-2 rounded-lg mb-3 ${webhookResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                {webhookResult.ok
+                  ? <><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />{webhookResult.msg}</>
+                  : <><XCircle className="inline w-4 h-4 text-red-500 mr-1" />{webhookResult.msg}</>}
+              </p>
+            )}
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Webhook URL<Tooltip text="接收缺失曲目通知的 URL" /></label>
+                <input type="text" value={String(s.webhook_url ?? '')} onChange={e => handleChange('webhook_url', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Headers (JSON)<Tooltip text="Webhook 请求头，JSON 格式" /></label>
+                <input type="text" value={String(s.webhook_headers_json ?? '')} onChange={e => handleChange('webhook_headers_json', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <FieldInput fieldKey="webhook_timeout_seconds" value={s.webhook_timeout_seconds} onChange={v => handleChange('webhook_timeout_seconds', v)} />
+              <FieldInput fieldKey="webhook_retry_count" value={s.webhook_retry_count} onChange={v => handleChange('webhook_retry_count', v)} />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="歌单解析">
+            <FieldInput fieldKey="playlist_api_url" value={s.playlist_api_url} onChange={v => handleChange('playlist_api_url', v)} />
+          </SectionCard>
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="推荐源 (Last.fm 抓取策略)" defaultOpen={false}>
+        <div className="space-y-4">
+          <SectionCard title="种子抓取策略">
+            <div className="grid grid-cols-2 gap-3">
+              <FieldInput fieldKey="seed_source_mode" value={s.seed_source_mode} onChange={v => handleChange('seed_source_mode', v)} />
+              {(s.seed_source_mode === 'recent_only' || s.seed_source_mode === 'recent_plus_top') && (
+                <FieldInput fieldKey="recent_tracks_limit" value={s.recent_tracks_limit} onChange={v => handleChange('recent_tracks_limit', v)} />
+              )}
+              {(s.seed_source_mode === 'top_only' || s.seed_source_mode === 'recent_plus_top') && (
+                <FieldInput fieldKey="top_period" value={s.top_period} onChange={v => handleChange('top_period', v)} />
+              )}
+              {s.seed_source_mode === 'recent_plus_top' && (
+                <FieldInput fieldKey="recent_top_mix_ratio" value={s.recent_top_mix_ratio} onChange={v => handleChange('recent_top_mix_ratio', v)} />
+              )}
+            </div>
+          </SectionCard>
+          <SectionCard title="获取数量控制">
+            <div className="grid grid-cols-2 gap-3">
+              <FieldInput fieldKey="top_track_seed_limit" value={s.top_track_seed_limit} onChange={v => handleChange('top_track_seed_limit', v)} />
+              <FieldInput fieldKey="top_artist_seed_limit" value={s.top_artist_seed_limit} onChange={v => handleChange('top_artist_seed_limit', v)} />
+              <FieldInput fieldKey="similar_track_limit" value={s.similar_track_limit} onChange={v => handleChange('similar_track_limit', v)} />
+              <FieldInput fieldKey="similar_artist_limit" value={s.similar_artist_limit} onChange={v => handleChange('similar_artist_limit', v)} />
+              <FieldInput fieldKey="artist_top_track_limit" value={s.artist_top_track_limit} onChange={v => handleChange('artist_top_track_limit', v)} />
+            </div>
+          </SectionCard>
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="歌单匹配 (Navidrome 生成与匹配)" defaultOpen={false}>
+        <div className="space-y-4">
+          <SectionCard title="歌单规模">
+            <div className="grid grid-cols-2 gap-3">
+              <FieldInput fieldKey="similar_playlist_size" value={s.similar_playlist_size} onChange={v => handleChange('similar_playlist_size', v)} />
+              <FieldInput fieldKey="artist_playlist_size" value={s.artist_playlist_size} onChange={v => handleChange('artist_playlist_size', v)} />
+            </div>
+          </SectionCard>
+          <SectionCard title="推荐平衡与预览">
+            <FieldInput fieldKey="recommendation_balance" value={s.recommendation_balance} onChange={v => handleChange('recommendation_balance', v)} />
+            <RecommendPreview
+              seedCount={Number(s.top_track_seed_limit) || 30}
+              similarPerSeed={Number(s.similar_track_limit) || 30}
+              playlistSize={Number(s.similar_playlist_size) || 30}
+              balance={Number(s.recommendation_balance) || 55}
+              threshold={Number(s.match_threshold) || 0.75}
+            />
+          </SectionCard>
+          <SectionCard title="匹配与搜索">
+            <div className="space-y-3">
+              <FieldInput fieldKey="match_threshold" value={s.match_threshold} onChange={v => handleChange('match_threshold', v)} />
+              <FieldInput fieldKey="search_concurrency" value={s.search_concurrency} onChange={v => handleChange('search_concurrency', v)} />
+              <FieldInput fieldKey="duplicate_avoid_days" value={s.duplicate_avoid_days} onChange={v => handleChange('duplicate_avoid_days', v)} />
+              <FieldInput fieldKey="library_mode_default" value={s.library_mode_default} onChange={v => handleChange('library_mode_default', v)} />
+            </div>
+          </SectionCard>
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="调度设置" defaultOpen={false}>
+        <div className="space-y-4">
+          <SectionCard title="推荐定时任务">
+            <label className="flex items-center gap-2 mb-3">
+              <input type="checkbox" checked={!!s.cron_enabled} onChange={e => handleChange('cron_enabled', e.target.checked)} className="w-4 h-4" />
+              <span className="text-sm">启用定时推荐</span>
+            </label>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Cron 表达式<Tooltip text="分 时 日 月 周" /></label>
+              <input type="text" value={String(s.cron_expression ?? '')} onChange={e => handleChange('cron_expression', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="网易云热榜定时同步">
+            <p className="text-xs text-slate-400 mb-3">定时从网易云抓取热榜并同步到 Navidrome</p>
+            <label className="flex items-center gap-2 mb-3">
+              <input type="checkbox" checked={!!s.hotboard_cron_enabled} onChange={e => handleChange('hotboard_cron_enabled', e.target.checked)} className="w-4 h-4" />
+              <span className="text-sm">启用热榜定时同步</span>
+            </label>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Cron 表达式</label>
+                <input type="text" value={String(s.hotboard_cron_expression ?? '')} onChange={e => handleChange('hotboard_cron_expression', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">抓取数量</label>
+                <input type="number" min={1} max={200} value={Number(s.hotboard_limit ?? 50)}
+                  onChange={e => handleChange('hotboard_limit', Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              </div>
+            </div>
+            <div className="space-y-2 mb-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500">匹配阈值</span>
+                <span className="text-xs font-medium">{Math.round((s.hotboard_match_threshold ?? 0.75) * 100)}%</span>
+              </div>
+              <input type="range" min={50} max={95}
+                value={Number((s.hotboard_match_threshold ?? 0.75) * 100)}
+                onChange={e => handleChange('hotboard_match_threshold', Number(e.target.value) / 100)}
+                className="w-full accent-orange-500" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <input type="text" placeholder="歌单名称（留空自动）" value={String(s.hotboard_playlist_name ?? '')}
+                onChange={e => handleChange('hotboard_playlist_name', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={!!s.hotboard_overwrite}
+                  onChange={e => handleChange('hotboard_overwrite', e.target.checked)} className="w-4 h-4 accent-blue-500" />
+                覆盖同名歌单
+              </label>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="歌单链接定时同步">
+            <p className="text-xs text-slate-400 mb-3">监控指定歌单链接，变化时自动增量同步到 Navidrome</p>
+            <label className="flex items-center gap-2 mb-3">
+              <input type="checkbox" checked={!!s.playlist_sync_cron_enabled}
+                onChange={e => handleChange('playlist_sync_cron_enabled', e.target.checked)} className="w-4 h-4" />
+              <span className="text-sm">启用歌单定时同步</span>
+            </label>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Cron 表达式</label>
+                <input type="text" placeholder="0 */6 * * * (每6小时)" value={String(s.playlist_sync_cron_expression ?? '')}
+                  onChange={e => handleChange('playlist_sync_cron_expression', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">歌单链接</label>
+                <input type="text" placeholder="https://music.163.com/playlist?id=xxx" value={String(s.playlist_sync_url ?? '')}
+                  onChange={e => handleChange('playlist_sync_url', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">匹配阈值</span>
+                    <span className="text-xs font-medium">{Math.round((s.playlist_sync_threshold ?? 0.75) * 100)}%</span>
+                  </div>
+                  <input type="range" min={50} max={95}
+                    value={Number((s.playlist_sync_threshold ?? 0.75) * 100)}
+                    onChange={e => handleChange('playlist_sync_threshold', Number(e.target.value) / 100)}
+                    className="w-full accent-orange-500" />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">歌单名称</label>
+                  <input type="text" placeholder="留空自动" value={String(s.playlist_sync_name ?? '')}
+                    onChange={e => handleChange('playlist_sync_name', e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={!!s.playlist_sync_overwrite}
+                  onChange={e => handleChange('playlist_sync_overwrite', e.target.checked)} className="w-4 h-4 accent-blue-500" />
+                每次全量覆盖（默认增量追加新歌）
+              </label>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="任务管理">
+            <div className="grid grid-cols-2 gap-3">
+              <FieldInput fieldKey="playlist_keep_days" value={s.playlist_keep_days} onChange={v => handleChange('playlist_keep_days', v)} />
+              <FieldInput fieldKey="max_concurrent_tasks" value={s.max_concurrent_tasks} onChange={v => handleChange('max_concurrent_tasks', v)} />
+            </div>
+          </SectionCard>
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="账户与备份" defaultOpen={false}>
+        <div className="space-y-4">
+          <SectionCard title="修改密码">
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">旧密码</label>
+                <input type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">新密码（至少6位）</label>
+                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+              </div>
+              <button onClick={handleChangePassword}
+                disabled={!oldPassword || newPassword.length < 6 || passwordLoading}
+                className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-600 disabled:opacity-50">
+                {passwordLoading ? '修改中...' : '修改密码'}
+              </button>
+              {passwordResult && (
+                <p className={`text-sm ${passwordResult.ok ? 'text-green-600' : 'text-red-500'}`}>
+                  {passwordResult.ok
+                    ? <><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />密码修改成功</>
+                    : <><XCircle className="inline w-4 h-4 text-red-500 mr-1" />{passwordResult.msg}</>}
+                </p>
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard title="配置备份">
+            <p className="text-xs text-slate-400 mb-3">
+              导出或导入全部配置（JSON格式）。迁移时请注意备份 .env 中的 JWT_SECRET_KEY，否则密码无法解密。
+            </p>
+            <div className="flex gap-3">
+              <button onClick={handleExport}
+                className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm hover:bg-slate-200 transition-colors">
+                导出配置
+              </button>
+              <label className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm hover:bg-slate-200 cursor-pointer transition-colors">
+                导入配置
+                <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+              </label>
+            </div>
+            {importResult && (
+              <p className={`text-sm ${importResult.ok ? 'text-green-600' : 'text-red-500'}`}>
+                {importResult.msg}
+              </p>
+            )}
+          </SectionCard>
+        </div>
+      </CollapsibleSection>
+
+      <button onClick={() => mutation.mutate(form)} disabled={mutation.isPending}
+        className="bg-blue-500 text-white px-6 py-2.5 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm font-medium">
         {mutation.isPending ? '保存中...' : '保存配置'}
       </button>
-      {mutation.isSuccess && (
-        <p className="text-green-600 text-sm"><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />已保存</p>
-      )}
-      {mutation.isError && (
-        <p className="text-red-500 text-sm">保存失败</p>
-      )}
+      {mutation.isSuccess && <p className="text-green-600 text-sm"><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />已保存</p>}
+      {mutation.isError && <p className="text-red-500 text-sm">保存失败</p>}
     </div>
   )
 }
