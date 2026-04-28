@@ -275,6 +275,47 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('')
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [passwordResult, setPasswordResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [importResult, setImportResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  // Export settings as JSON file
+  const handleExport = async () => {
+    try {
+      const data = await apiFetch('/settings/export')
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `sonicai-config-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      alert('导出失败: ' + (err.message || '未知错误'))
+    }
+  }
+
+  // Import settings from JSON file
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportResult(null)
+    try {
+      const text = await file.text()
+      const json = JSON.parse(text)
+      if (!json.settings || typeof json.settings !== 'object') {
+        throw new Error('无效配置文件：缺少 settings 字段')
+      }
+      const result = await apiFetch('/settings/import', {
+        method: 'POST',
+        body: JSON.stringify({ settings: json.settings }),
+      })
+      setImportResult({ ok: true, msg: `导入成功，更新了 ${result.updated_fields.length} 个字段` })
+      queryClient.invalidateQueries({ queryKey: ['settings'] })
+    } catch (err: any) {
+      setImportResult({ ok: false, msg: '导入失败: ' + (err.message || '未知错误') })
+    } finally {
+      e.target.value = ''
+    }
+  }
 
 
   if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
@@ -832,6 +873,29 @@ export default function SettingsPage() {
       </button>
       {mutation.isSuccess && <p className="text-green-600 text-sm">✅ 已保存</p>}
       {mutation.isError && <p className="text-red-500 text-sm">保存失败</p>}
+
+      {/* Config backup */}
+      <section className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
+        <h2 className="font-medium text-slate-700 text-sm">配置备份</h2>
+        <p className="text-xs text-slate-400">导出当前所有设置（JSON格式），或从备份文件恢复。迁移时请注意备份 .env 中的 JWT_SECRET_KEY，否则密码无法解密。</p>
+        <div className="flex gap-3">
+          <button
+            onClick={handleExport}
+            className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm hover:bg-slate-200 transition-colors"
+          >
+            📥 导出配置
+          </button>
+          <label className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm hover:bg-slate-200 cursor-pointer transition-colors">
+            📤 导入配置
+            <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+          </label>
+        </div>
+        {importResult && (
+          <p className={`text-sm ${importResult.ok ? 'text-green-600' : 'text-red-500'}`}>
+            {importResult.msg}
+          </p>
+        )}
+      </section>
     </div>
   )
 }

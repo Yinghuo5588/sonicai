@@ -1,8 +1,11 @@
 """System settings routes."""
 
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
+from datetime import datetime, timezone
+from typing import Optional, Any
 import json
 import httpx
 
@@ -192,6 +195,114 @@ async def test_navidrome(current_user: CurrentUser, db: AsyncSessionLocal = Depe
     if not ok:
         raise HTTPException(status_code=400, detail="Navidrome 连接失败 — 检查地址/用户名/密码")
     return {"status": "ok", "message": "Navidrome 连接成功"}
+
+
+@router.get("/export")
+async def export_settings(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
+    s = await get_settings_session(db)
+
+    # Build dict manually to avoid SQLAlchemy internal state
+    data = {}
+    for col in s.__table__.columns:
+        key = col.name
+        val = getattr(s, key)
+        if isinstance(val, datetime):
+            val = val.isoformat()
+        data[key] = val
+
+    # Remove metadata fields
+    data.pop("id", None)
+    data.pop("created_at", None)
+    data.pop("updated_at", None)
+
+    return JSONResponse(content={
+        "version": "1.0",
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "settings": data
+    })
+
+
+class SettingsImportRequest(BaseModel):
+    settings: dict[str, Any]
+
+
+@router.post("/import")
+async def import_settings(
+    body: SettingsImportRequest,
+    current_user: CurrentUser,
+    db: AsyncSessionLocal = Depends(get_db)
+):
+    s = await get_settings_session(db)
+    import_data = body.settings
+
+    # All columns except id and metadata
+    allowed_fields = {col.name for col in s.__table__.columns} - {"id", "created_at", "updated_at"}
+
+    # Fields that must be numeric
+    numeric_fields = {
+        "webhook_timeout_seconds", "webhook_retry_count", "playlist_keep_days",
+        "top_track_seed_limit", "top_artist_seed_limit", "similar_track_limit",
+        "similar_artist_limit", "artist_top_track_limit", "similar_playlist_size",
+        "artist_playlist_size", "recommendation_balance", "recent_tracks_limit",
+        "recent_top_mix_ratio", "search_concurrency", "hotboard_limit",
+        "match_threshold", "candidate_pool_multiplier_min", "candidate_pool_multiplier_max",
+        "hotboard_match_threshold", "playlist_sync_threshold", "duplicate_avoid_days",
+    }
+
+    # Fields that are enum-validated
+    enum_fields = {
+        "library_mode_default": {"library_only", "allow_missing"},
+        "seed_source_mode": {"recent_only", "top_only", "recent_plus_top"},
+        "top_period": {"7day", "1month", "3month", "6month", "12month", "overall"},
+    }
+
+    updated_fields = []
+    for key, value in import_data.items():
+        if key not in allowed_fields:
+            continue
+
+        # Empty string → None
+        if value == "":
+            value = None
+
+        # Skip None values (retain current value)
+        if value is None:
+            continue
+
+        # Numeric validation
+        if key in numeric_fields:
+            if not isinstance(value, (int, float)):
+                raise HTTPException(status_code=400, detail=f"字段 {key} 必须是数字")
+
+        # Enum validation
+        if key in enum_fields:
+            if value not in enum_fields[key]:
+                raise HTTPException(status_code=400, detail=f"字段 {key} 必须是: {', '.join(enum_fields[key])}")
+
+        # Cron expression basic validation (5 fields)
+        if key.endswith("_cron_expression"):
+            parts = str(value).split()
+            if len(parts) != 5:
+                raise HTTPException(status_code=400, detail=f"字段 {key} 的 Cron 表达式无效")
+
+        # webhook_headers_json must be valid JSON
+        if key == "webhook_headers_json":
+            try:
+                json.loads(value)
+            except Exception:
+                raise HTTPException(status_code=400, detail="webhook_headers_json 格式错误，需为合法 JSON")
+
+        setattr(s, key, value)
+        updated_fields.append(key)
+
+    if updated_fields:
+        await db.commit()
+        await db.refresh(s)
+        # Reload cron schedule so new定时任务 take effect
+        from app.core.scheduler import load_cron_schedule
+        await load_cron_schedule(db)
+
+    return {"message": "配置导入成功", "updated_fields": updated_fields}
 
 
 @router.post("/test-webhook")
