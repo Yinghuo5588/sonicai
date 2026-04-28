@@ -2,13 +2,23 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/hooks/useAuth'
 import { useQuery } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
+import clsx from 'clsx'
+import {
+  LayoutDashboard,
+  Play,
+  ScrollText,
+  Link2,
+  Settings,
+  LogOut,
+  User,
+} from 'lucide-react'
 
 const navItems = [
-  { to: '/', label: '仪表盘', icon: '📊' },
-  { to: '/jobs', label: '任务执行', icon: '▶️' },
-  { to: '/history', label: '推荐历史', icon: '📜' },
-  { to: '/webhooks', label: 'Webhook', icon: '🔗' },
-  { to: '/settings', label: '配置', icon: '⚙️' },
+  { to: '/', label: '仪表盘', icon: LayoutDashboard },
+  { to: '/jobs', label: '任务执行', icon: Play },
+  { to: '/history', label: '推荐历史', icon: ScrollText },
+  { to: '/webhooks', label: 'Webhook', icon: Link2 },
+  { to: '/settings', label: '配置', icon: Settings },
 ]
 
 export default function Layout() {
@@ -45,14 +55,13 @@ export default function Layout() {
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`
+                clsx(
+                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  isActive ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                )
               }
             >
-              <span>{item.icon}</span>
+              <item.icon className="w-5 h-5" />
               {item.label}
             </NavLink>
           ))}
@@ -60,14 +69,15 @@ export default function Layout() {
         <div className="p-3 border-t border-slate-100">
           {user && (
             <div className="px-3 py-2 text-xs text-slate-400 truncate mb-1">
-              👤 {(user as any).username}
+              <User className="w-4 h-4 inline mr-1" />
+              {(user as any).username}
             </div>
           )}
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg"
           >
-            <span>🚪</span> 退出登录
+            <LogOut className="w-4 h-4" /> 退出登录
           </button>
         </div>
       </aside>
@@ -84,16 +94,14 @@ export default function Layout() {
             key={item.to}
             to={item.to}
             end={item.to === '/'}
-            className={({ isActive }) =>
-              `mobile-nav-item${isActive ? ' active' : ''}`
-            }
+            className={({ isActive }) => clsx('mobile-nav-item', { active: isActive })}
           >
-            <span className="text-lg">{item.icon}</span>
+            <item.icon className="w-5 h-5" />
             {item.label}
           </NavLink>
         ))}
         <button onClick={handleLogout} className="mobile-nav-item">
-          <span className="text-lg">🚪</span>
+          <LogOut className="w-5 h-5" />
           退出
         </button>
       </nav>

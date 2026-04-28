@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
+import { formatRelativeTime } from '@/lib/date'
 
 async function fetchDashboard() {
   return apiFetch('/dashboard/summary')
@@ -58,7 +59,7 @@ export default function DashboardPage() {
             {' · '}
             <span className={`text-sm ${statusColor(d.last_run.status)}`}>{d.last_run.status}</span>
           </p>
-          <p className="text-xs text-slate-400 mt-1">{d.last_run.created_at}</p>
+          <p className="text-xs text-slate-400 mt-1">{formatRelativeTime(d.last_run.created_at)}</p>
         </div>
       )}
     </div>

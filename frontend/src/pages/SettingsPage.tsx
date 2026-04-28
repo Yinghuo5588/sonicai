@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import apiFetch from '@/lib/api'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { CheckCircle, XCircle } from 'lucide-react'
+import { changePasswordSchema } from '@/lib/validators'
 
 async function fetchSettings() {
   return apiFetch('/settings')
@@ -388,10 +390,24 @@ export default function SettingsPage() {
   const handleChangePassword = async () => {
     setPasswordLoading(true)
     setPasswordResult(null)
+
+    const validation = changePasswordSchema.safeParse({
+      oldPassword: oldPassword,
+      newPassword: newPassword,
+    })
+    if (!validation.success) {
+      setPasswordResult({ ok: false, msg: validation.error.errors[0].message })
+      setPasswordLoading(false)
+      return
+    }
+
     try {
       const result = await apiFetch('/auth/change-password', {
         method: 'POST',
-        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+        body: JSON.stringify({
+          old_password: validation.data.oldPassword,
+          new_password: validation.data.newPassword,
+        }),
       })
       setPasswordResult({ ok: true, msg: '密码修改成功' })
       setOldPassword('')
@@ -474,7 +490,9 @@ export default function SettingsPage() {
 
           <p className={`text-xs px-3 py-2 rounded-lg ${navidromeResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
 
-            {navidromeResult.ok ? '✅ ' : '❌ '}{navidromeResult.msg}
+            {navidromeResult.ok
+                ? <><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />{navidromeResult.msg}</>
+                : <><XCircle className="inline w-4 h-4 text-red-500 mr-1" />{navidromeResult.msg}</>}
 
           </p>
 
@@ -547,8 +565,7 @@ export default function SettingsPage() {
           </button>
           {passwordResult && (
             <p className={`text-sm ${passwordResult.ok ? 'text-green-600' : 'text-red-500'}`}>
-              {passwordResult.ok ? 'ok ' : 'err '}{passwordResult.msg}
-            </p>
+              {passwordResult.ok ? <><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />密码修改成功</> : <><XCircle className="inline w-4 h-4 text-red-500 mr-1" />{passwordResult.msg}</>}</p>
           )}
         </div>
       </section>
@@ -581,7 +598,7 @@ export default function SettingsPage() {
 
           <p className={`text-xs px-3 py-2 rounded-lg ${webhookResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
 
-            {webhookResult.ok ? '✅ ' : '❌ '}{webhookResult.msg}
+            {webhookResult.ok ? <CheckCircle className="inline w-4 h-4 text-green-500 mr-1" /> : <XCircle className="inline w-4 h-4 text-red-500 mr-1" />}{webhookResult.msg}
 
           </p>
 
@@ -871,7 +888,7 @@ export default function SettingsPage() {
       >
         {mutation.isPending ? '保存中...' : '保存配置'}
       </button>
-      {mutation.isSuccess && <p className="text-green-600 text-sm">✅ 已保存</p>}
+      {mutation.isSuccess && <p className="text-green-600 text-sm"><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />已保存</p>}
       {mutation.isError && <p className="text-red-500 text-sm">保存失败</p>}
 
       {/* Config backup */}

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
+import { formatRelativeTime } from '@/lib/date'
 
 async function fetchRuns() {
   return apiFetch('/runs')
@@ -50,7 +51,7 @@ export default function HistoryPage() {
                 <span className="text-sm font-medium text-slate-800">{runTypeLabel(r.run_type)}</span>
                 {statusBadge(r.status)}
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">{r.created_at}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{formatRelativeTime(r.created_at)}</p>
             </div>
             <span className="text-blue-400 text-sm ml-2">查看 →</span>
           </Link>

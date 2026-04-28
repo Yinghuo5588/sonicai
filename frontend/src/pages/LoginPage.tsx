@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { loginSchema } from '@/lib/validators'
 
 interface LoginForm {
   username: string
@@ -14,11 +15,19 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+
+    const validation = loginSchema.safeParse(form)
+    if (!validation.success) {
+      setError(validation.error.errors[0].message)
+      setLoading(false)
+      return
+    }
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(validation.data),
       })
       if (!res.ok) {
         const data = await res.json()

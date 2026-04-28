@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
 import apiFetch from '@/lib/api'
+import { formatRelativeTime, formatDateTime } from '@/lib/date'
+import clsx from 'clsx'
+import { StopCircle } from 'lucide-react'
 
 async function fetchRunDetail(runId: number) {
   return apiFetch(`/runs/${runId}`)
@@ -29,12 +32,18 @@ function runTypeLabel(type: string) {
 }
 
 function statusBadge(status: string) {
-  const cls = status === 'success' ? 'bg-green-100 text-green-700'
-    : status === 'failed' ? 'bg-red-100 text-red-700'
-    : status === 'running' ? 'bg-blue-100 text-blue-700'
-    : status === 'stopped' ? 'bg-orange-100 text-orange-700'
-    : 'bg-slate-100 text-slate-600'
-  return <span className={`px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{status}</span>
+  const color = {
+    success: 'bg-green-100 text-green-700',
+    failed: 'bg-red-100 text-red-700',
+    running: 'bg-blue-100 text-blue-700',
+    stopped: 'bg-orange-100 text-orange-700',
+  }[status] || 'bg-slate-100 text-slate-600'
+
+  return (
+    <span className={clsx('px-2 py-0.5 rounded text-xs font-medium', color)}>
+      {status}
+    </span>
+  )
 }
 
 export default function RunDetailPage() {
@@ -92,7 +101,7 @@ export default function RunDetailPage() {
             disabled={stopping || stopMutation.isPending}
             className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-red-600 disabled:opacity-50 transition-colors"
           >
-            {stopping || stopMutation.isPending ? '停止中...' : '⏹ 停止任务'}
+            {stopping || stopMutation.isPending ? '停止中...' : <><StopCircle className="w-4 h-4 inline mr-1" />停止任务</>}
           </button>
         )}
       </div>
@@ -103,10 +112,14 @@ export default function RunDetailPage() {
           <h1 className="text-lg font-bold text-slate-800">{runTypeLabel(run.run_type)}</h1>
           {statusBadge(run.status)}
         </div>
-        <p className="text-xs text-slate-400 mt-1">
-          {run.created_at}
-          {run.started_at && ` · 开始 ${run.started_at}`}
-          {run.finished_at && ` → 完成 ${run.finished_at}`}
+        <p className="text-xs text-slate-400 mt-1 space-x-1">
+          <span>创建于 {formatRelativeTime(run.created_at)}</span>
+          {run.started_at && (
+            <span>· 开始于 {formatDateTime(run.started_at)}</span>
+          )}
+          {run.finished_at && (
+            <span>· 完成于 {formatDateTime(run.finished_at)}</span>
+          )}
         </p>
         {run.error_message && (
           <p className="text-xs text-red-500 mt-2 bg-red-50 rounded p-2">{run.error_message}</p>

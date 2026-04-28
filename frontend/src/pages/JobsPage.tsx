@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
+import { Star, Music, FileText, CheckCircle, XCircle } from 'lucide-react'
 
 async function triggerJob(type: string) {
   const endpoint = type === 'full' ? 'all' : type
@@ -111,7 +112,7 @@ export default function JobsPage() {
 
       {/* 网易云热榜同步 */}
       <div className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
-        <h2 className="font-medium text-slate-700 text-sm">🌟 网易云热榜同步</h2>
+        <h2 className="font-medium text-slate-700 text-sm"><Star className="w-4 h-4 inline mr-1" />网易云热榜同步</h2>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-slate-500 mb-1">抓取热榜歌曲数</label>
@@ -145,13 +146,13 @@ export default function JobsPage() {
           覆盖同名歌单
         </label>
         {run(hotboardMutation, '🌟 网易云热榜同步')}
-        {hotboardMutation.isSuccess && <p className="text-green-600 text-sm">✅ 已提交，可在推荐历史查看进度</p>}
-        {hotboardMutation.isError && <p className="text-red-500 text-sm">❌ {String(hotboardMutation.error?.message)}</p>}
+        {hotboardMutation.isSuccess && <p className="text-green-600 text-sm"><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />已提交，可在推荐历史查看进度</p>}
+        {hotboardMutation.isError && <p className="text-red-500 text-sm"><XCircle className="inline w-4 h-4 text-red-500 mr-1" />{String(hotboardMutation.error?.message)}</p>}
       </div>
 
       {/* 第三方歌单同步 */}
       <div className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
-        <h2 className="font-medium text-slate-700 text-sm">🎵 第三方歌单同步</h2>
+        <h2 className="font-medium text-slate-700 text-sm"><Music className="w-4 h-4 inline mr-1" />第三方歌单同步</h2>
         <div>
           <label className="block text-xs text-slate-500 mb-1">歌单链接</label>
           <input
@@ -190,14 +191,14 @@ export default function JobsPage() {
           disabled={!isPlaylistUrlValid(playlistUrl) || playlistMutation.isPending}
           className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm font-medium disabled:cursor-not-allowed"
         >
-          {playlistMutation.isPending ? '解析中...' : playlistMutation.isSuccess ? '✅ 已提交，可前往推荐历史查看' : playlistMutation.isError ? `❌ ${String(playlistMutation.error?.message)}` : '🎵 解析并同步到 Navidrome'}
+          {playlistMutation.isPending ? '解析中...' : playlistMutation.isSuccess ? <><CheckCircle className="inline w-4 h-4 mr-1" />已提交，可前往推荐历史查看</> : playlistMutation.isError ? <><XCircle className="inline w-4 h-4 mr-1" />{String(playlistMutation.error?.message)}</> : <><Music className="w-4 h-4 inline mr-1" />解析并同步到 Navidrome</>}
         </button>
         {playlistMutation.isSuccess && <p className="text-green-600 text-sm">✅ 任务已提交！</p>}
       </div>
 
       {/* 文本歌单上传 */}
       <div className="bg-white rounded-lg p-4 border border-slate-200 space-y-4">
-        <h2 className="font-medium text-slate-700 text-sm">📄 文本歌单上传</h2>
+        <h2 className="font-medium text-slate-700 text-sm"><FileText className="w-4 h-4 inline mr-1" />文本歌单上传</h2>
         <p className="text-xs text-slate-400">
           上传 .txt 文件，每行格式：
           <code className="bg-slate-100 px-1 rounded">歌名 - 艺术家</code>
@@ -270,10 +271,10 @@ export default function JobsPage() {
             text-sm font-medium disabled:cursor-not-allowed"
         >
           {textMutation.isPending ? '上传中...' :
-            textMutation.isSuccess ? '✅ 已提交' :
+            textMutation.isSuccess ? <><CheckCircle className="inline w-4 h-4 mr-1" />已提交</> :
               textMutation.isError
-                ? `❌ ${String(textMutation.error?.message)}`
-                : '📄 上传并同步到 Navidrome'}
+                ? <><XCircle className="inline w-4 h-4 mr-1" />{String(textMutation.error?.message)}</>
+                : <><FileText className="w-4 h-4 inline mr-1" />上传并同步到 Navidrome</>}
         </button>
 
         {/* Result feedback */}
