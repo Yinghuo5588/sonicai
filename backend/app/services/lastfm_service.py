@@ -80,26 +80,34 @@ async def lastfm_get(method: str, params: dict[str, Any]) -> dict | None:
 
 async def get_user_top_tracks(username: str, limit: int = 30, period: str = "1month") -> list[dict]:
     data = await lastfm_get("user.getTopTracks", {"user": username, "limit": limit, "period": period})
-    if not data or "toptracks" not in data:
+    if not data or not isinstance(data, dict) or "toptracks" not in data:
         return []
-    return data["toptracks"].get("track", [])
+    toptracks = data.get("toptracks")
+    if not isinstance(toptracks, dict):
+        return []
+    return toptracks.get("track", [])
 
 
 async def get_user_top_artists(username: str, limit: int = 30, period: str = "1month") -> list[dict]:
     data = await lastfm_get("user.getTopArtists", {"user": username, "limit": limit, "period": period})
-    if not data or "topartists" not in data:
+    if not data or not isinstance(data, dict) or "topartists" not in data:
         return []
-    return data["topartists"].get("artist", [])
+    topartists = data.get("topartists")
+    if not isinstance(topartists, dict):
+        return []
+    return topartists.get("artist", [])
 
 
 async def get_user_recent_tracks(username: str, limit: int = 100) -> list[dict]:
     """Get user's recently played tracks."""
     data = await lastfm_get("user.getRecentTracks", {"user": username, "limit": limit})
-    if not data or "recenttracks" not in data:
+    if not data or not isinstance(data, dict) or "recenttracks" not in data:
         return []
-    tracks = data["recenttracks"].get("track", [])
-    # Filter out "now playing" entry (no date)
-    return [t for t in tracks if t.get("date", {}).get("uts")]
+    recenttracks = data.get("recenttracks")
+    if not isinstance(recenttracks, dict):
+        return []
+    tracks = recenttracks.get("track", [])
+    return [t for t in tracks if isinstance(t, dict) and t.get("date", {}).get("uts")]
 
 
 async def get_similar_tracks(track_name: str, artist_name: str, limit: int = 50) -> list[dict]:
@@ -108,24 +116,31 @@ async def get_similar_tracks(track_name: str, artist_name: str, limit: int = 50)
         "track": track_name,
         "limit": limit,
     })
-    if not data or "similartracks" not in data:
+    if not data or not isinstance(data, dict) or "similartracks" not in data:
         return []
-    return data["similartracks"].get("track", [])
+    similartracks = data.get("similartracks")
+    if not isinstance(similartracks, dict):
+        return []
+    return similartracks.get("track", [])
 
 
 async def get_similar_artists(artist_name: str, limit: int = 50) -> list[dict]:
     data = await lastfm_get("artist.getSimilar", {"artist": artist_name, "limit": limit})
-    if not data or "similarartists" not in data:
+    if not data or not isinstance(data, dict) or "similarartists" not in data:
         return []
-    raw = data["similarartists"].get("artist", [])
-    # Last.fm 单个结果时返回 dict 而非 list，统一转为 list
+    raw = data.get("similarartists", {})
     if isinstance(raw, dict):
         raw = [raw]
+    elif not isinstance(raw, list):
+        return []
     return raw
 
 
 async def get_artist_top_tracks(artist_name: str, limit: int = 10) -> list[dict]:
     data = await lastfm_get("artist.getTopTracks", {"artist": artist_name, "limit": limit})
-    if not data or "toptracks" not in data:
+    if not data or not isinstance(data, dict) or "toptracks" not in data:
         return []
-    return data["toptracks"].get("track", [])
+    toptracks = data.get("toptracks")
+    if not isinstance(toptracks, dict):
+        return []
+    return toptracks.get("track", [])

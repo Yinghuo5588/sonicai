@@ -47,6 +47,7 @@ class SettingsResponse(BaseModel):
     candidate_pool_multiplier_min: float | None = None
     candidate_pool_multiplier_max: float | None = None
     search_concurrency: int | None = None
+    max_concurrent_tasks: int | None = None
     cron_enabled: bool
     cron_expression: str | None
     # Hotboard scheduled sync
@@ -104,6 +105,7 @@ class SettingsUpdate(BaseModel):
     candidate_pool_multiplier_min: float | None = Field(default=None, ge=1.0, le=20.0)
     candidate_pool_multiplier_max: float | None = Field(default=None, ge=1.0, le=20.0)
     search_concurrency: int | None = Field(default=None, ge=1, le=20)
+    max_concurrent_tasks: int | None = Field(default=None, ge=1, le=5)
     cron_enabled: bool | None = None
     cron_expression: str | None = None
     # Hotboard scheduled sync
@@ -166,6 +168,11 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
     # Reload full cron schedule (all three: recommendation + hotboard + playlist_sync)
     from app.core.scheduler import load_cron_schedule
     await load_cron_schedule(db)
+
+    # Refresh task semaphore if max_concurrent_tasks changed
+    if body.max_concurrent_tasks is not None:
+        from app.core.task_registry import set_max_concurrent
+        set_max_concurrent(body.max_concurrent_tasks)
 
     return SettingsResponse.model_validate(s)
 

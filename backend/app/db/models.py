@@ -91,6 +91,9 @@ class SystemSettings(Base):
     candidate_pool_multiplier_max = Column(Numeric(4, 1), default=10.0)
     search_concurrency = Column(Integer, default=5)  # Navidrome concurrent search limit (1-20)
 
+    # Task concurrency
+    max_concurrent_tasks = Column(Integer, default=2)  # Global background task limit (1-5)
+
     # Scheduler
     cron_enabled = Column(Boolean, default=False)
     cron_expression = Column(String(100), nullable=True)

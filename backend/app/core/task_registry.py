@@ -6,11 +6,35 @@ import logging
 logger = logging.getLogger(__name__)
 
 _background_tasks: set[asyncio.Task] = set()
+_semaphore: asyncio.Semaphore | None = None
+_max_concurrent: int = 2
+
+
+async def get_semaphore() -> asyncio.Semaphore:
+    global _semaphore
+    if _semaphore is None:
+        _semaphore = asyncio.Semaphore(_max_concurrent)
+    return _semaphore
+
+
+def set_max_concurrent(value: int) -> None:
+    global _max_concurrent, _semaphore
+    _max_concurrent = value
+    _semaphore = asyncio.Semaphore(value)
+    logger.info(f"[task_registry] max_concurrent_tasks updated to {value}")
 
 
 def create_background_task(coro, *, name: str | None = None) -> asyncio.Task:
-    """Create a background task and keep a strong reference to prevent GC."""
-    task = asyncio.create_task(coro, name=name)
+    """Create a background task protected by the global semaphore."""
+    async def _semaphore_protected():
+        sem = await get_semaphore()
+        async with sem:
+            task = asyncio.create_task(coro, name=name)
+            _background_tasks.add(task)
+            task.add_done_callback(_task_done)
+            await task
+
+    task = asyncio.create_task(_semaphore_protected(), name=name)
     _background_tasks.add(task)
     task.add_done_callback(_task_done)
     return task

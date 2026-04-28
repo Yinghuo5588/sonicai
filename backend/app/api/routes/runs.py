@@ -28,6 +28,12 @@ async def get_playlist_items(
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
 
+    count_result = await db.execute(
+        select(func.count(RecommendationItem.id))
+        .where(RecommendationItem.generated_playlist_id == playlist_id)
+    )
+    total = count_result.scalar()
+
     items_result = await db.execute(
         select(RecommendationItem)
         .where(RecommendationItem.generated_playlist_id == playlist_id)
@@ -80,7 +86,7 @@ async def get_playlist_items(
             "created_at": playlist.created_at.isoformat() if playlist.created_at else None,
         },
         "items": enriched,
-        "total": len(enriched),
+        "total": total,
     }
 
 
@@ -129,6 +135,9 @@ async def list_runs(
     limit: int = 50,
     offset: int = 0,
 ):
+    count_result = await db.execute(select(func.count(RecommendationRun.id)))
+    total = count_result.scalar()
+
     result = await db.execute(
         select(RecommendationRun)
         .order_by(RecommendationRun.created_at.desc())
@@ -136,18 +145,21 @@ async def list_runs(
         .offset(offset)
     )
     runs = result.scalars().all()
-    return [
-        {
-            "id": r.id,
-            "run_type": r.run_type,
-            "status": r.status,
-            "error_message": r.error_message,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-            "started_at": r.started_at.isoformat() if r.started_at else None,
-            "finished_at": r.finished_at.isoformat() if r.finished_at else None,
-        }
-        for r in runs
-    ]
+    return {
+        "runs": [
+            {
+                "id": r.id,
+                "run_type": r.run_type,
+                "status": r.status,
+                "error_message": r.error_message,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "started_at": r.started_at.isoformat() if r.started_at else None,
+                "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+            }
+            for r in runs
+        ],
+        "total": total,
+    }
 
 
 @router.get("/{run_id}")

@@ -76,7 +76,13 @@ async def _nd_get(endpoint: str, params: dict[str, Any] | None = None) -> dict |
                 logger.warning(f"[navidrome] HTTP {response.status_code} for {url}")
                 return None
             data = response.json()
+            if not isinstance(data, dict):
+                logger.warning(f"[navidrome] Unexpected response type: {type(data)}")
+                return None
             resp = data.get("subsonic-response", data)
+            if not isinstance(resp, dict):
+                logger.warning(f"[navidrome] Invalid subsonic-response structure: {type(resp)}")
+                return None
             if resp.get("status") == "failed":
                 logger.warning(f"[navidrome] Subsonic error for {url}: {resp}")
                 return None

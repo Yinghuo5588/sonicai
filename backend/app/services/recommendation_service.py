@@ -649,7 +649,7 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict, settings) -> di
 
     scored.sort(key=lambda x: x[0], reverse=True)
     best_score, best = scored[0]
-    threshold = float(getattr(settings, 'match_threshold', 0.75) or 0.75)
+    threshold = float(settings.match_threshold)
     if best and best_score >= threshold:
         return {
             "selected_song_id": best.get("id"),
