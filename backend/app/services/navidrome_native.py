@@ -23,7 +23,7 @@ async def navidrome_native_login() -> str | None:
     """Authenticate with Navidrome native API and return a Bearer token."""
     from sqlalchemy import select
     from app.db.models import SystemSettings
-    from app.core.security import decrypt_secret
+    from app.core.crypto import decrypt_value
     from app.db.session import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:
@@ -33,7 +33,7 @@ async def navidrome_native_login() -> str | None:
     if not s or not s.navidrome_url or not s.navidrome_username or not s.navidrome_password_encrypted:
         return None
 
-    password = decrypt_secret(s.navidrome_password_encrypted)
+    password = decrypt_value(s.navidrome_password_encrypted)
     base = _base_url(s.navidrome_url)
 
     # Try common payload shapes
