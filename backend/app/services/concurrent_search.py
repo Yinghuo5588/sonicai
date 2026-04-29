@@ -34,7 +34,7 @@ async def _search_one(
                     "title": title,
                     "artist": artist,
                     "best_match": {
-                        "navidrome_id": cached["id"],
+                        "id": cached["id"],
                         "title": cached["title"],
                         "artist": cached["artist"],
                         "album": cached.get("album"),

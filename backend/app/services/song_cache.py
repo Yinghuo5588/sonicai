@@ -11,19 +11,9 @@ from typing import Any
 from rapidfuzz import fuzz
 
 from app.services.navidrome_native import get_all_songs_native
+from app.utils.text_normalizer import normalize_for_compare
 
 logger = logging.getLogger(__name__)
-
-
-def normalize_for_compare(value: str | None) -> str:
-    """Normalize a string for fuzzy comparison."""
-    if not value:
-        return ""
-    value = value.lower().strip()
-    remove_chars = ["（", "）", "(", ")", "[", "]", "【", "】", "-", "_", ".", ",", "，", "。", "'", '"']
-    for ch in remove_chars:
-        value = value.replace(ch, " ")
-    return " ".join(value.split())
 
 
 @dataclass

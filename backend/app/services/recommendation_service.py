@@ -619,8 +619,37 @@ async def _filter_recent(db: AsyncSession, candidates: list[dict], avoid_days: i
 
 async def _match_to_navidrome(db: AsyncSession, item_data: dict, settings) -> dict | None:
     from app.utils.text_normalizer import score_candidate, make_search_queries
+
     title = item_data["title"]
     artist = item_data["artist"]
+    threshold = float(settings.match_threshold) if settings.match_threshold is not None else 0.0
+
+    # ---- 缓存优先 ----
+    try:
+        from app.services.song_cache import song_cache
+        cached = song_cache.match_one(title=title, artist=artist, threshold=threshold)
+        if cached:
+            return {
+                "selected_song_id": cached["id"],
+                "selected_title": cached["title"],
+                "selected_artist": cached["artist"],
+                "selected_album": cached.get("album"),
+                "confidence_score": cached["score"],
+                "title_score": None,
+                "artist_score": None,
+                "search_query": f"{title} {artist}",
+                "raw_response": {
+                    **cached,
+                    "cache_hit": True,
+                },
+            }
+    except Exception as cache_error:
+        logger.debug(
+            "[recommendation] cache lookup failed title=%s artist=%s: %s",
+            title, artist, cache_error,
+        )
+    # ---- 缓存未命中，继续原有搜索逻辑 ----
+
     queries = make_search_queries(title, artist)
     seen_ids: set = set()
     all_results: list = []
@@ -651,6 +680,25 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict, settings) -> di
     best_score, best = scored[0]
     threshold = float(settings.match_threshold) if settings.match_threshold is not None else 0.0
     if best and best_score >= threshold:
+        # ---- 被动补录 ----
+        try:
+            from app.services.song_cache import song_cache
+            await song_cache.add_song(
+                {
+                    "id": best.get("id"),
+                    "title": best.get("title"),
+                    "artist": best.get("artist"),
+                    "album": best.get("album"),
+                    "duration": best.get("duration"),
+                },
+                source="passive",
+            )
+        except Exception as cache_error:
+            logger.debug(
+                "[recommendation] passive cache add failed title=%s artist=%s: %s",
+                title, artist, cache_error,
+            )
+
         return {
             "selected_song_id": best.get("id"),
             "selected_title": best.get("title"),
