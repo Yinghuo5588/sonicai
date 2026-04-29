@@ -4,13 +4,19 @@ import { useAuthStore } from '@/hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
 import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
-import SettingsPage from '@/pages/SettingsPage'
 import JobsPage from '@/pages/JobsPage'
 import HistoryPage from '@/pages/HistoryPage'
 import WebhooksPage from '@/pages/WebhooksPage'
 import PlaylistDetailPage from '@/pages/PlaylistDetailPage'
 import RunDetailPage from '@/pages/RunDetailPage'
 import Layout from '@/layouts/Layout'
+import SettingsLayout from '@/pages/settings/SettingsLayout'
+import SettingsConnections from '@/pages/settings/SettingsConnections'
+import SettingsSource from '@/pages/settings/SettingsSource'
+import SettingsPlaylist from '@/pages/settings/SettingsPlaylist'
+import SettingsSchedule from '@/pages/settings/SettingsSchedule'
+import SettingsAccount from '@/pages/settings/SettingsAccount'
+import SettingsAppearance from '@/pages/settings/SettingsAppearance'
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { token, logout } = useAuthStore()
@@ -51,7 +57,15 @@ export default function App() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings" element={<SettingsLayout />}>
+          <Route index element={<Navigate to="connections" replace />} />
+          <Route path="connections" element={<SettingsConnections />} />
+          <Route path="source" element={<SettingsSource />} />
+          <Route path="playlist" element={<SettingsPlaylist />} />
+          <Route path="schedule" element={<SettingsSchedule />} />
+          <Route path="account" element={<SettingsAccount />} />
+          <Route path="appearance" element={<SettingsAppearance />} />
+        </Route>
         <Route path="jobs" element={<JobsPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="history/run/:run_id" element={<RunDetailPage />} />

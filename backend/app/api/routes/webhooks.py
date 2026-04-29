@@ -1,7 +1,7 @@
 """Webhook batch routes."""
 
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Depends, Query
+from sqlalchemy import select, func
 
 from app.db.session import get_db, AsyncSessionLocal
 from app.db.models import WebhookBatch, WebhookBatchItem
@@ -11,26 +11,41 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
 @router.get("/batches")
-async def list_batches(current_user: CurrentUser, db: AsyncSessionLocal = Depends(get_db)):
+async def list_batches(
+    current_user: CurrentUser,
+    db: AsyncSessionLocal = Depends(get_db),
+    limit: int = Query(default=5, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    total_result = await db.execute(select(func.count(WebhookBatch.id)))
+    total = total_result.scalar() or 0
+
     result = await db.execute(
         select(WebhookBatch)
         .order_by(WebhookBatch.created_at.desc())
-        .limit(50)
+        .offset(offset)
+        .limit(limit)
     )
     batches = result.scalars().all()
-    return [
-        {
-            "id": b.id,
-            "run_id": b.run_id,
-            "playlist_type": b.playlist_type,
-            "status": b.status,
-            "retry_count": b.retry_count,
-            "max_retry_count": b.max_retry_count,
-            "response_code": b.response_code,
-            "created_at": b.created_at.isoformat() if b.created_at else None,
-        }
-        for b in batches
-    ]
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [
+            {
+                "id": b.id,
+                "run_id": b.run_id,
+                "playlist_type": b.playlist_type,
+                "status": b.status,
+                "retry_count": b.retry_count,
+                "max_retry_count": b.max_retry_count,
+                "response_code": b.response_code,
+                "created_at": b.created_at.isoformat() if b.created_at else None,
+            }
+            for b in batches
+        ],
+    }
 
 
 @router.get("/batches/{batch_id}")
