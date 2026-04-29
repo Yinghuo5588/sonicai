@@ -65,6 +65,11 @@ class SettingsResponse(BaseModel):
     playlist_sync_name: str | None = None
     playlist_sync_overwrite: bool | None = False
 
+    # Song cache
+    song_cache_enabled: bool | None = True
+    song_cache_auto_refresh_enabled: bool | None = True
+    song_cache_refresh_cron: str | None = "0 4 * * *"
+
     class Config:
         from_attributes = True
 
@@ -122,6 +127,11 @@ class SettingsUpdate(BaseModel):
     playlist_sync_threshold: float | None = None
     playlist_sync_name: str | None = None
     playlist_sync_overwrite: bool | None = False
+
+    # Song cache
+    song_cache_enabled: bool | None = None
+    song_cache_auto_refresh_enabled: bool | None = None
+    song_cache_refresh_cron: str | None = None
 
 
 async def get_settings_session(db: AsyncSessionLocal):

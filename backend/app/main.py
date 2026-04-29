@@ -48,6 +48,12 @@ async def lifespan(app: FastAPI):
     from app.db.session import AsyncSessionLocal
     async with AsyncSessionLocal() as db:
         await load_cron_schedule(db)
+
+    # Warm up song cache asynchronously (do not block startup)
+    from app.core.task_registry import create_background_task
+    from app.services.song_cache import song_cache
+    create_background_task(song_cache.refresh_full(), name="song-cache-startup-refresh")
+
     yield
     shutdown_scheduler()
     logger.info("SonicAI backend stopped")

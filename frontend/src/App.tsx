@@ -15,6 +15,7 @@ import SettingsConnections from '@/pages/settings/SettingsConnections'
 import SettingsSource from '@/pages/settings/SettingsSource'
 import SettingsPlaylist from '@/pages/settings/SettingsPlaylist'
 import SettingsSchedule from '@/pages/settings/SettingsSchedule'
+import SettingsCache from '@/pages/settings/SettingsCache'
 import SettingsAccount from '@/pages/settings/SettingsAccount'
 import SettingsAppearance from '@/pages/settings/SettingsAppearance'
 
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="source" element={<SettingsSource />} />
           <Route path="playlist" element={<SettingsPlaylist />} />
           <Route path="schedule" element={<SettingsSchedule />} />
+          <Route path="cache" element={<SettingsCache />} />
           <Route path="account" element={<SettingsAccount />} />
           <Route path="appearance" element={<SettingsAppearance />} />
         </Route>

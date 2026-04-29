@@ -6,6 +6,7 @@ from typing import Callable, Awaitable
 
 from app.services.navidrome_service import navidrome_multi_search
 from app.services.matching_service import pick_best_match
+from app.services.song_cache import song_cache
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,48 @@ async def _search_one(
     threshold: float,
     semaphore: asyncio.Semaphore,
 ) -> dict:
-    """Search and match a single track, respecting concurrency limit."""
+    """Search and match a single track, respecting concurrency limit.
+
+    Cache lookup is tried first. On miss or low confidence, falls back to
+    the real Navidrome Subsonic API. Successful API results are passively
+    added to the cache for future use.
+    """
     async with semaphore:
         try:
+            # 1. Try cache first
+            cached = song_cache.match_one(title=title, artist=artist, threshold=threshold)
+            if cached:
+                return {
+                    "index": index,
+                    "title": title,
+                    "artist": artist,
+                    "best_match": {
+                        "navidrome_id": cached["id"],
+                        "title": cached["title"],
+                        "artist": cached["artist"],
+                        "album": cached.get("album"),
+                        "score": cached["score"],
+                        "source": "cache",
+                    },
+                }
+
+            # 2. Cache miss — go to Navidrome API
             nav_results = await navidrome_multi_search(title, artist)
             best = pick_best_match(title, artist, nav_results, threshold)
+
+            # 3. Passively add successful result to cache
+            if best and best.get("navidrome_id"):
+                await song_cache.add_song(
+                    {
+                        "id": best.get("navidrome_id"),
+                        "title": best.get("title"),
+                        "artist": best.get("artist"),
+                        "album": best.get("album"),
+                        "duration": best.get("duration"),
+                    },
+                    source="passive",
+                )
+
             return {"index": index, "title": title, "artist": artist, "best_match": best}
         except Exception as e:
             logger.error(f"[concurrent_search] failed index={index} title={title}: {e}")

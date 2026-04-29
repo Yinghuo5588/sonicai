@@ -6,6 +6,7 @@ import {
   Clock,
   UserCog,
   Palette,
+  Database,
 } from 'lucide-react'
 
 const SETTINGS_SECTIONS = [
@@ -32,6 +33,12 @@ const SETTINGS_SECTIONS = [
     title: '调度设置',
     desc: '定时任务、热榜同步与歌单同步',
     icon: Clock,
+  },
+  {
+    key: 'cache',
+    title: '歌曲缓存',
+    desc: '缓存 Navidrome 曲库，加速匹配',
+    icon: Database,
   },
   {
     key: 'account',

@@ -110,9 +110,38 @@ async def load_cron_schedule(db: AsyncSession):
                     replace_existing=True,
                     misfire_grace_time=120,
                 )
-                logger.info(f"Playlist sync cron loaded: {config.playlist_sync_cron_expression}")
+                logger.info("Playlist sync cron loaded: %s", config.playlist_sync_cron_expression)
         except Exception as e:
-            logger.warning(f"Invalid playlist sync cron: {e}")
+            logger.warning("Invalid playlist sync cron: %s", e)
+
+    # ===== Song cache scheduled refresh =====
+    if config and config.song_cache_auto_refresh_enabled and config.song_cache_refresh_cron:
+        try:
+            parts = config.song_cache_refresh_cron.split()
+            if len(parts) >= 5:
+                tz = config.timezone if config and config.timezone else settings.app_timezone
+
+                async def _song_cache_refresh_job():
+                    from app.services.song_cache import song_cache
+                    await song_cache.refresh_full()
+
+                sched.add_job(
+                    _song_cache_refresh_job,
+                    CronTrigger(
+                        minute=parts[0],
+                        hour=parts[1],
+                        day=parts[2],
+                        month=parts[3],
+                        day_of_week=parts[4],
+                        timezone=tz,
+                    ),
+                    id="song_cache_refresh",
+                    replace_existing=True,
+                    misfire_grace_time=300,
+                )
+                logger.info("Song cache cron loaded: %s", config.song_cache_refresh_cron)
+        except Exception as e:
+            logger.warning("Invalid song cache cron '%s': %s", config.song_cache_refresh_cron, e)
 
     # Register webhook retry job (every 2 minutes)
     from apscheduler.triggers.interval import IntervalTrigger

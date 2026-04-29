@@ -115,6 +115,11 @@ class SystemSettings(Base):
     playlist_sync_overwrite = Column(Boolean, default=False)
     playlist_sync_last_hash = Column(String(64), nullable=True)
 
+    # Song cache
+    song_cache_enabled = Column(Boolean, default=True)
+    song_cache_auto_refresh_enabled = Column(Boolean, default=True)
+    song_cache_refresh_cron = Column(String(100), default="0 4 * * *")
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
