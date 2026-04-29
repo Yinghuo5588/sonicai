@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 210 40% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -21,30 +21,149 @@
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 221 83% 53%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
-}
 
-@layer base {
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 224 76% 48%;
+  }
+
   * {
     @apply border-border;
   }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
 }
 
-/* Mobile nav bar */
-.mobile-nav {
-  @apply fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 flex;
-  @apply md:hidden;
-}
+@layer components {
+  .page {
+    @apply p-4 md:p-6 space-y-4 md:space-y-6;
+  }
 
-.mobile-nav-item {
-  @apply flex-1 flex flex-col items-center gap-0.5 py-2 text-xs text-slate-500;
-  @apply hover:text-blue-600 transition-colors;
-}
+  .page-wide {
+    @apply p-4 md:p-6 space-y-4 md:space-y-6 max-w-7xl mx-auto;
+  }
 
-.mobile-nav-item.active {
-  @apply text-blue-600;
+  .page-narrow {
+    @apply p-4 md:p-6 space-y-4 md:space-y-6 max-w-3xl mx-auto;
+  }
+
+  .page-title {
+    @apply text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-slate-500 dark:text-slate-400;
+  }
+
+  .card {
+    @apply bg-card text-card-foreground rounded-2xl border border-border shadow-sm;
+  }
+
+  .card-padding {
+    @apply p-4 md:p-5;
+  }
+
+  .section-title {
+    @apply text-sm font-semibold text-slate-800 dark:text-slate-100;
+  }
+
+  .muted-text {
+    @apply text-xs text-slate-500 dark:text-slate-400;
+  }
+
+  .input {
+    @apply w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm
+      text-slate-900 dark:text-slate-100 placeholder:text-slate-400
+      focus:outline-none focus:ring-2 focus:ring-primary/40;
+  }
+
+  .select {
+    @apply w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm
+      text-slate-900 dark:text-slate-100
+      focus:outline-none focus:ring-2 focus:ring-primary/40;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600;
+  }
+
+  .btn-secondary {
+    @apply btn bg-slate-100 text-slate-700 hover:bg-slate-200
+      dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-50 text-red-600 hover:bg-red-100
+      dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply badge bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300;
+  }
+
+  .badge-danger {
+    @apply badge bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300;
+  }
+
+  .badge-info {
+    @apply badge bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300;
+  }
+
+  .badge-muted {
+    @apply badge bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300;
+  }
+
+  .mobile-nav {
+    @apply fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur border-t border-border flex md:hidden;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mobile-nav-item {
+    @apply flex-1 flex flex-col items-center gap-0.5 py-2 text-[11px] text-slate-500
+      dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors;
+  }
+
+  .mobile-nav-item.active {
+    @apply text-blue-600 dark:text-blue-400;
+  }
 }

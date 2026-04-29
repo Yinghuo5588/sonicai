@@ -43,28 +43,15 @@ type PlaylistItemsResponse = {
   total: number
 }
 
-async function fetchPlaylistItems(
-  playlistId: number,
-  offset = 0,
-): Promise<PlaylistItemsResponse> {
-  return apiFetch(
-    `/runs/playlists/${playlistId}/items?limit=${PAGE_SIZE}&offset=${offset}`,
-  )
+async function fetchPlaylistItems(playlistId: number, offset = 0): Promise<PlaylistItemsResponse> {
+  return apiFetch(`/runs/playlists/${playlistId}/items?limit=${PAGE_SIZE}&offset=${offset}`)
 }
 
-function Stat({
-  label,
-  value,
-  color = 'text-slate-800',
-}: {
-  label: string
-  value: number
-  color?: string
-}) {
+function Stat({ label, value, color = 'text-slate-900 dark:text-slate-50' }: { label: string; value: number; color?: string }) {
   return (
     <div className="text-center">
       <p className={`text-xl font-bold ${color}`}>{value}</p>
-      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
     </div>
   )
 }
@@ -86,18 +73,18 @@ function sourceTypeLabel(type: string) {
 }
 
 function sourceTypeClass(type: string) {
-  if (type === 'track_similarity') return 'bg-blue-50 text-blue-600'
-  if (type === 'artist_similarity') return 'bg-purple-50 text-purple-600'
-  if (type === 'hotboard') return 'bg-red-50 text-red-600'
-  return 'bg-slate-100 text-slate-600'
+  if (type === 'track_similarity') return 'badge-info'
+  if (type === 'artist_similarity') return 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300'
+  if (type === 'hotboard') return 'badge-danger'
+  return 'badge-muted'
 }
 
 function statusBadgeClass(status: string) {
-  if (status === 'success') return 'bg-green-100 text-green-700'
-  if (status === 'failed') return 'bg-red-100 text-red-700'
-  if (status === 'running') return 'bg-blue-100 text-blue-700'
-  if (status === 'pending') return 'bg-slate-100 text-slate-600'
-  return 'bg-slate-100 text-slate-600'
+  if (status === 'success') return 'badge-success'
+  if (status === 'failed') return 'badge-danger'
+  if (status === 'running') return 'badge-info'
+  if (status === 'pending') return 'badge-muted'
+  return 'badge-muted'
 }
 
 export default function PlaylistDetailPage() {
@@ -119,225 +106,130 @@ export default function PlaylistDetailPage() {
     initialPageParam: 0,
     queryFn: ({ pageParam }) => fetchPlaylistItems(pid, Number(pageParam)),
     getNextPageParam: (lastPage, allPages) => {
-      const loadedCount = allPages.reduce(
-        (sum, page) => sum + (page.items?.length || 0),
-        0,
-      )
+      const loadedCount = allPages.reduce((sum, page) => sum + (page.items?.length || 0), 0)
       const total = lastPage.total || 0
-      if (loadedCount >= total) {
-        return undefined
-      }
+      if (loadedCount >= total) return undefined
       return loadedCount
     },
   })
 
-  if (!Number.isFinite(pid) || pid <= 0) {
-    return <div className="p-6 text-red-500">歌单 ID 无效</div>
-  }
-
-  if (isLoading) {
-    return <div className="p-6 text-slate-500">加载中...</div>
-  }
-
-  if (isError) {
-    return (
-      <div className="p-6 text-red-500">
-        加载失败：{error instanceof Error ? error.message : '未知错误'}
-      </div>
-    )
-  }
+  if (!Number.isFinite(pid) || pid <= 0) return <div className="p-6 text-red-500">歌单 ID 无效</div>
+  if (isLoading) return <div className="p-6 text-slate-500">加载中...</div>
+  if (isError) return <div className="p-6 text-red-500">加载失败：{error instanceof Error ? error.message : '未知错误'}</div>
 
   const firstPage = data?.pages?.[0]
-
-  if (!firstPage) {
-    return <div className="p-6 text-red-500">未找到歌单</div>
-  }
+  if (!firstPage) return <div className="p-6 text-red-500">未找到歌单</div>
 
   const playlist = firstPage.playlist
   const total = firstPage.total || 0
   const items = data.pages.flatMap(page => page.items || [])
 
-  const typeLabel = playlistTypeLabel(playlist.playlist_type)
   const playlistName = playlist.name || playlist.playlist_name || '未命名歌单'
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="page">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-slate-800 truncate">
-              {playlistName}
-            </h1>
-            <span
-              className={`px-2 py-0.5 rounded text-xs font-medium ${statusBadgeClass(
-                playlist.status,
-              )}`}
-            >
-              {playlist.status}
-            </span>
+            <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-50 truncate">{playlistName}</h1>
+            <span className={statusBadgeClass(playlist.status)}>{playlist.status}</span>
           </div>
-
-          <p className="text-sm text-slate-500 mt-1">
-            {typeLabel}
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            {playlistTypeLabel(playlist.playlist_type)}
             {playlist.playlist_date ? ` · ${playlist.playlist_date}` : ''}
-            {' · '}
-            共 {total} 首
+            {' · '}共 {total} 首
           </p>
         </div>
-
         <div className="flex gap-6 text-sm shrink-0">
           <Stat label="候选" value={playlist.total_candidates || 0} />
-          <Stat
-            label="命中"
-            value={playlist.matched_count || 0}
-            color="text-green-600"
-          />
-          <Stat
-            label="缺失"
-            value={playlist.missing_count || 0}
-            color={
-              (playlist.missing_count || 0) > 0 ? 'text-amber-600' : 'text-slate-700'
-            }
-          />
+          <Stat label="命中" value={playlist.matched_count || 0} color="text-green-600" />
+          <Stat label="缺失" value={playlist.missing_count || 0} color={(playlist.missing_count || 0) > 0 ? 'text-amber-600' : 'text-slate-700 dark:text-slate-50'} />
         </div>
       </div>
 
       {/* Progress bar */}
       {(playlist.total_candidates || 0) > 0 && (
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
             <div
               className="h-full bg-green-500 transition-all"
-              style={{
-                width: `${Math.min(
-                  100,
-                  ((playlist.matched_count || 0) / (playlist.total_candidates || 1)) * 100,
-                )}%`,
-              }}
+              style={{ width: `${Math.min(100, ((playlist.matched_count || 0) / (playlist.total_candidates || 1)) * 100)}%` }}
             />
           </div>
-          <span className="text-sm text-slate-500 w-40">
+          <span className="text-sm text-slate-500 dark:text-slate-400 w-40">
             {playlist.matched_count || 0}/{playlist.total_candidates || 0} 命中
           </span>
         </div>
       )}
 
       {/* Back link */}
-      <Link
-        to={playlist.run_id ? `/history/run/${playlist.run_id}` : '/history'}
-        className="text-sm text-blue-500 hover:underline flex items-center gap-1"
-      >
+      <Link to={playlist.run_id ? `/history/run/${playlist.run_id}` : '/history'} className="text-sm text-blue-500 hover:underline dark:text-blue-400 flex items-center gap-1">
         ← 返回历史记录
       </Link>
 
       {/* Items table */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="card overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50">
+          <thead className="bg-slate-50 dark:bg-slate-900">
             <tr>
-              <th className="text-left p-3 font-medium text-slate-600 w-12">#</th>
-              <th className="text-left p-3 font-medium text-slate-600">状态</th>
-              <th className="text-left p-3 font-medium text-slate-600">曲目</th>
-              <th className="text-left p-3 font-medium text-slate-600">艺术家</th>
-              <th className="text-left p-3 font-medium text-slate-600">专辑</th>
-              <th className="text-left p-3 font-medium text-slate-600">来源</th>
-              <th className="text-left p-3 font-medium text-slate-600">置信度</th>
+              <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300 w-12">#</th>
+              <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">状态</th>
+              <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">曲目</th>
+              <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">艺术家</th>
+              <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300 hidden sm:table-cell">专辑</th>
+              <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">来源</th>
+              <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">置信度</th>
             </tr>
           </thead>
-
           <tbody>
             {items.length === 0 && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="p-6 text-slate-400 text-center"
-                >
-                  暂无数据
-                </td>
-              </tr>
+              <tr><td colSpan={7} className="p-6 text-slate-400 text-center">暂无数据</td></tr>
             )}
-
             {items.map(item => (
-              <tr
-                key={item.id}
-                className="border-t border-slate-100 hover:bg-slate-50"
-              >
-                <td className="p-3 text-slate-400 text-xs">
-                  {item.rank_index ?? '-'}
-                </td>
-
+              <tr key={item.id} className="border-t border-border hover:bg-slate-50 dark:hover:bg-slate-900">
+                <td className="p-3 text-slate-400 text-xs">{item.rank_index ?? '-'}</td>
                 <td className="p-3">
                   {item.matched ? (
                     <span className="inline-flex items-center gap-1 text-green-600 text-xs font-medium">
-                      <span className="w-2 h-2 rounded-full bg-green-500" />
-                      命中
+                      <span className="w-2 h-2 rounded-full bg-green-500" />命中
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-amber-600 text-xs font-medium">
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      缺失
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />缺失
                     </span>
                   )}
                 </td>
-
-                <td className="p-3 font-medium text-slate-800">
-                  {item.title}
-                </td>
-
-                <td className="p-3 text-slate-600">
-                  {item.artist}
-                </td>
-
-                <td className="p-3 text-slate-400 text-xs">
-                  {item.album || '-'}
-                </td>
-
+                <td className="p-3 font-medium text-slate-900 dark:text-slate-50">{item.title}</td>
+                <td className="p-3 text-slate-600 dark:text-slate-300">{item.artist}</td>
+                <td className="p-3 text-slate-400 text-xs hidden sm:table-cell">{item.album || '-'}</td>
                 <td className="p-3">
-                  <span
-                    className={`px-2 py-0.5 rounded text-xs ${sourceTypeClass(
-                      item.source_type,
-                    )}`}
-                  >
-                    {sourceTypeLabel(item.source_type)}
-                  </span>
+                  <span className={`badge ${sourceTypeClass(item.source_type)}`}>{sourceTypeLabel(item.source_type)}</span>
                 </td>
-
                 <td className="p-3 text-slate-400 text-xs">
-                  {item.confidence_score != null
-                    ? `${(Number(item.confidence_score) * 100).toFixed(0)}%`
-                    : '-'}
+                  {item.confidence_score != null ? `${(Number(item.confidence_score) * 100).toFixed(0)}%` : '-'}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        {/* Load more */}
         {total > PAGE_SIZE && (
-          <div className="p-3 text-center border-t border-slate-100">
+          <div className="p-3 text-center border-t border-border">
             {isFetchingNextPage ? (
               <span className="text-sm text-slate-400">加载中...</span>
             ) : hasNextPage ? (
-              <button
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-                className="text-sm text-blue-500 hover:text-blue-600 font-medium disabled:opacity-50"
-              >
+              <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage} className="text-sm text-blue-500 hover:text-blue-600 font-medium disabled:opacity-50 dark:text-blue-400">
                 加载更多 ({items.length}/{total})
               </button>
             ) : (
-              <span className="text-sm text-slate-400">
-                已显示全部 {items.length} 首
-              </span>
+              <span className="text-sm text-slate-400">已显示全部 {items.length} 首</span>
             )}
           </div>
         )}
 
         {isFetching && !isFetchingNextPage && (
-          <div className="p-2 text-center text-xs text-slate-400 border-t border-slate-100">
-            正在刷新...
-          </div>
+          <div className="p-2 text-center text-xs text-slate-400 border-t border-border">正在刷新...</div>
         )}
       </div>
     </div>
