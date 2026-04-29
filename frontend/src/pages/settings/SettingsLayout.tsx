@@ -7,6 +7,7 @@ import {
   UserCog,
   Palette,
   Database,
+  Library,
 } from 'lucide-react'
 
 const SETTINGS_SECTIONS = [
@@ -36,9 +37,16 @@ const SETTINGS_SECTIONS = [
   },
   {
     key: 'cache',
+  {
+    key: 'library',
+    title: '曲库索引',
+    desc: '数据库曲库、别名索引与匹配日志',
+    icon: Library,
+  },
     title: '歌曲缓存',
     desc: '缓存 Navidrome 曲库，加速匹配',
     icon: Database,
+  Library,
   },
   {
     key: 'account',

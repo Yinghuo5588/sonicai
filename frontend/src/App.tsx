@@ -17,6 +17,7 @@ import SettingsPlaylist from '@/pages/settings/SettingsPlaylist'
 import SettingsSchedule from '@/pages/settings/SettingsSchedule'
 import SettingsCache from '@/pages/settings/SettingsCache'
 import SettingsAccount from '@/pages/settings/SettingsAccount'
+import SettingsLibrary from '@/pages/settings/SettingsLibrary'
 import SettingsAppearance from '@/pages/settings/SettingsAppearance'
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="playlist" element={<SettingsPlaylist />} />
           <Route path="schedule" element={<SettingsSchedule />} />
           <Route path="cache" element={<SettingsCache />} />
+          <Route path="library" element={<SettingsLibrary />} />
           <Route path="account" element={<SettingsAccount />} />
           <Route path="appearance" element={<SettingsAppearance />} />
         </Route>

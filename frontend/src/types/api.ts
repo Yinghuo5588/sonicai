@@ -118,3 +118,78 @@ export interface Settings {
   playlist_sync_name: string | null
   playlist_sync_overwrite: boolean
 }
+// ── Library / Song Cache ────────────────────────────────────────────────────────
+
+export interface SongCacheStatus {
+  enabled: boolean
+  ready: boolean
+  refreshing: boolean
+  total_songs: number
+  last_full_refresh: string | null
+  last_error: string | null
+  hits: number
+  misses: number
+  fallbacks: number
+  hit_rate: number
+  refresh_count: number
+}
+
+export interface LibraryStatus {
+  total_songs: number
+  cache: SongCacheStatus
+}
+
+export interface LibrarySong {
+  id: number
+  navidrome_id: string
+  title: string
+  artist: string | null
+  album: string | null
+  duration: number | null
+  source: string | null
+  last_seen_at: string | null
+}
+
+export interface LibrarySongsResponse {
+  total: number
+  items: LibrarySong[]
+}
+
+export interface MatchLogItem {
+  id: number
+  input_title: string
+  input_artist: string | null
+  matched: boolean
+  navidrome_id: string | null
+  selected_title: string | null
+  selected_artist: string | null
+  confidence_score: number | null
+  source: string | null
+  created_at: string | null
+}
+
+export interface MatchLogsResponse {
+  total: number
+  items: MatchLogItem[]
+}
+
+export interface ManualMatchItem {
+  id: number
+  input_title: string
+  input_artist: string | null
+  navidrome_id: string | null
+  note: string | null
+  created_at: string | null
+}
+
+export interface ManualMatchesResponse {
+  total: number
+  items: ManualMatchItem[]
+}
+
+export interface CreateManualMatchPayload {
+  input_title: string
+  input_artist?: string
+  navidrome_id: string
+  note?: string
+}

@@ -142,6 +142,25 @@ async def run_hotboard_cron_job():
     )
 
 
+async def cleanup_old_match_logs():
+    """Clean up match_log entries older than 30 days."""
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import delete
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import MatchLog
+
+    logger.info("[match-log-cleanup] scanning old match logs")
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            delete(MatchLog).where(MatchLog.created_at < cutoff)
+        )
+        deleted = result.rowcount
+        await db.commit()
+        logger.info("[match-log-cleanup] deleted %s old logs", deleted)
+
+
 async def run_playlist_sync_cron_job():
     """Cron-triggered playlist incremental sync task."""
     from fastapi import HTTPException

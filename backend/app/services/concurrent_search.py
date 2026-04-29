@@ -1,12 +1,10 @@
-"""Concurrent Navidrome search — parallelizes track matching with bounded concurrency."""
+"""Concurrent Navidrome search — unified through library_match_service."""
 
 import asyncio
 import logging
 from typing import Callable, Awaitable
 
-from app.services.navidrome_service import navidrome_multi_search
-from app.services.matching_service import pick_best_match
-from app.services.song_cache import song_cache
+from app.services.library_match_service import match_track
 
 logger = logging.getLogger(__name__)
 
@@ -18,52 +16,39 @@ async def _search_one(
     threshold: float,
     semaphore: asyncio.Semaphore,
 ) -> dict:
-    """Search and match a single track, respecting concurrency limit.
+    """
+    Search and match a single track through the unified library matching pipeline.
 
-    Cache lookup is tried first. On miss or low confidence, falls back to
-    the real Navidrome Subsonic API. Successful API results are passively
-    added to the cache for future use.
+    Chain: manual_match -> match_cache -> memory index
+           -> db alias exact -> db fuzzy -> Subsonic
     """
     async with semaphore:
         try:
-            # 1. Try cache first
-            cached = song_cache.match_one(title=title, artist=artist, threshold=threshold)
-            if cached:
-                return {
-                    "index": index,
-                    "title": title,
-                    "artist": artist,
-                    "best_match": {
-                        "id": cached["id"],
-                        "title": cached["title"],
-                        "artist": cached["artist"],
-                        "album": cached.get("album"),
-                        "score": cached["score"],
-                        "source": "cache",
-                    },
-                }
+            best = await match_track(
+                title=title,
+                artist=artist,
+                threshold=threshold,
+            )
 
-            # 2. Cache miss — go to Navidrome API
-            nav_results = await navidrome_multi_search(title, artist)
-            best = pick_best_match(title, artist, nav_results, threshold)
+            return {
+                "index": index,
+                "title": title,
+                "artist": artist,
+                "best_match": best,
+            }
 
-            # 3. Passively add successful result to cache
-            if best and best.get("id"):
-                await song_cache.add_song(
-                    {
-                        "id": best.get("id"),
-                        "title": best.get("title"),
-                        "artist": best.get("artist"),
-                        "album": best.get("album"),
-                        "duration": best.get("duration"),
-                    },
-                    source="passive",
-                )
-
-            return {"index": index, "title": title, "artist": artist, "best_match": best}
         except Exception as e:
-            logger.error(f"[concurrent_search] failed index={index} title={title}: {e}")
-            return {"index": index, "title": title, "artist": artist, "best_match": None, "error": str(e)}
+            logger.error(
+                "[concurrent_search] failed index=%s title=%s artist=%s: %s",
+                index, title, artist, e,
+            )
+            return {
+                "index": index,
+                "title": title,
+                "artist": artist,
+                "best_match": None,
+                "error": str(e),
+            }
 
 
 async def batch_search_and_match(
@@ -76,10 +61,10 @@ async def batch_search_and_match(
     Concurrently search and match a list of tracks against Navidrome.
 
     Args:
-        tracks: List of {"title": ..., "artist": ..., "album": ...}
+        tracks: List of {"title": ..., "artist": ...}
         threshold: Minimum match score to accept
-        concurrency: Max concurrent Navidrome requests (clamped to 1-20)
-        progress_callback: Optional async callback(done_count, total_count)
+        concurrency: Max concurrent requests (clamped 1-20)
+        progress_callback: Optional async callback(done, total)
 
     Returns:
         List of results in original order, each with "index", "title", "artist", "best_match"

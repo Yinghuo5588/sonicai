@@ -618,99 +618,31 @@ async def _filter_recent(db: AsyncSession, candidates: list[dict], avoid_days: i
 
 
 async def _match_to_navidrome(db: AsyncSession, item_data: dict, settings) -> dict | None:
-    from app.utils.text_normalizer import score_candidate, make_search_queries
+    """
+    Match recommendation item through the unified library matching pipeline.
+    """
+    from app.services.library_match_service import match_track
 
     title = item_data["title"]
     artist = item_data["artist"]
-    threshold = float(settings.match_threshold) if settings.match_threshold is not None else 0.0
+    threshold = float(settings.match_threshold) if settings.match_threshold is not None else 0.75
 
-    # ---- 缓存优先 ----
-    try:
-        from app.services.song_cache import song_cache
-        cached = song_cache.match_one(title=title, artist=artist, threshold=threshold)
-        if cached:
-            return {
-                "selected_song_id": cached["id"],
-                "selected_title": cached["title"],
-                "selected_artist": cached["artist"],
-                "selected_album": cached.get("album"),
-                "confidence_score": cached["score"],
-                "title_score": None,
-                "artist_score": None,
-                "search_query": f"{title} {artist}",
-                "raw_response": {
-                    **cached,
-                    "cache_hit": True,
-                },
-            }
-    except Exception as cache_error:
-        logger.debug(
-            "[recommendation] cache lookup failed title=%s artist=%s: %s",
-            title, artist, cache_error,
-        )
-    # ---- 缓存未命中，继续原有搜索逻辑 ----
+    best = await match_track(title=title, artist=artist, threshold=threshold)
 
-    queries = make_search_queries(title, artist)
-    seen_ids: set = set()
-    all_results: list = []
-    for q_info in queries:
-        q = q_info["query"]
-        label = q_info["label"]
-        results = await navidrome_search(q, limit=10)
-        logger.info(f"[match-query] title={title} artist={artist} query='{q}' label={label} hits={len(results)}")
-        for r in results:
-            rid = r.get("id")
-            if rid and rid not in seen_ids:
-                seen_ids.add(rid)
-                r["_query_label"] = label
-                all_results.append(r)
-
-    if not all_results:
+    if not best:
         return None
 
-    scored = []
-    for r in all_results:
-        scores = score_candidate(title, artist, r.get("title") or "", r.get("artist") or "")
-        r["_title_score"] = scores["title_score"]
-        r["_artist_score"] = scores["artist_score"]
-        r["_combined_score"] = scores["score"]
-        scored.append((scores["score"], r))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-    best_score, best = scored[0]
-    threshold = float(settings.match_threshold) if settings.match_threshold is not None else 0.0
-    if best and best_score >= threshold:
-        # ---- 被动补录 ----
-        try:
-            from app.services.song_cache import song_cache
-            await song_cache.add_song(
-                {
-                    "id": best.get("id"),
-                    "title": best.get("title"),
-                    "artist": best.get("artist"),
-                    "album": best.get("album"),
-                    "duration": best.get("duration"),
-                },
-                source="passive",
-            )
-        except Exception as cache_error:
-            logger.debug(
-                "[recommendation] passive cache add failed title=%s artist=%s: %s",
-                title, artist, cache_error,
-            )
-
-        return {
-            "selected_song_id": best.get("id"),
-            "selected_title": best.get("title"),
-            "selected_artist": best.get("artist"),
-            "selected_album": best.get("album"),
-            "confidence_score": best_score,
-            "title_score": best.get("_title_score"),
-            "artist_score": best.get("_artist_score"),
-            "search_query": f"{title} {artist}",
-            "raw_response": best,
-        }
-    return None
+    return {
+        "selected_song_id": best.get("id"),
+        "selected_title": best.get("title"),
+        "selected_artist": best.get("artist"),
+        "selected_album": best.get("album"),
+        "confidence_score": best.get("score"),
+        "title_score": best.get("title_score"),
+        "artist_score": best.get("artist_score"),
+        "search_query": f"{title} {artist}",
+        "raw_response": best,
+    }
 
 
 async def _create_webhook_batch(db: AsyncSession, run_id: int, playlist, missing_items: list[dict], settings=None):

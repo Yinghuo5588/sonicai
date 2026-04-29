@@ -1,4 +1,4 @@
-"""In-memory hybrid song cache for Navidrome matching."""
+"""In-memory hybrid song cache for Navidrome matching — Phase 1 enhanced."""
 
 from __future__ import annotations
 
@@ -11,7 +11,12 @@ from typing import Any
 from rapidfuzz import fuzz
 
 from app.services.navidrome_native import get_all_songs_native
-from app.utils.text_normalizer import normalize_for_compare, score_candidate
+from app.utils.text_normalizer import (
+    normalize_for_compare,
+    score_candidate,
+    generate_title_aliases,
+    generate_artist_aliases,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,16 +103,25 @@ class SongCache:
     def _index_song_unlocked(self, song: CacheSong) -> None:
         self.songs[song.id] = song
 
-        nt = normalize_for_compare(song.title)
-        na = normalize_for_compare(song.artist)
-        combo = f"{nt}::{na}"
+        # Enhanced indexing: generate multiple title + artist aliases
+        title_aliases = generate_title_aliases(song.title)
+        artist_aliases = generate_artist_aliases(song.artist)
 
-        if nt:
-            self.title_index.setdefault(nt, set()).add(song.id)
-        if na:
-            self.artist_index.setdefault(na, set()).add(song.id)
-        if nt or na:
-            self.title_artist_index.setdefault(combo, set()).add(song.id)
+        for ta in title_aliases:
+            self.title_index.setdefault(ta, set()).add(song.id)
+
+        for aa in artist_aliases:
+            self.artist_index.setdefault(aa, set()).add(song.id)
+
+        # Title + artist combo indexes
+        for ta in title_aliases:
+            for aa in artist_aliases:
+                self.title_artist_index.setdefault(f"{ta}::{aa}", set()).add(song.id)
+
+        # Allow title-only召回 when artist is empty
+        if title_aliases and not artist_aliases:
+            for ta in title_aliases:
+                self.title_artist_index.setdefault(f"{ta}::", set()).add(song.id)
 
     def _clear_unlocked(self) -> None:
         self.songs.clear()
@@ -131,8 +145,8 @@ class SongCache:
         except Exception as e:
             logger.warning("Failed to load cache settings from DB: %s", e)
 
-    async def refresh_full(self) -> dict[str, Any]:
-        """Trigger a full cache rebuild."""
+    async def refresh_full(self, skip_sync: bool = False) -> dict[str, Any]:
+        """Trigger a full cache rebuild (optionally skip Navidrome sync)."""
         await self.load_settings()
 
         if not self.enabled:
@@ -147,34 +161,49 @@ class SongCache:
             self.last_error = None
 
             try:
-                raw_songs = await get_all_songs_native()
+                if not skip_sync:
+                    from app.services.song_library_service import sync_navidrome_to_song_library
+                    await sync_navidrome_to_song_library()
 
-                if not raw_songs:
-                    raise RuntimeError("Navidrome native song API returned empty data")
-
-                parsed: list[CacheSong] = []
-                for raw in raw_songs:
-                    song = self._make_song(raw, source="full")
-                    if song:
-                        parsed.append(song)
-
-                self._clear_unlocked()
-                for song in parsed:
-                    self._index_song_unlocked(song)
+                await self._load_from_database_unlocked()
 
                 self.ready = True
                 self.last_full_refresh = datetime.now(timezone.utc)
                 self.refresh_count += 1
 
-                logger.info("Song cache refreshed: %s songs", len(self.songs))
             except Exception as e:
                 self.ready = False
                 self.last_error = str(e)
-                logger.exception("Song cache full refresh failed: %s", e)
+                logger.exception("Song cache refresh failed: %s", e)
             finally:
                 self.refreshing = False
 
         return self.status()
+
+    async def _load_from_database_unlocked(self) -> None:
+        """Load cache from persistent song_library table (internal, caller holds lock)."""
+        from sqlalchemy import select
+        from app.db.session import AsyncSessionLocal
+        from app.db.models import SongLibrary
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(SongLibrary))
+            rows = result.scalars().all()
+
+        self._clear_unlocked()
+
+        for row in rows:
+            song = CacheSong(
+                id=row.navidrome_id,
+                title=row.title,
+                artist=row.artist or "",
+                album=row.album,
+                duration=row.duration,
+                source=row.source or "db",
+            )
+            self._index_song_unlocked(song)
+
+        logger.info("Song cache loaded from DB: %s songs", len(self.songs))
 
     async def add_song(self, raw: dict[str, Any], source: str = "passive") -> None:
         """Passively add a song to the cache (after successful Subsonic search)."""
@@ -185,24 +214,33 @@ class SongCache:
             self._index_song_unlocked(song)
 
     def _candidate_ids(self, title: str, artist: str | None) -> set[str]:
-        """Look up candidate song IDs from indexes."""
-        nt = normalize_for_compare(title)
-        na = normalize_for_compare(artist) if artist else ""
+        """Look up candidate song IDs from enhanced alias indexes."""
+        title_aliases = generate_title_aliases(title)
+        artist_aliases = generate_artist_aliases(artist or "")
 
         ids: set[str] = set()
 
-        if nt or na:
-            ids.update(self.title_artist_index.get(f"{nt}::{na}", set()))
+        # 1. title + artist precise alias combos
+        for ta in title_aliases:
+            for aa in artist_aliases:
+                ids.update(self.title_artist_index.get(f"{ta}::{aa}", set()))
 
-        if nt:
-            ids.update(self.title_index.get(nt, set()))
+        # 2. Title-only召回
+        for ta in title_aliases:
+            ids.update(self.title_index.get(ta, set()))
 
-        # Fuzzy fallback: if exact title lookup misses, scan title keys for high similarity
-        if not ids and nt:
+        # 3. Artist-only fallback (only if title-only missed)
+        if not ids:
+            for aa in artist_aliases:
+                ids.update(self.artist_index.get(aa, set()))
+
+        # 4. Fuzzy title fallback (only if exact misses)
+        if not ids and title_aliases:
             for indexed_title, song_ids in self.title_index.items():
-                score = fuzz.token_set_ratio(nt, indexed_title)
-                if score >= 90:
-                    ids.update(song_ids)
+                for ta in title_aliases:
+                    score = fuzz.token_set_ratio(ta, indexed_title)
+                    if score >= 90:
+                        ids.update(song_ids)
 
         return ids
 
@@ -227,9 +265,6 @@ class SongCache:
             self.misses += 1
             return None
 
-        nt = normalize_for_compare(title)
-        na = normalize_for_compare(artist) if artist else ""
-
         best_song: CacheSong | None = None
         best_score = 0.0
 
@@ -242,8 +277,6 @@ class SongCache:
                 title, artist or "",
                 song.title, song.artist,
             )
-            title_score = scores["title_score"]
-            artist_score = scores["artist_score"]
             score = scores["score"]
 
             if score > best_score:
@@ -270,7 +303,10 @@ class SongCache:
             "ready": self.ready,
             "refreshing": self.refreshing,
             "total_songs": len(self.songs),
-            "last_full_refresh": self.last_full_refresh.isoformat() if self.last_full_refresh else None,
+            "last_full_refresh": (
+                self.last_full_refresh.isoformat()
+                if self.last_full_refresh else None
+            ),
             "last_error": self.last_error,
             "hits": self.hits,
             "misses": self.misses,

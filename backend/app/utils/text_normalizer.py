@@ -94,7 +94,7 @@ def strip_feat(text: str) -> str:
 # ── Layer 5: Punctuation & whitespace normalization ───────────────────────────
 
 _MULTI_SPACE = re.compile(r"\s+")
-_ARTIST_SEP = re.compile(r"\s*[/&,;；和]\s*")
+_ARTIST_SEP = re.compile(r"\s*(?:/|&|,|，|、|;|；|\+|和|with)\s*", re.IGNORECASE)
 _PUNCTUATION = [
     ("（", "("), ("）", ")"), ("【", "["), ("】", "]"),
     ("——", "-"), ("–", "-"), ("—", "-"),
@@ -221,12 +221,13 @@ def score_candidate(lastfm_title: str, lastfm_artist: str, nav_title: str, nav_a
     nav_title_s2 = to_simplified(nav_title_raw)
     nav_artist_s2 = to_simplified(nav_artist_raw)
 
-    # For short Chinese titles, try multiple ratios and pick the best meaningful one
+    lf_core = title_core(lastfm_title)
+    nav_core = title_core(nav_title)
+
     def title_score(la, lb):
         r1 = fuzz.ratio(la, lb) / 100.0
         r2 = fuzz.token_sort_ratio(la, lb) / 100.0
         r3 = fuzz.partial_ratio(la, lb) / 100.0
-        # Cap partial_ratio for short titles to avoid false positives from substring matching
         if len(la) <= 6 or len(lb) <= 6:
             return max(r1, r2, min(r3, 0.92))
         return max(r1, r2)
@@ -235,14 +236,121 @@ def score_candidate(lastfm_title: str, lastfm_artist: str, nav_title: str, nav_a
     t_s_s2 = title_score(lf_title_s2, nav_title_s2)
     title_score_val = max(t_s_raw, t_s_s2)
 
-    a_s_raw = fuzz.token_set_ratio(lf_artist_raw, nav_artist_raw) / 100.0
-    a_s_s2 = fuzz.token_set_ratio(lf_artist_s2, nav_artist_s2) / 100.0
-    artist_score_val = max(a_s_raw, a_s_s2)
+    core_score_val = title_score(lf_core, nav_core) if lf_core and nav_core else title_score_val
 
-    combined = title_score_val * 0.65 + artist_score_val * 0.35
+    if lf_artist_raw and nav_artist_raw:
+        a_s_raw = fuzz.token_set_ratio(lf_artist_raw, nav_artist_raw) / 100.0
+        a_s_s2 = fuzz.token_set_ratio(lf_artist_s2, nav_artist_s2) / 100.0
+        artist_score_val = max(a_s_raw, a_s_s2)
+    else:
+        artist_score_val = 0.0
+
+    # New weights: core title 40%, raw title 30%, artist 30%
+    combined = core_score_val * 0.40 + title_score_val * 0.30 + artist_score_val * 0.30
+
+    # Cap combined score when artist info is missing on either side
+    if not lf_artist_raw or not nav_artist_raw:
+        combined = min(combined, 0.88)
 
     return {
         "score": round(combined, 4),
         "title_score": round(title_score_val, 4),
+        "title_core_score": round(core_score_val, 4),
         "artist_score": round(artist_score_val, 4),
     }
+
+
+def title_core(title: str) -> str:
+    """
+    Extract core title, stripping only common version/ edition markers.
+    Examples:
+      如果呢 (Live) -> 如果呢
+      一半一半 伴奏版 -> 一半一半
+      新鲜感 Live -> 新鲜感
+    """
+    if not title:
+        return ""
+
+    t = normalize_for_compare(title)
+
+    version_words = (
+        "live|version|remaster|remastered|demo|instrumental|伴奏|现场|现场版|"
+        "演唱会|演唱会版|重制|重制版|特别版|限定版|edit|mono|stereo"
+    )
+    t = re.sub(
+        rf"\s*[\(\[（【][^\)\]）】]*({version_words})[^\)\]）】]*[\)\]）】]",
+        "",
+        t,
+        flags=re.IGNORECASE,
+    )
+
+    end_patterns = [
+        r"\s*-\s*(live|version|remaster(ed)?|demo|instrumental|edit)$",
+        r"\s+(live|version|remaster(ed)?|demo|instrumental|edit)$",
+        r"\s*(伴奏版?|现场版?|演唱会版?|重制版?|特别版|限定版)$",
+    ]
+    for p in end_patterns:
+        t = re.sub(p, "", t, flags=re.IGNORECASE)
+
+    return normalize_whitespace(t)
+
+
+def generate_title_aliases(title: str) -> set[str]:
+    """
+    Generate multiple aliases for a title.
+    """
+    aliases: set[str] = set()
+
+    raw = normalize_for_compare(title)
+    core = title_core(title)
+
+    if raw:
+        aliases.add(raw)
+    if core:
+        aliases.add(core)
+
+    no_feat = strip_feat(raw)
+    if no_feat:
+        aliases.add(no_feat)
+        aliases.add(title_core(no_feat))
+
+    # Patch 1: bulk simplify all current aliases at once
+    simplified = {to_simplified(a) for a in aliases if a}
+    aliases.update(simplified)
+
+    return {a for a in aliases if a}
+
+
+def generate_artist_aliases(artist: str) -> set[str]:
+    """
+    Generate multiple aliases for an artist.
+    Examples:
+      颜人中 / xxx -> 颜人中, xxx, 颜人中 xxx
+      周杰伦, 林俊杰 -> 周杰伦, 林俊杰, 周杰伦 林俊杰
+      Taylor Swift -> Taylor Swift (no split on plain spaces)
+    """
+    aliases: set[str] = set()
+
+    norm = normalize_artist(artist)
+    if norm:
+        aliases.add(norm)
+
+    if not norm:
+        return aliases
+
+    # Patch 4: split only on explicit separators, not on spaces
+    parts = re.split(
+        r"\s*(?:/|&|,|，|、|;|；|\+|和|with)\s*",
+        norm,
+        flags=re.IGNORECASE,
+    )
+    parts = [p.strip() for p in parts if p.strip()]
+
+    for p in parts:
+        aliases.add(p)
+        aliases.add(to_simplified(p))
+
+    if len(parts) > 1:
+        aliases.add(" ".join(parts))
+
+    return {a for a in aliases if a}

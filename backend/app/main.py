@@ -52,7 +52,21 @@ async def lifespan(app: FastAPI):
     # Warm up song cache asynchronously (do not block startup)
     from app.core.task_registry import create_background_task
     from app.services.song_cache import song_cache
-    create_background_task(song_cache.refresh_full(), name="song-cache-startup-refresh")
+    from app.services.song_library_service import song_library_count
+
+    async def _warmup_song_cache():
+        try:
+            count = await song_library_count()
+            if count > 0:
+                # DB already has data — load directly without re-syncing from Navidrome
+                await song_cache.refresh_full(skip_sync=True)
+            else:
+                # Empty DB — sync from Navidrome then load
+                await song_cache.refresh_full()
+        except Exception:
+            logger.exception("Song cache warmup failed")
+
+    create_background_task(_warmup_song_cache(), name="song-cache-startup-warmup")
 
     yield
     shutdown_scheduler()

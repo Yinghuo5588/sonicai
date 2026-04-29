@@ -243,3 +243,104 @@ class LastfmCache(Base):
     payload_json = Column(Text, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
+
+
+# ── Song Library (Phase 2) ─────────────────────────────────────────────────────
+
+class SongLibrary(Base):
+    __tablename__ = "song_library"
+
+    id = Column(Integer, primary_key=True)
+    navidrome_id = Column(String(100), unique=True, nullable=False, index=True)
+    title = Column(String(500), nullable=False)
+    artist = Column(String(500), nullable=True)
+    album = Column(String(500), nullable=True)
+    duration = Column(Integer, nullable=True)
+    title_norm = Column(String(500), nullable=True, index=True)
+    title_core = Column(String(500), nullable=True, index=True)
+    artist_norm = Column(String(500), nullable=True, index=True)
+    source = Column(String(30), default="sync")  # sync | passive | manual
+    last_seen_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    title_aliases = relationship(
+        "SongTitleAlias",
+        back_populates="song",
+        cascade="all, delete-orphan",
+    )
+    artist_aliases = relationship(
+        "SongArtistAlias",
+        back_populates="song",
+        cascade="all, delete-orphan",
+    )
+
+
+class SongTitleAlias(Base):
+    __tablename__ = "song_title_alias"
+
+    id = Column(Integer, primary_key=True)
+    song_id = Column(Integer, ForeignKey("song_library.id", ondelete="CASCADE"), nullable=False)
+    alias = Column(String(500), nullable=False, index=True)
+    alias_type = Column(String(30), default="auto")  # auto | core | manual
+    created_at = Column(DateTime, server_default=func.now())
+
+    song = relationship("SongLibrary", back_populates="title_aliases")
+
+
+class SongArtistAlias(Base):
+    __tablename__ = "song_artist_alias"
+
+    id = Column(Integer, primary_key=True)
+    song_id = Column(Integer, ForeignKey("song_library.id", ondelete="CASCADE"), nullable=False)
+    alias = Column(String(500), nullable=False, index=True)
+    alias_type = Column(String(30), default="auto")
+    created_at = Column(DateTime, server_default=func.now())
+
+    song = relationship("SongLibrary", back_populates="artist_aliases")
+
+
+class MatchCache(Base):
+    __tablename__ = "match_cache"
+
+    id = Column(Integer, primary_key=True)
+    input_title = Column(String(500), nullable=False)
+    input_artist = Column(String(500), nullable=True)
+    input_title_norm = Column(String(500), nullable=True, index=True)
+    input_artist_norm = Column(String(500), nullable=True, index=True)
+    song_id = Column(Integer, ForeignKey("song_library.id", ondelete="SET NULL"), nullable=True)
+    navidrome_id = Column(String(100), nullable=True)
+    confidence_score = Column(Numeric(5, 4), nullable=True)
+    source = Column(String(30), default="auto")  # memory | db | subsonic | manual
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class ManualMatch(Base):
+    __tablename__ = "manual_match"
+
+    id = Column(Integer, primary_key=True)
+    input_title = Column(String(500), nullable=False)
+    input_artist = Column(String(500), nullable=True)
+    input_title_norm = Column(String(500), nullable=True, index=True)
+    input_artist_norm = Column(String(500), nullable=True, index=True)
+    song_id = Column(Integer, ForeignKey("song_library.id", ondelete="SET NULL"), nullable=True)
+    navidrome_id = Column(String(100), nullable=True)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class MatchLog(Base):
+    __tablename__ = "match_log"
+
+    id = Column(Integer, primary_key=True)
+    input_title = Column(String(500), nullable=False)
+    input_artist = Column(String(500), nullable=True)
+    matched = Column(Boolean, default=False)
+    navidrome_id = Column(String(100), nullable=True)
+    selected_title = Column(String(500), nullable=True)
+    selected_artist = Column(String(500), nullable=True)
+    confidence_score = Column(Numeric(5, 4), nullable=True)
+    source = Column(String(30), nullable=True)  # manual | cache | memory | db | subsonic | miss
+    raw_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())

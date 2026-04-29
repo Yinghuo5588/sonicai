@@ -157,6 +157,7 @@ async def load_cron_schedule(db: AsyncSession):
         logger.info("Webhook retry job registered (every 2 min)")
 
     _register_cache_cleanup(sched)
+    _register_match_log_cleanup(sched)
 
 
 def start_scheduler():
@@ -188,3 +189,19 @@ def _register_cache_cleanup(sched):
             misfire_grace_time=60,
         )
         logger.info("Cache cleanup job registered (every 6 hours)")
+
+
+def _register_match_log_cleanup(sched):
+    from app.tasks.recommendation_tasks import cleanup_old_match_logs
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    existing = [j for j in sched.get_jobs() if j.id == "match_log_cleanup"]
+    if not existing:
+        sched.add_job(
+            cleanup_old_match_logs,
+            IntervalTrigger(hours=24),
+            id="match_log_cleanup",
+            replace_existing=True,
+            misfire_grace_time=300,
+        )
+        logger.info("Match log cleanup job registered (every 24 hours)")
