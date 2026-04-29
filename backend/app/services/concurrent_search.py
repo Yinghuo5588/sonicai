@@ -48,10 +48,10 @@ async def _search_one(
             best = pick_best_match(title, artist, nav_results, threshold)
 
             # 3. Passively add successful result to cache
-            if best and best.get("navidrome_id"):
+            if best and best.get("id"):
                 await song_cache.add_song(
                     {
-                        "id": best.get("navidrome_id"),
+                        "id": best.get("id"),
                         "title": best.get("title"),
                         "artist": best.get("artist"),
                         "album": best.get("album"),

@@ -11,7 +11,7 @@ from typing import Any
 from rapidfuzz import fuzz
 
 from app.services.navidrome_native import get_all_songs_native
-from app.utils.text_normalizer import normalize_for_compare
+from app.utils.text_normalizer import normalize_for_compare, score_candidate
 
 logger = logging.getLogger(__name__)
 
@@ -238,12 +238,13 @@ class SongCache:
             if not song:
                 continue
 
-            title_score = fuzz.token_set_ratio(nt, normalize_for_compare(song.title)) / 100
-            artist_score = 1.0
-            if na:
-                artist_score = fuzz.token_set_ratio(na, normalize_for_compare(song.artist)) / 100
-
-            score = title_score * 0.72 + artist_score * 0.28
+            scores = score_candidate(
+                title, artist or "",
+                song.title, song.artist,
+            )
+            title_score = scores["title_score"]
+            artist_score = scores["artist_score"]
+            score = scores["score"]
 
             if score > best_score:
                 best_score = score
