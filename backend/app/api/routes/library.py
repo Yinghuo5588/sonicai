@@ -14,7 +14,12 @@ from app.services.song_library_service import (
 )
 from app.services.song_cache import song_cache
 from app.core.task_registry import create_background_task
-from app.utils.text_normalizer import normalize_for_compare, normalize_artist
+from app.utils.text_normalizer import (
+    normalize_for_compare,
+    normalize_artist,
+    generate_title_aliases,
+    generate_artist_aliases,
+)
 
 router = APIRouter(prefix="/library", tags=["library"])
 
@@ -144,6 +149,7 @@ async def list_match_logs(
                 "selected_artist": r.selected_artist,
                 "confidence_score": float(r.confidence_score) if r.confidence_score else None,
                 "source": r.source,
+                "raw_json": r.raw_json,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in rows
@@ -309,14 +315,16 @@ async def debug_match(
     body: DebugMatchRequest,
     current_user: CurrentUser,
 ):
-    from app.services.library_match_service import match_track
-    from app.utils.text_normalizer import generate_title_aliases, generate_artist_aliases
+    from app.services.library_match_service import match_track_debug
+    import time
 
     title = body.title.strip()
     artist = (body.artist or "").strip()
     threshold = float(body.threshold or 0.75)
 
-    result = await match_track(title=title, artist=artist, threshold=threshold)
+    t0 = time.time()
+    debug_result = await match_track_debug(title=title, artist=artist, threshold=threshold)
+    elapsed = round((time.time() - t0) * 1000, 2)
 
     return {
         "input": {
@@ -328,6 +336,8 @@ async def debug_match(
             "title_aliases": sorted(generate_title_aliases(title)),
             "artist_aliases": sorted(generate_artist_aliases(artist)),
         },
-        "result": result,
+        "result": debug_result.get("result"),
+        "steps": debug_result.get("steps", []),
+        "total_elapsed_ms": elapsed,
         "cache_status": song_cache.status(),
     }

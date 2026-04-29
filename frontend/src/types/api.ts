@@ -117,6 +117,12 @@ export interface Settings {
   playlist_sync_threshold: number | null
   playlist_sync_name: string | null
   playlist_sync_overwrite: boolean
+  // Song cache
+  song_cache_enabled: boolean | null
+  song_cache_auto_refresh_enabled: boolean | null
+  song_cache_refresh_cron: string | null
+  // Match debug
+  match_debug_enabled: boolean | null
 }
 // ── Library / Song Cache ────────────────────────────────────────────────────────
 
@@ -165,6 +171,7 @@ export interface MatchLogItem {
   selected_artist: string | null
   confidence_score: number | null
   source: string | null
+  raw_json?: string | null
   created_at: string | null
 }
 

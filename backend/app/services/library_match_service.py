@@ -7,12 +7,18 @@ Final chain:
 
 All successful matches are written back to:
   song_library, alias tables, match_cache, memory index.
+
+Debug mode:
+  Set SystemSettings.match_debug_enabled=True to record full chain steps
+  in match_log.raw_json.  Or call match_track_debug() directly for one-shot
+  diagnostics without changing system settings.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
 from sqlalchemy import select, text
@@ -41,7 +47,53 @@ from app.utils.text_normalizer import (
 logger = logging.getLogger(__name__)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ── Debug helpers ───────────────────────────────────────────────────────────────
+
+async def _is_debug_enabled() -> bool:
+    """Query SystemSettings.match_debug_enabled."""
+    try:
+        from app.db.models import SystemSettings
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(SystemSettings))
+            row = result.scalar_one_or_none()
+            if row and getattr(row, "match_debug_enabled", False):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _step_info(
+    *,
+    step: str,
+    hit: bool,
+    candidates_count: int = 0,
+    best_score: float | None = None,
+    best_candidate: dict | None = None,
+    top_candidates: list[dict] | None = None,
+    duration_ms: float | None = None,
+    threshold: float | None = None,
+    error: str | None = None,
+    **extra,
+) -> dict:
+    info = {
+        "step": step,
+        "hit": hit,
+        "candidates_count": candidates_count,
+        "best_score": round(best_score, 4) if best_score is not None else None,
+        "threshold": threshold,
+        "duration_ms": round(duration_ms, 2) if duration_ms is not None else None,
+        "top_candidates": top_candidates or [],
+        "error": error,
+    }
+    if best_candidate and not info["top_candidates"]:
+        info["best_candidate"] = best_candidate
+    info.update(extra)
+    return info
+
+
+# ── Internal matchers ───────────────────────────────────────────────────────────
 
 def _format_song_match(song: SongLibrary, score: float, source: str) -> dict[str, Any]:
     return {
@@ -130,13 +182,37 @@ async def _find_match_cache(title: str, artist: str, threshold: float) -> dict |
         return None
 
 
-async def _find_db_alias_match(title: str, artist: str, threshold: float) -> dict | None:
-    """Step 4: Database alias exact search."""
+async def _find_db_alias_match(
+    title: str,
+    artist: str,
+    threshold: float,
+    debug: bool = False,
+) -> tuple[dict | None, dict | None]:
+    """Step 4: Database alias exact search.
+
+    Returns (match, step_info).  step_info is None when debug=False.
+    """
     title_aliases = generate_title_aliases(title)
     artist_aliases = generate_artist_aliases(artist)
 
+    step: dict | None = (
+        {
+            "step": "db_alias",
+            "hit": False,
+            "threshold": threshold,
+            "candidates_count": 0,
+            "best_score": None,
+            "best_candidate": None,
+            "top_candidates": [],
+            "title_aliases": sorted(title_aliases),
+            "artist_aliases": sorted(artist_aliases),
+        }
+        if debug
+        else None
+    )
+
     if not title_aliases:
-        return None
+        return None, step
 
     async with AsyncSessionLocal() as db:
         # Title alias hits
@@ -146,7 +222,7 @@ async def _find_db_alias_match(title: str, artist: str, threshold: float) -> dic
         title_song_ids = {r[0] for r in title_result.fetchall() if r[0]}
 
         if not title_song_ids:
-            return None
+            return None, step
 
         candidate_ids = title_song_ids
 
@@ -167,6 +243,7 @@ async def _find_db_alias_match(title: str, artist: str, threshold: float) -> dic
         )
         songs = songs_result.scalars().all()
 
+        scored_candidates = []
         best = None
         best_score = 0.0
 
@@ -177,23 +254,71 @@ async def _find_db_alias_match(title: str, artist: str, threshold: float) -> dic
             )
             score = scores["score"]
 
+            candidate = {
+                "id": song.navidrome_id,
+                "title": song.title,
+                "artist": song.artist or "",
+                "album": song.album,
+                "duration": song.duration,
+                "score": score,
+                "title_score": scores["title_score"],
+                "title_core_score": scores["title_core_score"],
+                "artist_score": scores["artist_score"],
+            }
+            scored_candidates.append(candidate)
+
             if score > best_score:
                 best_score = score
                 best = song
 
+        scored_candidates.sort(key=lambda x: x["score"], reverse=True)
+
+        if debug and step is not None:
+            step["candidates_count"] = len(scored_candidates)
+            step["top_candidates"] = scored_candidates[:5]
+            step["best_score"] = scored_candidates[0]["score"] if scored_candidates else None
+            step["best_candidate"] = scored_candidates[0] if scored_candidates else None
+
         if best and best_score >= threshold:
-            return _format_song_match(best, best_score, "db_alias")
+            result = _format_song_match(best, best_score, "db_alias")
+            if debug and step is not None:
+                step["hit"] = True
+            return result, step
 
-        return None
+        return None, step
 
 
-async def _find_db_fuzzy_match(title: str, artist: str, threshold: float) -> dict | None:
-    """Step 5: PostgreSQL pg_trgm fuzzy search (requires pg_trgm extension)."""
+async def _find_db_fuzzy_match(
+    title: str,
+    artist: str,
+    threshold: float,
+    debug: bool = False,
+) -> tuple[dict | None, dict | None]:
+    """Step 5: PostgreSQL pg_trgm fuzzy search.
+
+    Returns (match, step_info).  step_info is None when debug=False.
+    """
     title_norm = normalize_for_compare(title)
     artist_norm = normalize_artist(artist)
 
+    step: dict | None = (
+        {
+            "step": "db_fuzzy",
+            "hit": False,
+            "threshold": threshold,
+            "candidates_count": 0,
+            "best_score": None,
+            "best_candidate": None,
+            "top_candidates": [],
+            "title_norm": title_norm,
+            "artist_norm": artist_norm,
+        }
+        if debug
+        else None
+    )
+
     if not title_norm:
-        return None
+        return None, step
 
     async with AsyncSessionLocal() as db:
         sql = text("""
@@ -225,6 +350,7 @@ async def _find_db_fuzzy_match(title: str, artist: str, threshold: float) -> dic
         )
         rows = result.mappings().all()
 
+        scored_candidates = []
         best = None
         best_score = 0.0
 
@@ -235,12 +361,35 @@ async def _find_db_fuzzy_match(title: str, artist: str, threshold: float) -> dic
             )
             score = scores["score"]
 
+            candidate = {
+                "id": row["navidrome_id"],
+                "title": row["title"],
+                "artist": row["artist"],
+                "album": row["album"],
+                "duration": row["duration"],
+                "score": score,
+                "title_score": scores["title_score"],
+                "title_core_score": scores["title_core_score"],
+                "artist_score": scores["artist_score"],
+                "pg_title_sim": float(row["title_sim"] or 0),
+                "pg_artist_sim": float(row["artist_sim"] or 0),
+            }
+            scored_candidates.append(candidate)
+
             if score > best_score:
                 best_score = score
                 best = row
 
+        scored_candidates.sort(key=lambda x: x["score"], reverse=True)
+
+        if debug and step is not None:
+            step["candidates_count"] = len(scored_candidates)
+            step["top_candidates"] = scored_candidates[:5]
+            step["best_score"] = scored_candidates[0]["score"] if scored_candidates else None
+            step["best_candidate"] = scored_candidates[0] if scored_candidates else None
+
         if best and best_score >= threshold:
-            return {
+            matched = {
                 "id": best["navidrome_id"],
                 "title": best["title"],
                 "artist": best["artist"],
@@ -249,8 +398,11 @@ async def _find_db_fuzzy_match(title: str, artist: str, threshold: float) -> dic
                 "score": best_score,
                 "source": "db_fuzzy",
             }
+            if debug and step is not None:
+                step["hit"] = True
+            return matched, step
 
-        return None
+        return None, step
 
 
 async def _write_match_cache(title: str, artist: str, match: dict, source: str) -> None:
@@ -305,75 +457,239 @@ async def _write_match_cache(title: str, artist: str, match: dict, source: str) 
 
 
 async def _write_match_log(
-    title: str, artist: str, match: dict | None, source: str
+    title: str,
+    artist: str,
+    match: dict | None,
+    source: str,
+    debug_steps: list[dict] | None = None,
 ) -> None:
-    """Append a record to match_log."""
+    """Append a record to match_log.
+
+    When debug_steps is provided, raw_json stores the full trace.
+    """
     async with AsyncSessionLocal() as db:
-        db.add(MatchLog(
-            input_title=title,
-            input_artist=artist,
-            matched=bool(match),
-            navidrome_id=match.get("id") if match else None,
-            selected_title=match.get("title") if match else None,
-            selected_artist=match.get("artist") if match else None,
-            confidence_score=match.get("score") if match else None,
-            source=source,
-            raw_json=json.dumps(match, ensure_ascii=False) if match else None,
-        ))
+        if debug_steps:
+            raw_json = json.dumps(
+                {"result": match, "steps": debug_steps},
+                ensure_ascii=False,
+            )
+        else:
+            raw_json = json.dumps(match, ensure_ascii=False) if match else None
+
+        db.add(
+            MatchLog(
+                input_title=title,
+                input_artist=artist,
+                matched=bool(match),
+                navidrome_id=match.get("id") if match else None,
+                selected_title=match.get("title") if match else None,
+                selected_artist=match.get("artist") if match else None,
+                confidence_score=match.get("score") if match else None,
+                source=source,
+                raw_json=raw_json,
+            )
+        )
         await db.commit()
 
 
-# ── Main entry point ────────────────────────────────────────────────────────────
+# ── Core internal matcher ──────────────────────────────────────────────────────
 
-async def match_track(
+async def _match_track_internal(
     title: str,
     artist: str,
     threshold: float = 0.75,
-) -> dict | None:
+    force_debug: bool = False,
+) -> tuple[dict | None, list[dict] | None]:
     """
-    Unified matching chain.
-    Returns a dict with id/title/artist/album/duration/score/source or None.
+    Internal implementation of the full matching chain.
+    Returns (match, steps).  steps is None when debug is disabled.
     """
-    # 1. manual_match
+    debug_enabled = force_debug or await _is_debug_enabled()
+    steps: list[dict] | None = [] if debug_enabled else None
+
+    # ── Step 1: manual_match ────────────────────────────────────────────────
+    t0 = time.time()
     manual = await _find_manual_match(title, artist)
+
+    if debug_enabled and steps is not None:
+        steps.append(
+            _step_info(
+                step="manual_match",
+                hit=manual is not None,
+                candidates_count=1 if manual else 0,
+                best_score=manual.get("score") if manual else None,
+                best_candidate=manual,
+                duration_ms=round((time.time() - t0) * 1000, 2),
+                threshold=threshold,
+            )
+        )
+
     if manual:
-        await _write_match_log(title, artist, manual, "manual")
-        return manual
+        await _write_match_log(title, artist, manual, "manual", steps)
+        return manual, steps
 
-    # 2. match_cache
+    # ── Step 2: match_cache ────────────────────────────────────────────────
+    t0 = time.time()
     cached = await _find_match_cache(title, artist, threshold)
-    if cached:
-        await _write_match_log(title, artist, cached, "match_cache")
-        return cached
 
-    # 3. memory index
+    if debug_enabled and steps is not None:
+        steps.append(
+            _step_info(
+                step="match_cache",
+                hit=cached is not None,
+                candidates_count=1 if cached else 0,
+                best_score=cached.get("score") if cached else None,
+                best_candidate=cached,
+                duration_ms=round((time.time() - t0) * 1000, 2),
+                threshold=threshold,
+            )
+        )
+
+    if cached:
+        await _write_match_log(title, artist, cached, "match_cache", steps)
+        return cached, steps
+
+    # ── Step 3: memory index ───────────────────────────────────────────────
+    t0 = time.time()
     memory = song_cache.match_one(title=title, artist=artist, threshold=threshold)
+
+    if debug_enabled and steps is not None:
+        # Collect top candidates from memory index using internal helper
+        try:
+            candidate_ids = song_cache._candidate_ids(title, artist or "")
+        except AttributeError:
+            candidate_ids = []
+
+        memory_candidates = []
+        for cid in list(candidate_ids)[:50]:
+            song = song_cache.songs.get(cid)
+            if not song:
+                continue
+            scores = score_candidate(title, artist or "", song.title, song.artist)
+            memory_candidates.append(
+                {
+                    "id": song.id,
+                    "title": song.title,
+                    "artist": song.artist,
+                    "album": song.album,
+                    "duration": song.duration,
+                    "score": scores["score"],
+                    "title_score": scores["title_score"],
+                    "title_core_score": scores["title_core_score"],
+                    "artist_score": scores["artist_score"],
+                }
+            )
+        memory_candidates.sort(key=lambda x: x["score"], reverse=True)
+
+        steps.append(
+            _step_info(
+                step="memory",
+                hit=memory is not None,
+                candidates_count=len(candidate_ids),
+                best_score=(
+                    memory["score"]
+                    if memory
+                    else memory_candidates[0]["score"]
+                    if memory_candidates
+                    else None
+                ),
+                best_candidate=memory or (
+                    memory_candidates[0] if memory_candidates else None
+                ),
+                top_candidates=memory_candidates[:5],
+                duration_ms=round((time.time() - t0) * 1000, 2),
+                threshold=threshold,
+            )
+        )
+
     if memory:
         memory["source"] = "memory"
         await _write_match_cache(title, artist, memory, "memory")
-        await _write_match_log(title, artist, memory, "memory")
-        return memory
+        await _write_match_log(title, artist, memory, "memory", steps)
+        return memory, steps
 
-    # 4. database alias exact search
-    db_match = await _find_db_alias_match(title, artist, threshold)
+    # ── Step 4: database alias exact search ────────────────────────────────
+    t0 = time.time()
+    db_match, db_alias_step = await _find_db_alias_match(
+        title, artist, threshold, debug=debug_enabled
+    )
+
+    if debug_enabled and steps is not None and db_alias_step:
+        db_alias_step["duration_ms"] = round((time.time() - t0) * 1000, 2)
+        db_alias_step["hit"] = db_match is not None
+        steps.append(db_alias_step)
+
     if db_match:
         await _write_match_cache(title, artist, db_match, "db_alias")
-        await _write_match_log(title, artist, db_match, "db_alias")
-        return db_match
+        await _write_match_log(title, artist, db_match, "db_alias", steps)
+        return db_match, steps
 
-    # 5. database fuzzy search (pg_trgm)
-    db_fuzzy = await _find_db_fuzzy_match(title, artist, threshold)
+    # ── Step 5: database fuzzy search (pg_trgm) ───────────────────────────
+    t0 = time.time()
+    db_fuzzy, db_fuzzy_step = await _find_db_fuzzy_match(
+        title, artist, threshold, debug=debug_enabled
+    )
+
+    if debug_enabled and steps is not None and db_fuzzy_step:
+        db_fuzzy_step["duration_ms"] = round((time.time() - t0) * 1000, 2)
+        db_fuzzy_step["hit"] = db_fuzzy is not None
+        steps.append(db_fuzzy_step)
+
     if db_fuzzy:
         await _write_match_cache(title, artist, db_fuzzy, "db_fuzzy")
-        await _write_match_log(title, artist, db_fuzzy, "db_fuzzy")
-        return db_fuzzy
+        await _write_match_log(title, artist, db_fuzzy, "db_fuzzy", steps)
+        return db_fuzzy, steps
 
-    # 6. Subsonic fallback
+    # ── Step 6: Subsonic fallback ──────────────────────────────────────────
+    t0 = time.time()
     nav_results = await navidrome_multi_search(title, artist)
     best = pick_best_match(title, artist, nav_results, threshold)
 
+    if debug_enabled and steps is not None:
+        subsonic_candidates = []
+        for r in nav_results:
+            scores = score_candidate(
+                title, artist,
+                r.get("title") or "", r.get("artist") or "",
+            )
+            subsonic_candidates.append(
+                {
+                    "id": r.get("id"),
+                    "title": r.get("title"),
+                    "artist": r.get("artist"),
+                    "album": r.get("album"),
+                    "duration": r.get("duration"),
+                    "score": scores["score"],
+                    "title_score": scores["title_score"],
+                    "title_core_score": scores["title_core_score"],
+                    "artist_score": scores["artist_score"],
+                    "query_label": r.get("_query_label"),
+                }
+            )
+        subsonic_candidates.sort(key=lambda x: x["score"], reverse=True)
+
+        steps.append(
+            _step_info(
+                step="subsonic",
+                hit=best is not None,
+                candidates_count=len(nav_results),
+                best_score=(
+                    best.get("score")
+                    if best
+                    else subsonic_candidates[0]["score"]
+                    if subsonic_candidates
+                    else None
+                ),
+                best_candidate=best or (
+                    subsonic_candidates[0] if subsonic_candidates else None
+                ),
+                top_candidates=subsonic_candidates[:5],
+                duration_ms=round((time.time() - t0) * 1000, 2),
+                threshold=threshold,
+            )
+        )
+
     if best and best.get("id"):
-        # Write back to song_library + memory
         from app.services.song_library_service import upsert_song_to_library
 
         async with AsyncSessionLocal() as db:
@@ -403,8 +719,50 @@ async def match_track(
 
         best["source"] = "subsonic"
         await _write_match_cache(title, artist, best, "subsonic")
-        await _write_match_log(title, artist, best, "subsonic")
-        return best
+        await _write_match_log(title, artist, best, "subsonic", steps)
+        return best, steps
 
-    await _write_match_log(title, artist, None, "miss")
-    return None
+    await _write_match_log(title, artist, None, "miss", steps)
+    return None, steps
+
+
+# ── Public entry points ────────────────────────────────────────────────────────
+
+async def match_track(
+    title: str,
+    artist: str,
+    threshold: float = 0.75,
+) -> dict | None:
+    """
+    Unified matching chain (original signature, backward-compatible).
+    Returns a dict with id/title/artist/album/duration/score/source or None.
+    """
+    match, _ = await _match_track_internal(
+        title=title,
+        artist=artist,
+        threshold=threshold,
+        force_debug=False,
+    )
+    return match
+
+
+async def match_track_debug(
+    title: str,
+    artist: str,
+    threshold: float = 0.75,
+) -> dict:
+    """
+    Force-debug version of match_track.
+    Always collects and returns full chain steps regardless of system settings.
+    Returns {"result": match, "steps": [...]}.
+    """
+    match, steps = await _match_track_internal(
+        title=title,
+        artist=artist,
+        threshold=threshold,
+        force_debug=True,
+    )
+    return {
+        "result": match,
+        "steps": steps or [],
+    }

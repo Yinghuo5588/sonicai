@@ -96,6 +96,13 @@ export const FIELD_LABELS: Record<string, { label: string; type?: string; toolti
       '▸ 同一首歌多少天内不会再次推荐\n' +
       ' 默认：14  推荐：7 - 30',
   },
+  match_debug_enabled: {
+    label: '匹配调试模式',
+    type: 'boolean',
+    tooltip:
+      '▸ 开启后，每次匹配都会记录详细的链路诊断信息到匹配日志。\n' +
+      '⚠️ 会增加 raw_json 写入量，建议仅在排查问题时开启。',
+  },
   seed_source_mode: {
     label: '种子来源模式',
     type: 'select',
@@ -219,6 +226,29 @@ export function FieldInput({
 }) {
   const meta = FIELD_LABELS[fieldKey]
   if (!meta) return null
+
+  if (meta.type === 'boolean') {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+            {meta.label}
+            <Tooltip text={meta.tooltip || ''} />
+          </label>
+        </div>
+
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!value}
+            onChange={e => onChange(e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
+        </label>
+      </div>
+    )
+  }
 
   if (meta.type === 'select') {
     const options: Record<string, string[]> = {

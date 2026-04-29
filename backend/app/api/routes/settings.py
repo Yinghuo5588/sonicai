@@ -70,6 +70,9 @@ class SettingsResponse(BaseModel):
     song_cache_auto_refresh_enabled: bool | None = True
     song_cache_refresh_cron: str | None = "0 4 * * *"
 
+    # Match debug
+    match_debug_enabled: bool | None = False
+
     class Config:
         from_attributes = True
 
@@ -132,6 +135,9 @@ class SettingsUpdate(BaseModel):
     song_cache_enabled: bool | None = None
     song_cache_auto_refresh_enabled: bool | None = None
     song_cache_refresh_cron: str | None = None
+
+    # Match debug
+    match_debug_enabled: bool | None = None
 
 
 async def get_settings_session(db: AsyncSessionLocal):

@@ -1,8 +1,13 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
-import { SectionCard } from './SettingsShared'
-import { RefreshCcw, Search, Activity } from 'lucide-react'
+import {
+  FieldInput,
+  SaveBar,
+  SectionCard,
+  useSettingsForm,
+} from './SettingsShared'
+import { RefreshCcw, Search } from 'lucide-react'
 
 const PAGE_SIZE = 20
 
@@ -113,10 +118,283 @@ function PaginationControls({
   )
 }
 
+// ── Debug trace components ─────────────────────────────────────────────────────
+
+function AliasList({
+  title,
+  values,
+}: {
+  title: string
+  values: string[]
+}) {
+  return (
+    <div className="mt-2">
+      <div className="text-slate-400 mb-1">{title}</div>
+      <div className="flex flex-wrap gap-1">
+        {values.map(value => (
+          <span key={value} className="badge-muted">{value}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CandidateRow({
+  candidate,
+  index,
+}: {
+  candidate: any
+  index: number
+}) {
+  return (
+    <div className="rounded-lg bg-slate-50 dark:bg-slate-950 p-2 border border-border">
+      <div className="flex items-start gap-2">
+        <span className="font-mono text-slate-400">#{index}</span>
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-slate-700 dark:text-slate-200 truncate">
+            {candidate.title || '-'}
+          </div>
+          <div className="text-slate-500 dark:text-slate-400 truncate">
+            {candidate.artist || '-'}
+          </div>
+          {candidate.album && (
+            <div className="text-slate-400 truncate">专辑：{candidate.album}</div>
+          )}
+          {candidate.id && (
+            <div className="text-slate-400 truncate">ID：{candidate.id}</div>
+          )}
+          {candidate.query_label && (
+            <div className="text-slate-400 truncate">Query：{candidate.query_label}</div>
+          )}
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-slate-700 dark:text-slate-200 font-semibold">
+            {candidate.score != null ? Number(candidate.score).toFixed(4) : '-'}
+          </div>
+          <div className="text-slate-400">score</div>
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-slate-400">
+        {candidate.title_score != null && (
+          <span>title：{Number(candidate.title_score).toFixed(3)}</span>
+        )}
+        {candidate.title_core_score != null && (
+          <span>core：{Number(candidate.title_core_score).toFixed(3)}</span>
+        )}
+        {candidate.artist_score != null && (
+          <span>artist：{Number(candidate.artist_score).toFixed(3)}</span>
+        )}
+        {candidate.pg_title_sim != null && (
+          <span>pg_title：{Number(candidate.pg_title_sim).toFixed(3)}</span>
+        )}
+        {candidate.pg_artist_sim != null && (
+          <span>pg_artist：{Number(candidate.pg_artist_sim).toFixed(3)}</span>
+        )}
+        {candidate.duration != null && (
+          <span>duration：{candidate.duration}s</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function StepDetail({ step, index }: { step: any; index: number }) {
+  const hit = !!step.hit
+
+  const bestScore = step.best_score != null ? Number(step.best_score).toFixed(4) : '-'
+  const threshold = step.threshold != null ? Number(step.threshold).toFixed(2) : '-'
+
+  return (
+    <div
+      className={`rounded-xl p-3 text-xs border ${
+        hit
+          ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30'
+          : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
+      }`}
+    >
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-mono text-slate-400">[{index}]</span>
+        <span className="font-semibold text-slate-800 dark:text-slate-100">
+          {step.step || step.step_name || '-'}
+        </span>
+        <span className={hit ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}>
+          {hit ? '命中' : '未命中'}
+        </span>
+        {step.duration_ms != null && (
+          <span className="ml-auto text-slate-400">{step.duration_ms}ms</span>
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-slate-500 dark:text-slate-400">
+        {step.candidates_count != null && <span>候选数：{step.candidates_count}</span>}
+        <span>最佳得分：{bestScore}</span>
+        {step.threshold != null && <span>阈值：{threshold}</span>}
+        {step.result_id && <span>结果 ID：{step.result_id}</span>}
+      </div>
+
+      {Array.isArray(step.title_aliases) && step.title_aliases.length > 0 && (
+        <AliasList title="Title aliases" values={step.title_aliases} />
+      )}
+      {Array.isArray(step.artist_aliases) && step.artist_aliases.length > 0 && (
+        <AliasList title="Artist aliases" values={step.artist_aliases} />
+      )}
+
+      {Array.isArray(step.top_candidates) && step.top_candidates.length > 0 && (
+        <div className="mt-3">
+          <div className="text-slate-400 mb-1">Top Candidates</div>
+          <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            {step.top_candidates.map((c: any, i: number) => (
+              <CandidateRow key={i} candidate={c} index={i + 1} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step.best_candidate && !step.top_candidates?.length && (
+        <div className="mt-3">
+          <div className="text-slate-400 mb-1">Best Candidate</div>
+          <CandidateRow candidate={step.best_candidate} index={1} />
+        </div>
+      )}
+
+      {step.error && (
+        <div className="mt-2 rounded-lg bg-red-50 dark:bg-red-950/40 p-2 text-red-500">
+          {step.error}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DebugTraceView({ rawJson }: { rawJson: string | null | undefined }) {
+  if (!rawJson) {
+    return <div className="text-xs text-slate-400">无详情数据。</div>
+  }
+
+  let data: any
+  try {
+    data = typeof rawJson === 'string' ? JSON.parse(rawJson) : rawJson
+  } catch {
+    return (
+      <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-xs text-red-500">
+        raw_json 解析失败，可能不是合法 JSON。
+      </div>
+    )
+  }
+
+  const steps = Array.isArray(data?.steps) ? data.steps : []
+  const result = data?.result ?? data
+
+  if (!steps.length) {
+    return (
+      <div className="space-y-2">
+        <div className="rounded-xl bg-slate-100 dark:bg-slate-900 p-3 text-xs text-slate-500 dark:text-slate-400">
+          这条日志没有链路调试 steps。可能是调试模式未开启时产生的旧日志。
+        </div>
+        {result && (
+          <pre className="text-xs overflow-x-auto rounded-xl bg-slate-950 text-slate-100 p-3">
+            {JSON.stringify(result, null, 2)}
+          </pre>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+          匹配链路追踪，共 {steps.length} 步
+        </div>
+        {result?.source && (
+          <span className="badge-muted">最终来源：{result.source}</span>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {steps.map((s: any, i: number) => (
+          <StepDetail key={i} step={s} index={i + 1} />
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-border p-3">
+        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">
+          最终结果
+        </div>
+        {result ? (
+          <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+            <div>ID：{result.id || '-'}</div>
+            <div>曲目：{result.title || '-'}</div>
+            <div>艺术家：{result.artist || '-'}</div>
+            <div>来源：{result.source || '-'}</div>
+            <div>得分：{result.score != null ? Number(result.score).toFixed(4) : '-'}</div>
+          </div>
+        ) : (
+          <div className="text-xs text-amber-600 dark:text-amber-400">最终未命中。</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DebugMatchResultView({ data }: { data: any }) {
+  const result = data?.result
+  const steps = Array.isArray(data?.steps) ? data.steps : []
+
+  return (
+    <div className="mt-3 space-y-3">
+      <div className="rounded-xl border border-border p-3">
+        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">
+          诊断结果
+        </div>
+        {result ? (
+          <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+            <div>状态：命中</div>
+            <div>ID：{result.id || '-'}</div>
+            <div>曲目：{result.title || '-'}</div>
+            <div>艺术家：{result.artist || '-'}</div>
+            <div>来源：{result.source || '-'}</div>
+            <div>得分：{result.score != null ? Number(result.score).toFixed(4) : '-'}</div>
+          </div>
+        ) : (
+          <div className="text-xs text-amber-600 dark:text-amber-400">最终未命中。</div>
+        )}
+      </div>
+
+      {steps.length > 0 ? (
+        <div className="rounded-xl border border-border p-3">
+          <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">
+            匹配链路
+          </div>
+          <div className="space-y-2">
+            {steps.map((s: any, i: number) => (
+              <StepDetail key={i} step={s} index={i + 1} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-3 text-xs text-slate-500">
+          当前诊断结果没有 steps。请确认后端已接入 match_track_debug。
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SettingsLibrary() {
   const queryClient = useQueryClient()
+
+  // Settings form
+  const {
+    s,
+    isLoading: settingsLoading,
+    mutation: settingsMutation,
+    hasChanges,
+    handleChange,
+    save,
+  } = useSettingsForm()
 
   // Status
   const { data: status, isLoading: statusLoading, error: statusError } = useQuery({
@@ -143,6 +421,7 @@ export default function SettingsLibrary() {
 
   // Match logs
   const [logPage, setLogPage] = useState(1)
+  const [expandedLogId, setExpandedLogId] = useState<number | null>(null)
   const { data: logsData, isLoading: logsLoading } = useQuery({
     queryKey: ['library-match-logs', logPage],
     queryFn: () => fetchMatchLogs(logPage),
@@ -242,9 +521,7 @@ export default function SettingsLibrary() {
               />
               <StatusCard
                 label="刷新状态"
-                value={
-                  cache.refreshing ? '刷新中' : cache.ready ? '已就绪' : '未就绪'
-                }
+                value={cache.refreshing ? '刷新中' : cache.ready ? '已就绪' : '未就绪'}
                 desc={cache.last_full_refresh || '暂无刷新记录'}
               />
             </div>
@@ -283,6 +560,35 @@ export default function SettingsLibrary() {
         )}
         {syncMutation.isError && (
           <p className="text-sm text-red-500 mt-2">曲库同步失败: {(syncMutation.error as Error).message}</p>
+        )}
+      </SectionCard>
+
+      {/* ── 调试设置 ── */}
+      <SectionCard title="调试设置">
+        {settingsLoading ? (
+          <div className="text-sm text-slate-500 dark:text-slate-400">加载调试设置...</div>
+        ) : (
+          <>
+            <FieldInput
+              fieldKey="match_debug_enabled"
+              value={s.match_debug_enabled}
+              onChange={(v) => handleChange('match_debug_enabled', v)}
+            />
+
+            <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 p-3 text-xs text-amber-700 dark:text-amber-300">
+              开启后，新产生的匹配日志会写入完整链路 steps，
+              包括 manual_match、match_cache、memory、db_alias、db_fuzzy、subsonic 等步骤。
+              该功能会增加 match_log.raw_json 的写入体积，建议仅在排查问题时开启。
+            </div>
+
+            <SaveBar
+              hasChanges={hasChanges}
+              isPending={settingsMutation.isPending}
+              isSuccess={settingsMutation.isSuccess}
+              isError={settingsMutation.isError}
+              onSave={save}
+            />
+          </>
         )}
       </SectionCard>
 
@@ -398,11 +704,7 @@ export default function SettingsLibrary() {
           <p className="text-sm text-red-500 mt-2">诊断失败: {(debugMutation.error as Error).message}</p>
         )}
 
-        {debugMutation.data && (
-          <pre className="mt-3 text-xs overflow-x-auto rounded-xl bg-slate-950 text-slate-100 p-3">
-            {JSON.stringify(debugMutation.data, null, 2)}
-          </pre>
-        )}
+        {debugMutation.data && <DebugMatchResultView data={debugMutation.data} />}
       </SectionCard>
 
       {/* ── 人工匹配 ── */}
@@ -522,40 +824,70 @@ export default function SettingsLibrary() {
                   <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300">结果</th>
                   <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300 hidden md:table-cell">来源</th>
                   <th className="text-left p-3 font-medium text-slate-600 dark:text-slate-300 hidden lg:table-cell">置信度</th>
+                  <th className="text-right p-3 font-medium text-slate-600 dark:text-slate-300">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {((logsData as any)?.items || []).length === 0 && (
-                  <tr><td colSpan={4} className="p-6 text-center text-slate-400">暂无匹配日志</td></tr>
+                  <tr><td colSpan={5} className="p-6 text-center text-slate-400">暂无匹配日志</td></tr>
                 )}
-                {((logsData as any)?.items || []).map((item: any) => (
-                  <tr key={item.id} className="border-t border-border hover:bg-slate-50 dark:hover:bg-slate-900">
-                    <td className="p-3">
-                      <div className="font-medium text-slate-900 dark:text-slate-50">{item.input_title}</div>
-                      <div className="text-xs text-slate-400">{item.input_artist || '-'}</div>
-                    </td>
-                    <td className="p-3">
-                      {item.matched ? (
-                        <div>
-                          <div className="text-green-600 dark:text-green-400 font-medium">命中</div>
-                          <div className="text-xs text-slate-500">
-                            {item.selected_title || '-'} — {item.selected_artist || '-'}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-amber-600 dark:text-amber-400 font-medium">未命中</div>
+                {((logsData as any)?.items || []).map((item: any) => {
+                  const hasRawJson = !!item.raw_json
+                  const expanded = expandedLogId === item.id
+
+                  return (
+                    <Fragment key={item.id}>
+                      <tr className="border-t border-border hover:bg-slate-50 dark:hover:bg-slate-900">
+                        <td className="p-3">
+                          <div className="font-medium text-slate-900 dark:text-slate-50">{item.input_title}</div>
+                          <div className="text-xs text-slate-400">{item.input_artist || '-'}</div>
+                        </td>
+                        <td className="p-3">
+                          {item.matched ? (
+                            <div>
+                              <div className="text-green-600 dark:text-green-400 font-medium">命中</div>
+                              <div className="text-xs text-slate-500">
+                                {item.selected_title || '-'} — {item.selected_artist || '-'}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-amber-600 dark:text-amber-400 font-medium">未命中</div>
+                          )}
+                        </td>
+                        <td className="p-3 hidden md:table-cell">
+                          <span className="badge-muted">{item.source || '-'}</span>
+                        </td>
+                        <td className="p-3 text-slate-500 hidden lg:table-cell">
+                          {item.confidence_score != null
+                            ? `${Math.round(Number(item.confidence_score) * 100)}%`
+                            : '-'}
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            type="button"
+                            disabled={!hasRawJson}
+                            onClick={() => setExpandedLogId(expanded ? null : item.id)}
+                            className={
+                              hasRawJson
+                                ? 'text-xs text-blue-500 hover:underline dark:text-blue-400'
+                                : 'text-xs text-slate-400 cursor-not-allowed'
+                            }
+                          >
+                            {expanded ? '收起详情' : '查看详情'}
+                          </button>
+                        </td>
+                      </tr>
+
+                      {expanded && (
+                        <tr className="border-t border-border bg-slate-50/70 dark:bg-slate-950/40">
+                          <td colSpan={5} className="p-3">
+                            <DebugTraceView rawJson={item.raw_json} />
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="p-3 hidden md:table-cell">
-                      <span className="badge-muted">{item.source || '-'}</span>
-                    </td>
-                    <td className="p-3 text-slate-500 hidden lg:table-cell">
-                      {item.confidence_score != null
-                        ? `${Math.round(Number(item.confidence_score) * 100)}%`
-                        : '-'}
-                    </td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           )}
