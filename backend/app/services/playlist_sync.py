@@ -52,6 +52,7 @@ async def run_playlist_sync(
             "webhook_url": settings.webhook_url,
             "webhook_retry_count": settings.webhook_retry_count,
             "library_mode_default": settings.library_mode_default,
+            "search_concurrency": int(settings.search_concurrency or 5),
         }
 
     try:
@@ -119,6 +120,7 @@ async def run_text_sync(
                 "webhook_url": s.webhook_url,
                 "webhook_retry_count": s.webhook_retry_count,
                 "library_mode_default": s.library_mode_default,
+                "search_concurrency": int(s.search_concurrency or 5),
             }
 
     return await _run_sync_pipeline(
@@ -184,10 +186,11 @@ async def _run_sync_pipeline(
             if done % 20 == 0:
                 logger.info(f"[playlist] matching progress: {done}/{total}")
 
+        search_concurrency = max(1, min(20, int((settings or {}).get("search_concurrency") or 5)))
         search_results = await batch_search_and_match(
             tracks=songs,
             threshold=match_threshold,
-            concurrency=5,
+            concurrency=search_concurrency,
             progress_callback=_log_progress,
         )
 

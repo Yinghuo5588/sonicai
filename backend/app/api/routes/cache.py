@@ -1,8 +1,9 @@
 """Song cache routes."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from app.api.deps import CurrentUser
 from app.services.song_cache import song_cache
+from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/cache", tags=["cache"])
 
@@ -14,7 +15,8 @@ async def cache_status(current_user: CurrentUser):
 
 
 @router.post("/refresh")
-async def refresh_cache(current_user: CurrentUser):
+@limiter.limit("2/minute")
+async def refresh_cache(request: Request, current_user: CurrentUser):
     """Trigger a full song cache rebuild (runs in background)."""
     from app.core.task_registry import create_background_task
 

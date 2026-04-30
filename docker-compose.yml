@@ -9,12 +9,14 @@ services:
       - "8768:8000"
     environment:
       TZ: Asia/Shanghai
+      ENV: production
       DATABASE_URL: "postgresql+psycopg://postgres:postgres@postgres:5432/musicrec"
       INIT_ADMIN_USERNAME: admin
       INIT_ADMIN_PASSWORD: change_me_after_deploy
       INIT_ADMIN_EMAIL: admin@sonicai.local
       JWT_SECRET_KEY: sonicai-access-change-in-production
       JWT_REFRESH_SECRET_KEY: sonicai-refresh-change-in-production
+      ENCRYPTION_KEY: sonicai-encryption-change-in-production
       APP_TIMEZONE: Asia/Shanghai
     networks:
       - console_default

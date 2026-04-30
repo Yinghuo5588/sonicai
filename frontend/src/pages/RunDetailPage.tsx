@@ -158,11 +158,14 @@ export default function RunDetailPage() {
                 {statusBadge(pl.status)}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {pl.playlist_type === 'similar_tracks' ? '相似曲目' : '相邻艺术家'} ·{' '}
+                {pl.playlist_type === 'similar_tracks' ? '相似曲目' : pl.playlist_type === 'similar_artists' ? '相邻艺术家' : pl.playlist_type === 'hotboard' ? '网易云热榜' : pl.playlist_type?.startsWith('playlist_') ? '导入歌单' : pl.playlist_type} ·{' '}
                 {pl.navidrome_playlist_id ? '✅ 已创建' : '⚠️ 未创建'}
                 {pl.matched_count > 0 && ` · 命中 ${pl.matched_count}`}
                 {pl.missing_count > 0 && ` · 缺失 ${pl.missing_count}`}
               </p>
+              {pl.error_message && (
+                <p className="text-xs text-red-500 mt-1 truncate">{pl.error_message}</p>
+              )}
             </div>
             <span className="text-blue-500 dark:text-blue-400 text-sm ml-2">查看 →</span>
           </Link>

@@ -75,6 +75,10 @@ async def run_hotboard_sync(
 
         # All DB writes in ONE session
         async with AsyncSessionLocal() as db:
+            settings_result = await db.execute(select(SystemSettings))
+            settings = settings_result.scalar_one_or_none()
+            search_concurrency = max(1, min(20, int(getattr(settings, "search_concurrency", 5) or 5)))
+
             playlist = GeneratedPlaylist(
                 run_id=run_id,
                 playlist_type="hotboard",
@@ -101,7 +105,7 @@ async def run_hotboard_sync(
             search_results = await batch_search_and_match(
                 tracks=search_tracks,
                 threshold=match_threshold,
-                concurrency=5,
+                concurrency=search_concurrency,
                 progress_callback=_log_progress,
             )
 

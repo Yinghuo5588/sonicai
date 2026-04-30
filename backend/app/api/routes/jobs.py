@@ -2,7 +2,8 @@
 
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
+from app.core.rate_limit import limiter
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -23,7 +24,8 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.post("/run-all")
-async def run_all(current_user: CurrentUser):
+@limiter.limit("3/minute")
+async def run_all(request: Request, current_user: CurrentUser):
     logger.info(f"[jobs] queue run_type=full user_id={current_user.id}")
     run_id = await create_pending_run(
         run_type="full",
@@ -41,7 +43,8 @@ async def run_all(current_user: CurrentUser):
 
 
 @router.post("/run-similar-tracks")
-async def run_similar_tracks(current_user: CurrentUser):
+@limiter.limit("3/minute")
+async def run_similar_tracks(request: Request, current_user: CurrentUser):
     logger.info(f"[jobs] queue run_type=similar_tracks user_id={current_user.id}")
     run_id = await create_pending_run(
         run_type="similar_tracks",
@@ -59,7 +62,8 @@ async def run_similar_tracks(current_user: CurrentUser):
 
 
 @router.post("/run-similar-artists")
-async def run_similar_artists(current_user: CurrentUser):
+@limiter.limit("3/minute")
+async def run_similar_artists(request: Request, current_user: CurrentUser):
     logger.info(f"[jobs] queue run_type=similar_artists user_id={current_user.id}")
     run_id = await create_pending_run(
         run_type="similar_artists",
@@ -77,7 +81,13 @@ async def run_similar_artists(current_user: CurrentUser):
 
 
 @router.post("/{job_id}/stop")
-async def stop_job(job_id: int, current_user: CurrentUser, db: AsyncSession = Depends(get_db)):
+@limiter.limit("20/minute")
+async def stop_job(
+    request: Request,
+    job_id: int,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
     """Force-stop a running or pending job."""
     result = await db.execute(
         select(RecommendationRun).where(RecommendationRun.id == job_id)

@@ -73,7 +73,12 @@ class SettingsResponse(BaseModel):
 
     # Missed track retry
     missed_track_retry_mode: str | None = "local"
+    missed_track_retry_enabled: bool | None = False
+    missed_track_retry_cron: str | None = "0 3 * * *"
+    missed_track_retry_limit: int | None = 100
+    missed_track_retry_refresh_library: bool | None = True
 
+    match_debug_enabled: bool | None = False
 
     class Config:
         from_attributes = True
@@ -140,7 +145,13 @@ class SettingsUpdate(BaseModel):
     song_cache_refresh_cron: str | None = None
 
     # Missed track retry
+    missed_track_retry_enabled: bool | None = None
+    missed_track_retry_cron: str | None = None
+    missed_track_retry_limit: int | None = Field(default=None, ge=1, le=1000)
+    missed_track_retry_refresh_library: bool | None = None
     missed_track_retry_mode: str | None = None
+
+    match_debug_enabled: bool | None = None
 
 
 
@@ -179,7 +190,11 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
             raise HTTPException(status_code=400, detail="match_mode must be one of: full, local_only")
         if key == "missed_track_retry_mode" and value not in {"local", "api"}:
             raise HTTPException(status_code=400, detail="missed_track_retry_mode must be one of: local, api")
-        if key == "webhook_headers_json":
+        if (key.endswith("_cron_expression") or key.endswith("_cron")) and value:
+            parts = str(value).split()
+            if len(parts) != 5:
+                raise HTTPException(status_code=400, detail=f"{key} must be a valid 5-field cron expression")
+        if key == "webhook_headers_json" and value:
             try:
                 json.loads(value)
             except Exception:

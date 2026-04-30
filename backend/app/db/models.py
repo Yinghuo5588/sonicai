@@ -165,6 +165,7 @@ class GeneratedPlaylist(Base):
     playlist_date = Column(String(20), nullable=False)
     navidrome_playlist_id = Column(String(100), nullable=True)
     status = Column(String(30), default="pending")
+    error_message = Column(Text, nullable=True)
     total_candidates = Column(Integer, default=0)
     matched_count = Column(Integer, default=0)
     missing_count = Column(Integer, default=0)

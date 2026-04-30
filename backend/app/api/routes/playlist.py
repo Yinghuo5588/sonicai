@@ -1,7 +1,8 @@
 """Third-party playlist sync routes."""
 
 import logging
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
+from app.core.rate_limit import limiter
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -17,7 +18,9 @@ router = APIRouter(prefix="/playlist", tags=["playlist"])
 
 
 @router.post("/sync")
+@limiter.limit("3/minute")
 async def sync_playlist(
+    request: Request,
     url: str,
     current_user: CurrentUser,
     match_threshold: float = 0.75,
@@ -59,7 +62,9 @@ async def sync_playlist(
 
 
 @router.post("/sync-text")
+@limiter.limit("3/minute")
 async def sync_text_playlist(
+    request: Request,
     current_user: CurrentUser,
     file: UploadFile = File(...),
     match_threshold: float = 0.75,

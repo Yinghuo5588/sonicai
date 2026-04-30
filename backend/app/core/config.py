@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 7
 
+    # Encryption key for sensitive settings (e.g. Navidrome password).
+    # Should be stable across deployments. Do not rotate unless re-encrypting stored secrets.
+    encryption_key: str = Field(default="", alias="ENCRYPTION_KEY")
+
+    # Encryption
+    encryption_key: str = Field(default="", alias="ENCRYPTION_KEY")
+
     # CORS
     frontend_origin: str = Field(default="http://localhost:5173", alias="FRONTEND_ORIGIN")
 

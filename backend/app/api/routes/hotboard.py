@@ -1,7 +1,8 @@
 """Hotboard sync routes."""
 
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
+from app.core.rate_limit import limiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -15,7 +16,9 @@ router = APIRouter(prefix="/hotboard", tags=["hotboard"])
 
 
 @router.post("/sync")
+@limiter.limit("3/minute")
 async def sync_hotboard(
+    request: Request,
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
     limit: int = 50,

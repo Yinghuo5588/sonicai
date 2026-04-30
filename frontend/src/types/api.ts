@@ -25,6 +25,7 @@ export interface Playlist {
   playlist_name: string
   playlist_type: string
   status: string
+  error_message?: string | null
   matched_count: number
   missing_count: number
   total_candidates: number
@@ -156,6 +157,20 @@ export interface Settings {
   playlist_sync_threshold: number | null
   playlist_sync_name: string | null
   playlist_sync_overwrite: boolean
+  // Song cache
+  song_cache_enabled: boolean | null
+  song_cache_auto_refresh_enabled: boolean | null
+  song_cache_refresh_cron: string | null
+  // Missed track retry
+  missed_track_retry_enabled: boolean | null
+  missed_track_retry_cron: string | null
+  missed_track_retry_limit: number | null
+  missed_track_retry_refresh_library: boolean | null
+  missed_track_retry_mode: string | null
+  // Match debug
+  match_debug_enabled: boolean | null
+  max_concurrent_tasks: number | null
+  match_mode: string | null
 }
 // ── Library / Song Cache ────────────────────────────────────────────────────────
 

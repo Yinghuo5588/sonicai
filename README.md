@@ -72,7 +72,28 @@ sonicai/
 
 ## 配置说明
 
-详见系统设计文档。
+### 生产环境密钥
+
+生产环境必须设置以下密钥，请勿使用示例中的默认值：
+
+```env
+ENV=production
+JWT_SECRET_KEY=<强随机字符串>
+JWT_REFRESH_SECRET_KEY=<强随机字符串>
+ENCRYPTION_KEY=<强随机字符串>
+```
+
+说明：
+
+- `JWT_SECRET_KEY`：用于签发访问令牌
+- `JWT_REFRESH_SECRET_KEY`：用于签发刷新令牌
+- `ENCRYPTION_KEY`：用于加密数据库中的敏感配置，例如 Navidrome 密码
+
+**重要**：
+
+1. `ENCRYPTION_KEY` 必须长期保持稳定。迁移服务器、恢复数据库或备份还原时，必须同时保留原来的 `ENCRYPTION_KEY`，否则已加密的 Navidrome 密码将无法解密
+2. 如果丢失或更换 `ENCRYPTION_KEY`，需要在设置页重新填写并保存 Navidrome 密码
+3. 生产环境不要使用 `change-in-production` 示例值
 
 ## 开发
 

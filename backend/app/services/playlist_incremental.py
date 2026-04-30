@@ -69,6 +69,7 @@ async def run_incremental_playlist_sync(
 
     last_hash = settings.playlist_sync_last_hash
     api_base = settings.playlist_api_url
+    search_concurrency = max(1, min(20, int(getattr(settings, "search_concurrency", 5) or 5))
 
     # Parse playlist
     try:
@@ -156,7 +157,7 @@ async def run_incremental_playlist_sync(
         search_results = await batch_search_and_match(
             tracks=songs,
             threshold=match_threshold,
-            concurrency=5,
+            concurrency=search_concurrency,
             progress_callback=_log_progress,
         )
 

@@ -12,6 +12,7 @@ type PlaylistInfo = {
   playlist_type: string
   playlist_date?: string | null
   status: string
+  error_message?: string | null
   matched_count: number
   missing_count: number
   total_candidates: number
@@ -167,6 +168,13 @@ export default function PlaylistDetailPage() {
       <Link to={playlist.run_id ? `/history/run/${playlist.run_id}` : '/history'} className="text-sm text-blue-500 hover:underline dark:text-blue-400 flex items-center gap-1">
         ← 返回历史记录
       </Link>
+
+      {/* Error message */}
+      {playlist.error_message && (
+        <div className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900 p-3 text-sm text-red-600 dark:text-red-300">
+          {playlist.error_message}
+        </div>
+      )}
 
       {/* Items table */}
       <div className="card overflow-hidden">

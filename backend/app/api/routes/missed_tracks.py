@@ -2,12 +2,13 @@
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_db
 from app.db.models import MissedTrack
+from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/missed-tracks", tags=["missed-tracks"])
 
@@ -84,7 +85,11 @@ async def missed_track_stats(
 
 
 @router.post("/retry")
-async def retry_pending_missed_tracks(current_user: CurrentUser):
+@limiter.limit("3/minute")
+async def retry_pending_missed_tracks(
+    request: Request,
+    current_user: CurrentUser,
+):
     """Trigger a manual batch retry of all pending missed tracks."""
     from app.core.task_registry import create_background_task
     from app.tasks.missed_track_tasks import retry_missed_tracks_job
@@ -97,7 +102,9 @@ async def retry_pending_missed_tracks(current_user: CurrentUser):
 
 
 @router.post("/{track_id}/retry")
+@limiter.limit("30/minute")
 async def retry_one_missed_track(
+    request: Request,
     track_id: int,
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
@@ -168,6 +175,22 @@ async def reset_missed_track(
     return {"message": "已重置为 pending", "id": track_id}
 
 
+# NOTE: static routes (/matched) must be defined BEFORE dynamic ones (/{track_id})
+# to prevent "matched" being captured as an integer track_id.
+@router.delete("/matched")
+async def clear_matched_missed_tracks(
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete all matched-status records."""
+    result = await db.execute(
+        delete(MissedTrack).where(MissedTrack.status == "matched")
+    )
+    deleted = result.rowcount or 0
+    await db.commit()
+    return {"message": f"已清理 matched 记录 {deleted} 条"}
+
+
 @router.delete("/{track_id}")
 async def delete_missed_track(
     track_id: int,
@@ -182,17 +205,3 @@ async def delete_missed_track(
     await db.delete(row)
     await db.commit()
     return {"message": "已删除", "id": track_id}
-
-
-@router.delete("/matched")
-async def clear_matched_missed_tracks(
-    current_user: CurrentUser,
-    db: AsyncSession = Depends(get_db),
-):
-    """Delete all matched-status records."""
-    result = await db.execute(
-        delete(MissedTrack).where(MissedTrack.status == "matched")
-    )
-    deleted = result.rowcount or 0
-    await db.commit()
-    return {"message": f"已清理 matched 记录 {deleted} 条"}

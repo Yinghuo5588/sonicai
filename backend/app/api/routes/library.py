@@ -1,6 +1,7 @@
 """Song library routes — Phase 6."""
 
-from fastapi import APIRouter, Depends, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, Request
+from app.core.rate_limit import limiter
 from pydantic import BaseModel
 from sqlalchemy import select, func, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,13 +57,14 @@ async def library_status(
 
 
 @router.post("/sync")
+@limiter.limit("2/minute")
 async def sync_library(
+    request: Request,
     current_user: CurrentUser,
-    background: BackgroundTasks,
 ):
     async def _sync_and_reload():
         await sync_navidrome_to_song_library()
-        await song_cache.load_from_database()
+        await song_cache.refresh_full(skip_sync=True)
 
     create_background_task(_sync_and_reload(), name="song-library-sync")
 
