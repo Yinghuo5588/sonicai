@@ -142,45 +142,6 @@ def _format_song_match(song: SongLibrary, score: float, source: str) -> dict[str
         "score": float(score),
         "source": source,
     }
-
-
-# ── Config helpers ─────────────────────────────────────────────────────────────
-
-async def _get_match_mode() -> str:
-    """Query SystemSettings.match_mode."""
-    try:
-        from app.db.models import SystemSettings
-
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(SystemSettings))
-            row = result.scalar_one_or_none()
-            if row and getattr(row, "match_mode", None):
-                return str(row.match_mode)
-    except Exception:
-        pass
-    return "full"
-
-
-# ── Miss helpers ───────────────────────────────────────────────────────────────
-
-async def _record_miss(
-    title: str,
-    artist: str,
-    threshold: float,
-    source: str | None,
-) -> None:
-    try:
-        from app.services.missed_track_service import record_missed_track
-        await record_missed_track(
-            title=title,
-            artist=artist,
-            threshold=threshold,
-            source=source,
-        )
-    except Exception:
-        logger.exception("Failed to record missed track: %s - %s", title, artist)
-
-
 async def _find_manual_match(title: str, artist: str) -> dict | None:
     """Step 1: Check manual_match table."""
     title_norm = normalize_for_compare(title)
@@ -714,7 +675,14 @@ async def _match_track_internal(
         await _write_match_log(title, artist, db_fuzzy, "db_fuzzy", steps)
         return db_fuzzy, steps
 
-    # ── Step 6: Subsonic fallback ──────────────────────────────────────────
+    # ── Step 6: Subsonic fallback (gate: local_only skips this) ───────────
+    match_mode = await _get_match_mode()
+
+    if match_mode == "local_only":
+        await _write_match_log(title, artist, None, "miss", steps)
+        await _record_miss(title, artist, threshold, source="local_only")
+        return None, steps
+
     t0 = time.time()
     nav_results = await navidrome_multi_search(title, artist)
     best = pick_best_match(title, artist, nav_results, threshold)
