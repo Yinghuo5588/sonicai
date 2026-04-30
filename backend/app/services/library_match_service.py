@@ -801,14 +801,14 @@ async def match_track_local_only(
         return memory
 
     # 4. database alias exact search
-    db_match = await _find_db_alias_match(title, artist, threshold)
+    db_match, _ = await _find_db_alias_match(title, artist, threshold)
     if db_match:
         await _write_match_cache(title, artist, db_match, "db_alias")
         await _write_match_log(title, artist, db_match, "db_alias")
         return db_match
 
     # 5. database fuzzy search (pg_trgm)
-    db_fuzzy = await _find_db_fuzzy_match(title, artist, threshold)
+    db_fuzzy, _ = await _find_db_fuzzy_match(title, artist, threshold)
     if db_fuzzy:
         await _write_match_cache(title, artist, db_fuzzy, "db_fuzzy")
         await _write_match_log(title, artist, db_fuzzy, "db_fuzzy")
