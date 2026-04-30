@@ -70,6 +70,41 @@ async function debugMatch(payload: { title: string; artist?: string; threshold: 
   })
 }
 
+// ── Missed Tracks API ─────────────────────────────────────────────────────────
+
+async function fetchMissedTracks(status: string, q: string, page: number) {
+  const params = new URLSearchParams()
+  params.set('limit', String(PAGE_SIZE))
+  params.set('offset', String((page - 1) * PAGE_SIZE))
+  if (status) params.set('status', status)
+  if (q.trim()) params.set('q', q.trim())
+  return apiFetch(`/missed-tracks?${params.toString()}`)
+}
+
+async function fetchMissedTrackStats() {
+  return apiFetch('/missed-tracks/stats')
+}
+
+async function retryMissedTrack(id: number) {
+  return apiFetch(`/missed-tracks/${id}/retry`, { method: 'POST' })
+}
+
+async function retryMissedTracksBatch() {
+  return apiFetch('/missed-tracks/retry', { method: 'POST' })
+}
+
+async function ignoreMissedTrack(id: number) {
+  return apiFetch(`/missed-tracks/${id}/ignore`, { method: 'POST' })
+}
+
+async function resetMissedTrack(id: number) {
+  return apiFetch(`/missed-tracks/${id}/reset`, { method: 'POST' })
+}
+
+async function deleteMissedTrack(id: number) {
+  return apiFetch(`/missed-tracks/${id}`, { method: 'DELETE' })
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatusCard({
@@ -378,6 +413,180 @@ function DebugMatchResultView({ data }: { data: any }) {
         </div>
       )}
     </div>
+  )
+}
+
+// ── Missed Tracks ─────────────────────────────────────────────────────────────
+
+const MISSED_STATUS_LABELS: Record<string, string> = {
+  pending: '待处理',
+  matched: '已匹配',
+  failed: '失败',
+  ignored: '已忽略',
+}
+
+function MissedTracksCard() {
+  const queryClient = useQueryClient()
+  const [missedStatus, setMissedStatus] = useState('pending')
+  const [missedQuery, setMissedQuery] = useState('')
+  const [missedPage, setMissedPage] = useState(1)
+
+  const { data: missedStats } = useQuery({
+    queryKey: ['missed-track-stats'],
+    queryFn: fetchMissedTrackStats,
+  })
+
+  const { data: missedData, isLoading: missedLoading } = useQuery({
+    queryKey: ['missed-tracks', missedStatus, missedQuery, missedPage],
+    queryFn: () => fetchMissedTracks(missedStatus, missedQuery, missedPage),
+  })
+
+  const retryMissedMutation = useMutation({
+    mutationFn: retryMissedTrack,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['missed-tracks'] })
+      queryClient.invalidateQueries({ queryKey: ['missed-track-stats'] })
+    },
+  })
+
+  const retryMissedBatchMutation = useMutation({
+    mutationFn: retryMissedTracksBatch,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['missed-tracks'] })
+      queryClient.invalidateQueries({ queryKey: ['missed-track-stats'] })
+    },
+  })
+
+  const ignoreMissedMutation = useMutation({
+    mutationFn: ignoreMissedTrack,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['missed-tracks'] })
+      queryClient.invalidateQueries({ queryKey: ['missed-track-stats'] })
+    },
+  })
+
+  const resetMissedMutation = useMutation({
+    mutationFn: resetMissedTrack,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['missed-tracks'] })
+      queryClient.invalidateQueries({ queryKey: ['missed-track-stats'] })
+    },
+  })
+
+  const deleteMissedMutation = useMutation({
+    mutationFn: deleteMissedTrack,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['missed-tracks'] })
+      queryClient.invalidateQueries({ queryKey: ['missed-track-stats'] })
+    },
+  })
+
+  const totalMissedPages = useMemo(() => {
+    const total = Number((missedData as any)?.total || 0)
+    return Math.max(1, Math.ceil(total / PAGE_SIZE))
+  }, [missedData])
+
+  return (
+    <SectionCard title="未命中歌曲">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        这里记录自动匹配未命中的歌曲。它是任务池,不是普通日志。
+        同一首歌会自动去重并累计出现次数。补库后可手动或定时重试。
+      </p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3">
+        <StatusCard label="全部" value={(missedStats as any)?.total ?? 0} />
+        <StatusCard label="待处理" value={(missedStats as any)?.pending ?? 0} />
+        <StatusCard label="已匹配" value={(missedStats as any)?.matched ?? 0} />
+        <StatusCard label="失败" value={(missedStats as any)?.failed ?? 0} />
+        <StatusCard label="已忽略" value={(missedStats as any)?.ignored ?? 0} />
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2 mt-3">
+        <select
+          value={missedStatus}
+          onChange={e => { setMissedStatus(e.target.value); setMissedPage(1) }}
+          className="select sm:w-40"
+        >
+          <option value="">全部</option>
+          <option value="pending">待处理</option>
+          <option value="matched">已匹配</option>
+          <option value="failed">失败</option>
+          <option value="ignored">已忽略</option>
+        </select>
+        <input
+          type="text"
+          value={missedQuery}
+          onChange={e => { setMissedQuery(e.target.value); setMissedPage(1) }}
+          placeholder="搜索歌名或艺术家"
+          className="input flex-1"
+        />
+        <button
+          className="btn-secondary"
+          disabled={retryMissedBatchMutation.isPending}
+          onClick={() => retryMissedBatchMutation.mutate()}
+        >
+          {retryMissedBatchMutation.isPending ? '启动中...' : '批量重试'}
+        </button>
+      </div>
+
+      <div className="card overflow-hidden mt-3">
+        {missedLoading ? (
+          <div className="p-4 text-sm text-slate-500">加载未命中歌曲...</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-900">
+              <tr>
+                <th className="text-left p-3">歌曲</th>
+                <th className="text-left p-3 hidden md:table-cell">状态</th>
+                <th className="text-left p-3 hidden lg:table-cell">出现/重试</th>
+                <th className="text-right p-3">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {((missedData as any)?.items || []).length === 0 && (
+                <tr><td colSpan={4} className="p-6 text-center text-slate-400">暂无未命中歌曲</td></tr>
+              )}
+              {((missedData as any)?.items || []).map((item: any) => (
+                <tr key={item.id} className="border-t border-border hover:bg-slate-50 dark:hover:bg-slate-900">
+                  <td className="p-3">
+                    <div className="font-medium text-slate-900 dark:text-slate-50">{item.title}</div>
+                    <div className="text-xs text-slate-400">{item.artist || '-'}</div>
+                    {item.last_error && <div className="text-xs text-red-500 mt-1">{item.last_error}</div>}
+                  </td>
+                  <td className="p-3 hidden md:table-cell">
+                    <span className="badge-muted">{MISSED_STATUS_LABELS[item.status] || item.status}</span>
+                  </td>
+                  <td className="p-3 hidden lg:table-cell text-slate-500">
+                    出现 {item.seen_count ?? 0} 次 · 重试 {item.retry_count ?? 0}/{item.max_retries ?? 5}
+                  </td>
+                  <td className="p-3 text-right">
+                    <div className="flex justify-end gap-2">
+                      {item.status !== 'matched' && (
+                        <button className="text-xs text-blue-500 hover:underline" onClick={() => retryMissedMutation.mutate(item.id)}>重试</button>
+                      )}
+                      {item.status !== 'ignored' && item.status !== 'matched' && (
+                        <button className="text-xs text-amber-500 hover:underline" onClick={() => ignoreMissedMutation.mutate(item.id)}>忽略</button>
+                      )}
+                      {item.status !== 'pending' && (
+                        <button className="text-xs text-green-500 hover:underline" onClick={() => resetMissedMutation.mutate(item.id)}>重置</button>
+                      )}
+                      <button className="text-xs text-red-500 hover:underline" onClick={() => { if (confirm('确定删除?')) deleteMissedMutation.mutate(item.id) }}>删除</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <PaginationControls
+        current={missedPage}
+        total={totalMissedPages}
+        onPrev={() => setMissedPage(p => Math.max(1, p - 1))}
+        onNext={() => setMissedPage(p => Math.min(totalMissedPages, p + 1))}
+      />
+    </SectionCard>
   )
 }
 
