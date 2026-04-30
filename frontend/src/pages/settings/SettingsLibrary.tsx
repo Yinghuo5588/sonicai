@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import {
@@ -7,7 +7,7 @@ import {
   SectionCard,
   useSettingsForm,
 } from './SettingsShared'
-import { RefreshCcw, Search } from 'lucide-react'
+import { CheckCircle, RefreshCcw, Search, XCircle } from 'lucide-react'
 
 const PAGE_SIZE = 20
 
@@ -430,6 +430,13 @@ function MissedTracksCard() {
   const [missedStatus, setMissedStatus] = useState('pending')
   const [missedQuery, setMissedQuery] = useState('')
   const [missedPage, setMissedPage] = useState(1)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  useEffect(() => {
+    if (!feedback) return
+    const timer = setTimeout(() => setFeedback(null), 4000)
+    return () => clearTimeout(timer)
+  }, [feedback])
 
   const { data: missedStats } = useQuery({
     queryKey: ['missed-track-stats'],
@@ -443,17 +450,25 @@ function MissedTracksCard() {
 
   const retryMissedMutation = useMutation({
     mutationFn: retryMissedTrack,
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      setFeedback({ type: 'success', message: data?.message || '重试成功' })
       queryClient.invalidateQueries({ queryKey: ['missed-tracks'] })
       queryClient.invalidateQueries({ queryKey: ['missed-track-stats'] })
+    },
+    onError: (error: Error) => {
+      setFeedback({ type: 'error', message: `重试失败: ${error.message}` })
     },
   })
 
   const retryMissedBatchMutation = useMutation({
     mutationFn: retryMissedTracksBatch,
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      setFeedback({ type: 'success', message: data?.message || '批量重试任务已启动' })
       queryClient.invalidateQueries({ queryKey: ['missed-tracks'] })
       queryClient.invalidateQueries({ queryKey: ['missed-track-stats'] })
+    },
+    onError: (error: Error) => {
+      setFeedback({ type: 'error', message: `批量重试失败: ${error.message}` })
     },
   })
 
@@ -492,6 +507,19 @@ function MissedTracksCard() {
         这里记录自动匹配未命中的歌曲。它是任务池,不是普通日志。
         同一首歌会自动去重并累计出现次数。补库后可手动或定时重试。
       </p>
+
+      {feedback && (
+        <div className={`text-xs px-3 py-2 rounded-lg mt-3 flex items-center gap-1.5 ${
+          feedback.type === 'success'
+            ? 'bg-green-50 text-green-700 dark:bg-green-950/50 dark:text-green-300'
+            : 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300'
+        }`}>
+          {feedback.type === 'success'
+            ? <CheckCircle className="w-4 h-4 shrink-0" />
+            : <XCircle className="w-4 h-4 shrink-0" />}
+          {feedback.message}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3">
         <StatusCard label="全部" value={(missedStats as any)?.total ?? 0} />

@@ -90,7 +90,7 @@ async def retry_pending_missed_tracks(current_user: CurrentUser):
     from app.tasks.missed_track_tasks import retry_missed_tracks_job
 
     create_background_task(
-        retry_missed_tracks_job(),
+        retry_missed_tracks_job(force=True),
         name="missed-track-manual-retry",
     )
     return {"message": "缺失歌曲批量重试任务已启动"}

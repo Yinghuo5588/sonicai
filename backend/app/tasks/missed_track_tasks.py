@@ -8,18 +8,22 @@ from sqlalchemy import select
 logger = logging.getLogger(__name__)
 
 
-async def retry_missed_tracks_job():
+async def retry_missed_tracks_job(*, force: bool = False):
     """
     Retry pending missed tracks.
 
     Flow:
-    1. Read settings; skip if disabled.
+    1. Read settings; skip if disabled (unless force=True).
     2. Optional: refresh song_library + song_cache.
     3. Fetch pending rows (retry_count < max_retries), oldest first.
     4. For each: run match_track_local_only().
        - Matched  -> status = matched, record navidrome_id.
        - Unmatched: retry_count++, if >= max_retries -> status = failed.
        - Error    : record last_error, mark failed if exhausted.
+
+    Args:
+        force: If True, skip the missed_track_retry_enabled setting check.
+               Used for manual batch retries triggered from the API.
     """
     from app.db.session import AsyncSessionLocal
     from app.db.models import SystemSettings, MissedTrack
@@ -30,7 +34,7 @@ async def retry_missed_tracks_job():
         result = await db.execute(select(SystemSettings))
         settings = result.scalar_one_or_none()
 
-    if not settings or not getattr(settings, "missed_track_retry_enabled", False):
+    if not force and (not settings or not getattr(settings, "missed_track_retry_enabled", False)):
         logger.info("[missed-track-retry] disabled or no settings")
         return
 
