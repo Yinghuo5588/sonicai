@@ -40,7 +40,13 @@ async def load_cron_schedule(db: AsyncSession):
     # APScheduler handles running jobs gracefully — removal waits for the
     # currently-executing instance to yield at an await point before removing
     for job in sched.get_jobs():
-        if job.id in ("recommendation_cron", "hotboard_cron", "playlist_sync_cron"):
+        if job.id in (
+            "recommendation_cron",
+            "hotboard_cron",
+            "playlist_sync_cron",
+            "song_cache_refresh",
+            "missed_track_retry_cron",
+        ):
             job.remove()
 
     if config and config.cron_enabled and config.cron_expression:
@@ -142,6 +148,32 @@ async def load_cron_schedule(db: AsyncSession):
                 logger.info("Song cache cron loaded: %s", config.song_cache_refresh_cron)
         except Exception as e:
             logger.warning("Invalid song cache cron '%s': %s", config.song_cache_refresh_cron, e)
+
+    # ===== Missed tracks scheduled retry =====
+    if config and config.missed_track_retry_enabled and config.missed_track_retry_cron:
+        try:
+            from app.tasks.missed_track_tasks import retry_missed_tracks_job
+
+            parts = config.missed_track_retry_cron.split()
+            if len(parts) >= 5:
+                tz = config.timezone if config and config.timezone else settings.app_timezone
+                sched.add_job(
+                    retry_missed_tracks_job,
+                    CronTrigger(
+                        minute=parts[0],
+                        hour=parts[1],
+                        day=parts[2],
+                        month=parts[3],
+                        day_of_week=parts[4],
+                        timezone=tz,
+                    ),
+                    id="missed_track_retry_cron",
+                    replace_existing=True,
+                    misfire_grace_time=300,
+                )
+                logger.info("Missed track retry cron loaded: %s", config.missed_track_retry_cron)
+        except Exception as e:
+            logger.warning("Invalid missed track retry cron '%s': %s", config.missed_track_retry_cron, e)
 
     # Register webhook retry job (every 2 minutes)
     from apscheduler.triggers.interval import IntervalTrigger

@@ -44,6 +44,43 @@ from app.utils.text_normalizer import (
     score_candidate,
 )
 
+# ── Config helpers ─────────────────────────────────────────────────────────────
+
+async def _get_match_mode() -> str:
+    """Query SystemSettings.match_mode."""
+    try:
+        from app.db.models import SystemSettings
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(SystemSettings))
+            row = result.scalar_one_or_none()
+            if row and getattr(row, "match_mode", None):
+                return str(row.match_mode)
+    except Exception:
+        pass
+    return "full"
+
+
+# ── Miss helpers ───────────────────────────────────────────────────────────────
+
+async def _record_miss(
+    title: str,
+    artist: str,
+    threshold: float,
+    source: str | None,
+) -> None:
+    try:
+        from app.services.missed_track_service import record_missed_track
+        await record_missed_track(
+            title=title,
+            artist=artist,
+            threshold=threshold,
+            source=source,
+        )
+    except Exception:
+        logger.exception("Failed to record missed track: %s - %s", title, artist)
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,6 +142,43 @@ def _format_song_match(song: SongLibrary, score: float, source: str) -> dict[str
         "score": float(score),
         "source": source,
     }
+
+
+# ── Config helpers ─────────────────────────────────────────────────────────────
+
+async def _get_match_mode() -> str:
+    """Query SystemSettings.match_mode."""
+    try:
+        from app.db.models import SystemSettings
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(SystemSettings))
+            row = result.scalar_one_or_none()
+            if row and getattr(row, "match_mode", None):
+                return str(row.match_mode)
+    except Exception:
+        pass
+    return "full"
+
+
+# ── Miss helpers ───────────────────────────────────────────────────────────────
+
+async def _record_miss(
+    title: str,
+    artist: str,
+    threshold: float,
+    source: str | None,
+) -> None:
+    try:
+        from app.services.missed_track_service import record_missed_track
+        await record_missed_track(
+            title=title,
+            artist=artist,
+            threshold=threshold,
+            source=source,
+        )
+    except Exception:
+        logger.exception("Failed to record missed track: %s - %s", title, artist)
 
 
 async def _find_manual_match(title: str, artist: str) -> dict | None:
@@ -723,7 +797,58 @@ async def _match_track_internal(
         return best, steps
 
     await _write_match_log(title, artist, None, "miss", steps)
+    await _record_miss(title, artist, threshold, source="full")
     return None, steps
+
+
+# ── Local-only entry point for missed-track retry ─────────────────────────────
+
+async def match_track_local_only(
+    title: str,
+    artist: str,
+    threshold: float = 0.75,
+) -> dict | None:
+    """
+    Force local-only matching for scheduled retry of missed tracks.
+    Does NOT record misses again (avoid re-triggering the task pool).
+    """
+    # 1. manual_match
+    manual = await _find_manual_match(title, artist)
+    if manual:
+        await _write_match_log(title, artist, manual, "manual")
+        return manual
+
+    # 2. match_cache
+    cached = await _find_match_cache(title, artist, threshold)
+    if cached:
+        await _write_match_log(title, artist, cached, "match_cache")
+        return cached
+
+    # 3. memory index
+    memory = song_cache.match_one(title=title, artist=artist, threshold=threshold)
+    if memory:
+        memory["source"] = "memory"
+        await _write_match_cache(title, artist, memory, "memory")
+        await _write_match_log(title, artist, memory, "memory")
+        return memory
+
+    # 4. database alias exact search
+    db_match = await _find_db_alias_match(title, artist, threshold)
+    if db_match:
+        await _write_match_cache(title, artist, db_match, "db_alias")
+        await _write_match_log(title, artist, db_match, "db_alias")
+        return db_match
+
+    # 5. database fuzzy search (pg_trgm)
+    db_fuzzy = await _find_db_fuzzy_match(title, artist, threshold)
+    if db_fuzzy:
+        await _write_match_cache(title, artist, db_fuzzy, "db_fuzzy")
+        await _write_match_log(title, artist, db_fuzzy, "db_fuzzy")
+        return db_fuzzy
+
+    # No match in local index; retry context does not call Subsonic
+    await _write_match_log(title, artist, None, "miss")
+    return None
 
 
 # ── Public entry points ────────────────────────────────────────────────────────

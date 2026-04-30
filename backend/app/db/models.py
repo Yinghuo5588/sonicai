@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean,
-    ForeignKey, Text, JSON, Numeric
+    ForeignKey, Text, JSON, Numeric, UniqueConstraint
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.sql import func
@@ -122,6 +122,15 @@ class SystemSettings(Base):
 
     # Match debug
     match_debug_enabled = Column(Boolean, default=False)
+
+    # Matching mode
+    match_mode = Column(String(20), default="full")  # full | local_only
+
+    # Missed track retry
+    missed_track_retry_enabled = Column(Boolean, default=False)
+    missed_track_retry_cron = Column(String(100), default="0 3 * * *")
+    missed_track_retry_limit = Column(Integer, default=100)
+    missed_track_retry_refresh_library = Column(Boolean, default=True)
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -347,3 +356,46 @@ class MatchLog(Base):
     source = Column(String(30), nullable=True)  # manual | cache | memory | db | subsonic | miss
     raw_json = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class MissedTrack(Base):
+    """Task pool for tracks that were not matched locally.
+
+    Unlike match_log which is an append-only audit log, this table
+    acts as a recovery queue: the same track updates existing rows
+    (seen_count increments) rather than creating duplicates.
+    """
+    __tablename__ = "missed_tracks"
+
+    id = Column(Integer, primary_key=True)
+
+    title = Column(String(500), nullable=False)
+    artist = Column(String(500), nullable=True)
+
+    title_norm = Column(String(500), nullable=False, index=True)
+    artist_norm = Column(String(500), nullable=False, default="", index=True)
+
+    match_threshold = Column(Numeric(4, 3), default=0.75)
+
+    # pending: 待重试  matched: 已补库并匹配成功
+    # failed: 达到最大重试次数仍失败  ignored: 用户手动忽略
+    status = Column(String(20), default="pending", index=True)
+
+    source = Column(String(50), nullable=True)
+    last_error = Column(Text, nullable=True)
+
+    seen_count = Column(Integer, default=1)
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=5)
+
+    last_seen_at = Column(DateTime, nullable=True)
+    last_retry_at = Column(DateTime, nullable=True)
+    matched_at = Column(DateTime, nullable=True)
+    matched_navidrome_id = Column(String(100), nullable=True)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("title_norm", "artist_norm", name="uq_missed_tracks_input_norm"),
+    )

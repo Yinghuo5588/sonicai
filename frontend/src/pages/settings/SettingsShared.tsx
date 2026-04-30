@@ -140,6 +140,35 @@ export const FIELD_LABELS: Record<string, { label: string; type?: string; toolti
       '▸ 匹配 Navidrome 歌曲的最低相似度\n' +
       ' 默认：0.75  推荐：0.70 - 0.85',
   },
+  match_mode: {
+    label: '匹配模式',
+    type: 'select',
+    tooltip:
+      '▸ 控制本地未命中后是否继续请求 Navidrome/Subsonic\n' +
+      ' · full — 完整匹配,包含 Subsonic 实时兜底\n' +
+      ' · local_only — 仅本地索引,未命中直接进入缺失清单',
+  },
+  missed_track_retry_enabled: {
+    label: '启用缺失歌曲定时重试',
+    type: 'boolean',
+    tooltip:
+      '▸ 定时重试 missed_tracks 中 pending 的歌曲。\n' +
+      ' 建议补库后开启,任务会尝试在本地索引中重新匹配。',
+  },
+  missed_track_retry_limit: {
+    label: '每次重试数量',
+    type: 'number',
+    tooltip:
+      '▸ 每次定时任务最多处理多少首缺失歌曲。\n' +
+      ' 默认 100,建议 50 - 200。',
+  },
+  missed_track_retry_refresh_library: {
+    label: '重试前刷新曲库索引',
+    type: 'boolean',
+    tooltip:
+      '▸ 开启后,重试前会先同步 Navidrome 曲库并刷新内存缓存。\n' +
+      ' 如果你补库后希望自动命中,建议开启。',
+  },
   search_concurrency: {
     label: '搜索并发数',
     type: 'number',
@@ -255,6 +284,7 @@ export function FieldInput({
       library_mode_default: ['library_only', 'allow_missing'],
       seed_source_mode: ['recent_only', 'top_only', 'recent_plus_top'],
       top_period: ['7day', '1month', '3month', '6month', '12month', 'overall'],
+      match_mode: ['full', 'local_only'],
     }
 
     const opts = options[fieldKey] || []

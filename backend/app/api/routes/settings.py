@@ -70,8 +70,6 @@ class SettingsResponse(BaseModel):
     song_cache_auto_refresh_enabled: bool | None = True
     song_cache_refresh_cron: str | None = "0 4 * * *"
 
-    # Match debug
-    match_debug_enabled: bool | None = False
 
     class Config:
         from_attributes = True
@@ -136,8 +134,6 @@ class SettingsUpdate(BaseModel):
     song_cache_auto_refresh_enabled: bool | None = None
     song_cache_refresh_cron: str | None = None
 
-    # Match debug
-    match_debug_enabled: bool | None = None
 
 
 async def get_settings_session(db: AsyncSessionLocal):
@@ -270,6 +266,7 @@ async def import_settings(
         "recent_top_mix_ratio", "search_concurrency", "hotboard_limit",
         "match_threshold", "candidate_pool_multiplier_min", "candidate_pool_multiplier_max",
         "hotboard_match_threshold", "playlist_sync_threshold", "duplicate_avoid_days",
+        "missed_track_retry_limit",
     }
 
     # Fields that are enum-validated
@@ -277,6 +274,7 @@ async def import_settings(
         "library_mode_default": {"library_only", "allow_missing"},
         "seed_source_mode": {"recent_only", "top_only", "recent_plus_top"},
         "top_period": {"7day", "1month", "3month", "6month", "12month", "overall"},
+        "match_mode": {"full", "local_only"},
     }
 
     updated_fields = []
@@ -303,7 +301,7 @@ async def import_settings(
                 raise HTTPException(status_code=400, detail=f"字段 {key} 必须是: {', '.join(enum_fields[key])}")
 
         # Cron expression basic validation (5 fields)
-        if key.endswith("_cron_expression"):
+        if key.endswith("_cron_expression") or key.endswith("_cron"):
             parts = str(value).split()
             if len(parts) != 5:
                 raise HTTPException(status_code=400, detail=f"字段 {key} 的 Cron 表达式无效")

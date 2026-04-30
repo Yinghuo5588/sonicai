@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select, func
 
 from app.db.session import get_db, AsyncSessionLocal
-from app.db.models import RecommendationRun, GeneratedPlaylist, WebhookBatch
+from app.db.models import RecommendationRun, GeneratedPlaylist, WebhookBatch, MissedTrack
 from app.api.deps import CurrentUser
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -39,6 +39,27 @@ async def get_summary(current_user: CurrentUser, db: AsyncSessionLocal = Depends
     )
     wh_failed = wh_failed_result.scalar() or 0
 
+    # Missed tracks task pool stats
+    missed_pending_result = await db.execute(
+        select(func.count(MissedTrack.id)).where(MissedTrack.status == "pending")
+    )
+    missed_pending = missed_pending_result.scalar() or 0
+
+    missed_matched_result = await db.execute(
+        select(func.count(MissedTrack.id)).where(MissedTrack.status == "matched")
+    )
+    missed_matched = missed_matched_result.scalar() or 0
+
+    missed_failed_result = await db.execute(
+        select(func.count(MissedTrack.id)).where(MissedTrack.status == "failed")
+    )
+    missed_failed = missed_failed_result.scalar() or 0
+
+    missed_ignored_result = await db.execute(
+        select(func.count(MissedTrack.id)).where(MissedTrack.status == "ignored")
+    )
+    missed_ignored = missed_ignored_result.scalar() or 0
+
     return {
         "total_runs": total_runs,
         "last_run": {
@@ -52,6 +73,10 @@ async def get_summary(current_user: CurrentUser, db: AsyncSessionLocal = Depends
         "total_missing": total_missing,
         "webhook_success_count": wh_success,
         "webhook_failed_count": wh_failed,
+        "missed_tracks_pending": missed_pending,
+        "missed_tracks_matched": missed_matched,
+        "missed_tracks_failed": missed_failed,
+        "missed_tracks_ignored": missed_ignored,
     }
 
 

@@ -184,6 +184,41 @@ export default function SettingsSchedule() {
         </div>
       </SectionCard>
 
+      <SectionCard title="缺失歌曲定时重试">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          定时重试未命中歌曲。建议在补库后开启,并启用「重试前刷新曲库索引」。
+        </p>
+
+        <FieldInput
+          fieldKey="missed_track_retry_enabled"
+          value={s.missed_track_retry_enabled}
+          onChange={v => handleChange('missed_track_retry_enabled', v)}
+        />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Cron 表达式</label>
+            <input
+              type="text"
+              value={String(s.missed_track_retry_cron ?? '0 3 * * *')}
+              onChange={e => handleChange('missed_track_retry_cron', e.target.value)}
+              className="input"
+            />
+          </div>
+          <FieldInput
+            fieldKey="missed_track_retry_limit"
+            value={s.missed_track_retry_limit}
+            onChange={v => handleChange('missed_track_retry_limit', v)}
+          />
+        </div>
+
+        <FieldInput
+          fieldKey="missed_track_retry_refresh_library"
+          value={s.missed_track_retry_refresh_library}
+          onChange={v => handleChange('missed_track_retry_refresh_library', v)}
+        />
+      </SectionCard>
+
       <SectionCard title="任务管理">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FieldInput

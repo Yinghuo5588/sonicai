@@ -58,6 +58,45 @@ export interface DashboardSummary {
   total_missing: number
   webhook_success_count: number
   webhook_failed_count: number
+  missed_tracks_pending?: number
+  missed_tracks_matched?: number
+  missed_tracks_failed?: number
+  missed_tracks_ignored?: number
+}
+
+
+
+// ── Missed Tracks ─────────────────────────────────────────────────────────────
+
+export interface MissedTrackItem {
+  id: number
+  title: string
+  artist: string | null
+  status: 'pending' | 'matched' | 'failed' | 'ignored'
+  source: string | null
+  seen_count: number
+  retry_count: number
+  max_retries: number
+  match_threshold: number
+  last_seen_at: string | null
+  last_retry_at: string | null
+  matched_at: string | null
+  matched_navidrome_id: string | null
+  last_error: string | null
+  created_at: string | null
+}
+
+export interface MissedTracksResponse {
+  total: number
+  items: MissedTrackItem[]
+}
+
+export interface MissedTrackStats {
+  pending: number
+  matched: number
+  failed: number
+  ignored: number
+  total: number
 }
 
 export interface WebhookBatch {
@@ -117,12 +156,6 @@ export interface Settings {
   playlist_sync_threshold: number | null
   playlist_sync_name: string | null
   playlist_sync_overwrite: boolean
-  // Song cache
-  song_cache_enabled: boolean | null
-  song_cache_auto_refresh_enabled: boolean | null
-  song_cache_refresh_cron: string | null
-  // Match debug
-  match_debug_enabled: boolean | null
 }
 // ── Library / Song Cache ────────────────────────────────────────────────────────
 

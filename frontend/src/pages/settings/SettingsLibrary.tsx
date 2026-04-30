@@ -901,6 +901,9 @@ export default function SettingsLibrary() {
         />
       </SectionCard>
 
+      {/* ── 未命中歌曲 ── */}
+      <MissedTracksCard />
+
     </div>
   )
 }

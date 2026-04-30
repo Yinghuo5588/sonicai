@@ -37,6 +37,28 @@ export default function DashboardPage() {
         <StatCard label="Webhook 成功" value={d.webhook_success_count ?? 0} color="text-green-600" />
         <StatCard label="Webhook 失败" value={d.webhook_failed_count ?? 0} color="text-red-500" />
       </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label="待补库歌曲"
+          value={d.missed_tracks_pending ?? 0}
+          color={(d.missed_tracks_pending ?? 0) > 0 ? 'text-amber-600' : 'text-slate-700 dark:text-slate-50'}
+        />
+        <StatCard
+          label="补库后已匹配"
+          value={d.missed_tracks_matched ?? 0}
+          color="text-green-600"
+        />
+        <StatCard
+          label="补库重试失败"
+          value={d.missed_tracks_failed ?? 0}
+          color={(d.missed_tracks_failed ?? 0) > 0 ? 'text-red-500' : 'text-slate-700 dark:text-slate-50'}
+        />
+        <StatCard
+          label="已忽略缺失"
+          value={d.missed_tracks_ignored ?? 0}
+          color="text-slate-400"
+        />
+      </div>
       {d.last_run && (
         <div className="card card-padding">
           <h2 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">最近执行</h2>

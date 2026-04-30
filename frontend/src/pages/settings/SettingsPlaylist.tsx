@@ -54,6 +54,11 @@ export default function SettingsPlaylist() {
       <SectionCard title="匹配与搜索">
         <div className="space-y-3">
           <FieldInput
+            fieldKey="match_mode"
+            value={s.match_mode}
+            onChange={v => handleChange('match_mode', v)}
+          />
+          <FieldInput
             fieldKey="match_threshold"
             value={s.match_threshold}
             onChange={v => handleChange('match_threshold', v)}
