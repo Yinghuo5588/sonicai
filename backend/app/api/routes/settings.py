@@ -44,6 +44,7 @@ class SettingsResponse(BaseModel):
     top_period: str | None = None
     recent_top_mix_ratio: int | None = None
     match_threshold: float | None = None
+    match_mode: str | None = "full"
     candidate_pool_multiplier_min: float | None = None
     candidate_pool_multiplier_max: float | None = None
     search_concurrency: int | None = None
@@ -108,6 +109,7 @@ class SettingsUpdate(BaseModel):
     top_period: str | None = Field(default=None)
     recent_top_mix_ratio: int | None = Field(default=None, ge=0, le=100)
     match_threshold: float | None = Field(default=None, ge=0.5, le=0.95)
+    match_mode: str | None = None
     candidate_pool_multiplier_min: float | None = Field(default=None, ge=1.0, le=20.0)
     candidate_pool_multiplier_max: float | None = Field(default=None, ge=1.0, le=20.0)
     search_concurrency: int | None = Field(default=None, ge=1, le=20)
@@ -167,6 +169,8 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
             raise HTTPException(status_code=400, detail="seed_source_mode must be one of: recent_only, top_only, recent_plus_top")
         if key == "top_period" and value not in {"7day", "1month", "3month", "6month", "12month", "overall"}:
             raise HTTPException(status_code=400, detail="top_period must be one of: 7day, 1month, 3month, 6month, 12month, overall")
+        if key == "match_mode" and value not in {"full", "local_only"}:
+            raise HTTPException(status_code=400, detail="match_mode must be one of: full, local_only")
         if key == "webhook_headers_json":
             try:
                 json.loads(value)
