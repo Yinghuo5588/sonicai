@@ -590,7 +590,15 @@ function MissedTracksCard() {
                   <td className="p-3 text-right">
                     <div className="flex justify-end gap-2">
                       {item.status !== 'matched' && (
-                        <button className="text-xs text-blue-500 hover:underline" onClick={() => retryMissedMutation.mutate(item.id)}>重试</button>
+                        <button
+                          className="text-xs text-blue-500 hover:underline disabled:opacity-50"
+                          disabled={retryMissedMutation.isPending && retryMissedMutation.variables === item.id}
+                          onClick={() => retryMissedMutation.mutate(item.id)}
+                        >
+                          {retryMissedMutation.isPending && retryMissedMutation.variables === item.id
+                            ? '重试中...'
+                            : '重试'}
+                        </button>
                       )}
                       {item.status !== 'ignored' && item.status !== 'matched' && (
                         <button className="text-xs text-amber-500 hover:underline" onClick={() => ignoreMissedMutation.mutate(item.id)}>忽略</button>

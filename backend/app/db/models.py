@@ -131,6 +131,7 @@ class SystemSettings(Base):
     missed_track_retry_cron = Column(String(100), default="0 3 * * *")
     missed_track_retry_limit = Column(Integer, default=100)
     missed_track_retry_refresh_library = Column(Boolean, default=True)
+    missed_track_retry_mode = Column(String(20), default="local")  # local | api
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

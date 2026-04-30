@@ -71,6 +71,9 @@ class SettingsResponse(BaseModel):
     song_cache_auto_refresh_enabled: bool | None = True
     song_cache_refresh_cron: str | None = "0 4 * * *"
 
+    # Missed track retry
+    missed_track_retry_mode: str | None = "local"
+
 
     class Config:
         from_attributes = True
@@ -136,6 +139,9 @@ class SettingsUpdate(BaseModel):
     song_cache_auto_refresh_enabled: bool | None = None
     song_cache_refresh_cron: str | None = None
 
+    # Missed track retry
+    missed_track_retry_mode: str | None = None
+
 
 
 async def get_settings_session(db: AsyncSessionLocal):
@@ -171,6 +177,8 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
             raise HTTPException(status_code=400, detail="top_period must be one of: 7day, 1month, 3month, 6month, 12month, overall")
         if key == "match_mode" and value not in {"full", "local_only"}:
             raise HTTPException(status_code=400, detail="match_mode must be one of: full, local_only")
+        if key == "missed_track_retry_mode" and value not in {"local", "api"}:
+            raise HTTPException(status_code=400, detail="missed_track_retry_mode must be one of: local, api")
         if key == "webhook_headers_json":
             try:
                 json.loads(value)
@@ -279,6 +287,7 @@ async def import_settings(
         "seed_source_mode": {"recent_only", "top_only", "recent_plus_top"},
         "top_period": {"7day", "1month", "3month", "6month", "12month", "overall"},
         "match_mode": {"full", "local_only"},
+        "missed_track_retry_mode": {"local", "api"},
     }
 
     updated_fields = []

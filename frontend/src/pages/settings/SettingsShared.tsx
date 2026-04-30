@@ -169,6 +169,14 @@ export const FIELD_LABELS: Record<string, { label: string; type?: string; toolti
       '▸ 开启后,重试前会先同步 Navidrome 曲库并刷新内存缓存。\n' +
       ' 如果你补库后希望自动命中,建议开启。',
   },
+  missed_track_retry_mode: {
+    label: '重试模式',
+    type: 'select',
+    tooltip:
+      '▸ 定时或手动批量重试使用的匹配方式\n' +
+      ' · local — 刷新全库后本地匹配（适合大量补库）\n' +
+      ' · api — 直接用 Subsonic 实时搜索（适合少量补库）',
+  },
   search_concurrency: {
     label: '搜索并发数',
     type: 'number',
@@ -285,6 +293,7 @@ export function FieldInput({
       seed_source_mode: ['recent_only', 'top_only', 'recent_plus_top'],
       top_period: ['7day', '1month', '3month', '6month', '12month', 'overall'],
       match_mode: ['full', 'local_only'],
+      missed_track_retry_mode: ['local', 'api'],
     }
 
     const opts = options[fieldKey] || []

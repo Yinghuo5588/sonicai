@@ -41,8 +41,10 @@ async def retry_missed_tracks_job(*, force: bool = False):
     limit = int(getattr(settings, "missed_track_retry_limit", 100) or 100)
     limit = max(1, min(limit, 1000))
 
-    # 2. Optional library refresh
-    if getattr(settings, "missed_track_retry_refresh_library", True):
+    mode = getattr(settings, "missed_track_retry_mode", "local") or "local"
+
+    # 2. Optional library refresh (only in local mode)
+    if mode == "local" and getattr(settings, "missed_track_retry_refresh_library", True):
         try:
             from app.services.song_library_service import sync_navidrome_to_song_library
             from app.services.song_cache import song_cache
@@ -74,11 +76,19 @@ async def retry_missed_tracks_job(*, force: bool = False):
         now = datetime.now(timezone.utc)
 
         try:
-            match = await match_track_local_only(
-                title=row.title,
-                artist=row.artist or "",
-                threshold=float(row.match_threshold or 0.75),
-            )
+            if mode == "api":
+                from app.services.library_match_service import match_track
+                match = await match_track(
+                    title=row.title,
+                    artist=row.artist or "",
+                    threshold=float(row.match_threshold or 0.75),
+                )
+            else:
+                match = await match_track_local_only(
+                    title=row.title,
+                    artist=row.artist or "",
+                    threshold=float(row.match_threshold or 0.75),
+                )
 
             async with AsyncSessionLocal() as db:
                 fresh = await db.get(MissedTrack, row.id)

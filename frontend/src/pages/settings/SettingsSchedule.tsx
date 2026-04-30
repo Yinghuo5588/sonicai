@@ -217,6 +217,12 @@ export default function SettingsSchedule() {
           value={s.missed_track_retry_refresh_library}
           onChange={v => handleChange('missed_track_retry_refresh_library', v)}
         />
+
+        <FieldInput
+          fieldKey="missed_track_retry_mode"
+          value={s.missed_track_retry_mode}
+          onChange={v => handleChange('missed_track_retry_mode', v)}
+        />
       </SectionCard>
 
       <SectionCard title="任务管理">
