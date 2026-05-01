@@ -71,6 +71,14 @@ async function clearMatchCache() {
   return apiFetch('/library/match-cache', { method: 'DELETE' })
 }
 
+async function clearLowConfidenceCache(maxScore: number) {
+  return apiFetch(`/library/match-cache/low-confidence?max_score=${maxScore}`, { method: 'DELETE' })
+}
+
+async function clearOldMatchLogs(days: number) {
+  return apiFetch(`/library/match-logs/old?days=${days}`, { method: 'DELETE' })
+}
+
 async function debugMatch(payload: { title: string; artist?: string; threshold: number }) {
   return apiFetch('/library/debug-match', {
     method: 'POST',
@@ -728,9 +736,22 @@ export default function SettingsLibrary() {
   // Match logs
   const [logPage, setLogPage] = useState(1)
   const [expandedLogId, setExpandedLogId] = useState<number | null>(null)
+  const [logRetentionDays, setLogRetentionDays] = useState(30)
   const { data: logsData, isLoading: logsLoading } = useQuery({
     queryKey: ['library-match-logs', logPage],
     queryFn: () => fetchMatchLogs(logPage),
+  })
+
+  // Clear old logs mutation
+  const clearOldLogsMutation = useMutation({
+    mutationFn: clearOldMatchLogs,
+    onSuccess: (data: any) => {
+      toast.success('日志已清理', data?.message || `已删除 ${logRetentionDays} 天前的日志`)
+      queryClient.invalidateQueries({ queryKey: ['library-match-logs'] })
+    },
+    onError: (error: Error) => {
+      toast.error('清理失败', error.message)
+    },
   })
 
   // Manual matches
@@ -776,6 +797,20 @@ export default function SettingsLibrary() {
     },
     onError: (error: Error) => {
       toast.error('清空缓存失败', error.message)
+    },
+  })
+
+  // Clear low confidence cache
+  const [cacheThreshold, setCacheThreshold] = useState(0.75)
+  const clearLowConfidenceCacheMutation = useMutation({
+    mutationFn: clearLowConfidenceCache,
+    onSuccess: (data: any) => {
+      toast.success('低置信度缓存已清除', data?.message)
+      queryClient.invalidateQueries({ queryKey: ['library-match-logs'] })
+      queryClient.invalidateQueries({ queryKey: ['library-status'] })
+    },
+    onError: (error: Error) => {
+      toast.error('清除失败', error.message)
     },
   })
 
@@ -1119,6 +1154,30 @@ export default function SettingsLibrary() {
           </button>
         </div>
 
+        {/* 清除低置信度缓存 */}
+        <div className="flex items-center gap-2 mt-3">
+          <label className="text-xs text-slate-500 dark:text-slate-400">置信度低于</label>
+          <input
+            type="number"
+            min={0}
+            max={1}
+            step={0.05}
+            value={cacheThreshold}
+            onChange={e => setCacheThreshold(Number(e.target.value))}
+            className="input w-20"
+          />
+          <button
+            className="btn-secondary"
+            disabled={clearLowConfidenceCacheMutation.isPending}
+            onClick={() => {
+              if (!confirm(`确定清除所有置信度低于 ${Math.round(cacheThreshold * 100)}% 的缓存吗？`)) return
+              clearLowConfidenceCacheMutation.mutate(cacheThreshold)
+            }}
+          >
+            {clearLowConfidenceCacheMutation.isPending ? '清除中...' : '清除低置信度缓存'}
+          </button>
+        </div>
+
         <div className="card overflow-hidden mt-4">
           {manualLoading ? (
             <div className="p-4 text-sm text-slate-500">加载人工匹配...</div>
@@ -1267,6 +1326,29 @@ export default function SettingsLibrary() {
           onPrev={() => setLogPage(p => Math.max(1, p - 1))}
           onNext={() => setLogPage(p => Math.min(totalLogPages, p + 1))}
         />
+
+        {/* 清理旧日志 */}
+        <div className="flex items-center gap-2 mt-3">
+          <input
+            type="number"
+            min={1}
+            max={365}
+            value={logRetentionDays}
+            onChange={e => setLogRetentionDays(Number(e.target.value))}
+            className="input w-24"
+          />
+          <span className="text-xs text-slate-500 dark:text-slate-400">天前的日志</span>
+          <button
+            className="btn-secondary"
+            disabled={clearOldLogsMutation.isPending}
+            onClick={() => {
+              if (!confirm(`确定删除 ${logRetentionDays} 天前的所有匹配日志吗？`)) return
+              clearOldLogsMutation.mutate(logRetentionDays)
+            }}
+          >
+            {clearOldLogsMutation.isPending ? '清理中...' : '清理'}
+          </button>
+        </div>
       </SectionCard>
       )}
 
