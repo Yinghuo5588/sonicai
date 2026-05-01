@@ -17,7 +17,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { RUN_TYPE_LABELS, labelOf } from '@/lib/labels'
-import loginLogo from '@/assets/login-logo.webp'
+import loginLogo from '@/assets/login-logo.png'
 
 async function fetchDashboard() {
   return apiFetch('/dashboard/summary')

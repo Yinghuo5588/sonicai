@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { loginSchema } from '@/lib/validators'
 import { Loader2 } from 'lucide-react'
-import loginLogo from '@/assets/login-logo.webp'
+import loginLogo from '@/assets/login-logo.png'
 
 interface LoginForm {
   username: string
