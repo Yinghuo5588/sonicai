@@ -257,4 +257,34 @@
     background-size: 48px 100%, 72px 100%;
     mask-image: linear-gradient(to top, black, transparent);
   }
-}
+
+  /* SonicAI Logo 呼吸光效 */
+  .sonic-logo-glow {
+    animation: sonic-logo-glow 3.5s ease-in-out infinite;
+  }
+
+  @keyframes sonic-logo-glow {
+    0%, 100% {
+      box-shadow: 0 0 24px rgba(34, 211, 238, 0.25);
+    }
+    50% {
+      box-shadow: 0 0 42px rgba(34, 211, 238, 0.45);
+    }
+  }
+
+  /* 横向 Tab 滚动渐隐遮罩 */
+  .scroll-fade-x {
+    position: relative;
+  }
+
+  .scroll-fade-x::after {
+    content: "";
+    position: sticky;
+    right: 0;
+    display: block;
+    width: 2rem;
+    margin-left: auto;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, hsl(var(--background)));
+  }
