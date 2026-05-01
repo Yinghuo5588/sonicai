@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
+import { useToast } from '@/components/ui/useToast'
 import {
   Sparkles,
   Music,
@@ -12,6 +13,10 @@ import {
   Users,
   Star,
 } from 'lucide-react'
+
+async function fetchSettings() {
+  return apiFetch('/settings')
+}
 
 async function triggerJob(type: string) {
   const endpoint = type === 'full' ? 'all' : type
@@ -120,8 +125,23 @@ function RangeSlider({
 }
 
 export default function JobsPage() {
+  const toast = useToast()
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: fetchSettings,
+  })
+
   /* 推荐任务 */
-  const allMutation = useMutation({ mutationFn: () => triggerJob('all') })
+  const allMutation = useMutation({
+    mutationFn: () => triggerJob('all'),
+    onSuccess: (data: any) => {
+      toast.success('推荐任务已提交', `Run ID: ${data?.run_id ?? '-'}`)
+    },
+    onError: (error: Error) => {
+      toast.error('推荐任务提交失败', error.message)
+    },
+  })
   const tracksMutation = useMutation({ mutationFn: () => triggerJob('similar-tracks') })
   const artistsMutation = useMutation({ mutationFn: () => triggerJob('similar-artists') })
 
@@ -132,6 +152,12 @@ export default function JobsPage() {
   const [hotboardOverwrite, setHotboardOverwrite] = useState(false)
   const hotboardMutation = useMutation({
     mutationFn: () => triggerHotboard(limit, threshold, hotboardName, hotboardOverwrite),
+    onSuccess: (data: any) => {
+      toast.success('热榜同步已提交', `Run ID: ${data?.run_id ?? '-'}`)
+    },
+    onError: (error: Error) => {
+      toast.error('热榜同步失败', error.message)
+    },
   })
 
   /* 第三方歌单 */
@@ -141,6 +167,12 @@ export default function JobsPage() {
   const [playlistOverwrite, setPlaylistOverwrite] = useState(false)
   const playlistMutation = useMutation({
     mutationFn: () => triggerPlaylistSync(playlistUrl, playlistThreshold / 100, playlistName, playlistOverwrite),
+    onSuccess: (data: any) => {
+      toast.success('歌单同步已提交', `Run ID: ${data?.run_id ?? '-'}`)
+    },
+    onError: (error: Error) => {
+      toast.error('歌单同步失败', error.message)
+    },
   })
 
   /* 文本歌单 */
@@ -178,6 +210,29 @@ export default function JobsPage() {
       <div>
         <h1 className="page-title">任务执行</h1>
         <p className="page-subtitle mt-1">手动触发推荐任务、同步第三方歌单或上传文本歌单。</p>
+      </div>
+
+      {/* Preflight check */}
+      <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5">
+        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">执行前检查</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className={`flex items-center gap-1.5 text-xs ${!!settings?.lastfm_api_key ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+            {!!settings?.lastfm_api_key ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+            Last.fm API Key
+          </div>
+          <div className={`flex items-center gap-1.5 text-xs ${!!settings?.lastfm_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+            {!!settings?.lastfm_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+            Last.fm 用户名
+          </div>
+          <div className={`flex items-center gap-1.5 text-xs ${!!settings?.navidrome_url && !!settings?.navidrome_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+            {!!settings?.navidrome_url && !!settings?.navidrome_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+            Navidrome 配置
+          </div>
+          <div className={`flex items-center gap-1.5 text-xs ${!!settings?.match_mode ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+            {!!settings?.match_mode ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+            匹配模式：{settings?.match_mode || '-'}
+          </div>
+        </div>
       </div>
 
       {/* 推荐任务卡片 */}
