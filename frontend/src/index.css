@@ -257,4 +257,18 @@
     background-size: 48px 100%, 72px 100%;
     mask-image: linear-gradient(to top, black, transparent);
   }
+
+  /* SonicAI Logo 呼吸光效 */
+  .sonic-logo-glow {
+    animation: sonic-logo-glow 3.5s ease-in-out infinite;
+  }
+
+  @keyframes sonic-logo-glow {
+    0%, 100% {
+      box-shadow: 0 0 24px rgba(34, 211, 238, 0.25);
+    }
+    50% {
+      box-shadow: 0 0 42px rgba(34, 211, 238, 0.45);
+    }
+  }
 }

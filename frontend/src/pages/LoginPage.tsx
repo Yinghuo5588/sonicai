@@ -53,7 +53,7 @@ export default function LoginPage() {
 
       <div className="card card-padding w-full max-w-sm relative z-10">
         {/* Logo */}
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center mx-auto mb-5 shadow-lg shadow-cyan-500/30">
+        <div className="sonic-logo-glow w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center mx-auto mb-5 shadow-lg shadow-cyan-500/30">
           <Music2 className="w-7 h-7" />
         </div>
 
