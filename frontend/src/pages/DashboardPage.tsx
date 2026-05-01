@@ -93,6 +93,154 @@ function HeroCard({ lastRun }: { lastRun?: Record<string, any> }) {
   )
 }
 
+/* ---------- 系统状态栏 ---------- */
+function HealthStrip({ d }: { d: any }) {
+  const lastStatus = d.last_run?.status
+
+  const items = [
+    {
+      label: '最近任务',
+      value: !d.last_run
+        ? '暂无'
+        : lastStatus === 'success'
+        ? '正常'
+        : lastStatus === 'failed'
+        ? '异常'
+        : lastStatus === 'running'
+        ? '运行中'
+        : lastStatus,
+      tone:
+        lastStatus === 'failed'
+          ? 'danger'
+          : lastStatus === 'running'
+          ? 'info'
+          : 'success',
+    },
+    {
+      label: 'Webhook',
+      value: (d.webhook_failed_count ?? 0) > 0
+        ? `${d.webhook_failed_count} 失败`
+        : '正常',
+      tone: (d.webhook_failed_count ?? 0) > 0 ? 'danger' : 'success',
+    },
+    {
+      label: '缺失歌曲',
+      value: (d.missed_tracks_pending ?? 0) > 0
+        ? `${d.missed_tracks_pending} 待处理`
+        : '正常',
+      tone: (d.missed_tracks_pending ?? 0) > 0 ? 'warning' : 'success',
+    },
+    {
+      label: '补库重试',
+      value: (d.missed_tracks_failed ?? 0) > 0
+        ? `${d.missed_tracks_failed} 失败`
+        : '正常',
+      tone: (d.missed_tracks_failed ?? 0) > 0 ? 'danger' : 'success',
+    },
+  ]
+
+  const toneClass: Record<string, string> = {
+    success: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300',
+    danger: 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300',
+    warning: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300',
+    info: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-300',
+  }
+
+  return (
+    <div className="card card-padding">
+      <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3">系统状态</h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {items.map(item => (
+          <div
+            key={item.label}
+            className={`rounded-2xl p-3 ${toneClass[item.tone]}`}
+          >
+            <div className="text-xs opacity-70">{item.label}</div>
+            <div className="mt-1 text-sm font-semibold">{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ---------- 待处理事项 ---------- */
+function ActionList({ d }: { d: any }) {
+  const actions: {
+    title: string
+    desc: string
+    to: string
+    label: string
+    tone: 'warning' | 'danger' | 'info'
+  }[] = []
+
+  if ((d.missed_tracks_pending ?? 0) > 0) {
+    actions.push({
+      title: '有缺失歌曲待补库',
+      desc: `${d.missed_tracks_pending} 首歌曲等待处理或重试`,
+      to: '/settings/library',
+      label: '去曲库索引',
+      tone: 'warning',
+    })
+  }
+
+  if ((d.webhook_failed_count ?? 0) > 0) {
+    actions.push({
+      title: 'Webhook 存在失败记录',
+      desc: `${d.webhook_failed_count} 条通知失败或等待重试`,
+      to: '/webhooks',
+      label: '查看 Webhook',
+      tone: 'danger',
+    })
+  }
+
+  if (d.last_run?.status === 'failed') {
+    actions.push({
+      title: '最近任务执行失败',
+      desc: '建议查看任务详情，并检查 Last.fm、Navidrome 或歌单解析配置',
+      to: `/history/run/${d.last_run.id}`,
+      label: '查看任务详情',
+      tone: 'danger',
+    })
+  }
+
+  if (actions.length === 0) {
+    return (
+      <div className="card card-padding">
+        <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">待处理事项</h2>
+        <div className="rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+          当前没有待处理事项，系统运行良好。
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card card-padding">
+      <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3">待处理事项</h2>
+      <div className="space-y-2">
+        {actions.map(item => (
+          <Link
+            key={item.title}
+            to={item.to}
+            className="block rounded-2xl border border-border p-3 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+          >
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              {item.title}
+            </div>
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {item.desc}
+            </div>
+            <div className="mt-2 text-xs font-medium text-cyan-600 dark:text-cyan-300">
+              {item.label} →
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /* ---------- 快捷操作入口 ---------- */
 function QuickActions() {
   return (
@@ -122,6 +270,10 @@ export default function DashboardPage() {
     <div className="page">
       {/* Hero */}
       <HeroCard lastRun={d.last_run} />
+
+      {/* 系统状态 + 待处理事项 */}
+      <HealthStrip d={d} />
+      <ActionList d={d} />
 
       {/* 核心统计（桌面4列，移动2列） */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

@@ -172,6 +172,57 @@ function RunHeaderCard({ run }: { run: any }) {
   )
 }
 
+/* ---------- 状态引导卡片 ---------- */
+function RunActionHint({ run }: { run: any }) {
+  if (run.status === 'running' || run.status === 'pending') {
+    return (
+      <div className="card card-padding border-cyan-500/30 bg-cyan-50/60 dark:bg-cyan-950/20">
+        <div className="flex items-center gap-2 text-sm font-semibold text-cyan-700 dark:text-cyan-300">
+          <RotateCw className="h-4 w-4 animate-spin" />
+          任务正在执行
+        </div>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          页面会自动刷新进度。停止任务后，已经写入的数据不会自动回滚。
+        </p>
+      </div>
+    )
+  }
+
+  if (run.status === 'failed') {
+    return (
+      <div className="card card-padding border-red-500/30 bg-red-50/60 dark:bg-red-950/20">
+        <div className="flex items-center gap-2 text-sm font-semibold text-red-600 dark:text-red-300">
+          <AlertTriangle className="h-4 w-4" />
+          任务失败
+        </div>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          建议检查 Last.fm、Navidrome、Playlist API、Webhook 或曲库索引配置。
+        </p>
+        <div className="mt-3 flex flex-col sm:flex-row gap-2">
+          <Link to="/jobs" className="btn-secondary text-xs">重新执行</Link>
+          <Link to="/settings/connections" className="btn-secondary text-xs">检查服务连接</Link>
+          <Link to="/settings/library" className="btn-secondary text-xs">查看曲库索引</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (run.status === 'stopped') {
+    return (
+      <div className="card card-padding border-amber-500/30 bg-amber-50/60 dark:bg-amber-950/20">
+        <div className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+          任务已停止
+        </div>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          任务已被手动停止。你可以回到任务执行页重新发起。
+        </p>
+      </div>
+    )
+  }
+
+  return null
+}
+
 export default function RunDetailPage() {
   const { run_id } = useParams<{ run_id: string }>()
   const rid = Number(run_id)
@@ -246,6 +297,9 @@ export default function RunDetailPage() {
 
       {/* 头部信息 */}
       <RunHeaderCard run={run} />
+
+      {/* 状态引导 */}
+      <RunActionHint run={run} />
 
       {/* 进度条（仅 running 有意义） */}
       {run.progress && <ProgressCard run={run} />}
