@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
-import { CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Link2 } from 'lucide-react'
+import EmptyState from '@/components/ui/EmptyState'
 
 const PAGE_SIZE = 5
 
@@ -193,7 +194,13 @@ export default function WebhooksPage() {
       {/* 移动端卡片列表 */}
       <div className="md:hidden space-y-3">
         {batches.length === 0 && (
-          <div className="card card-padding text-center text-sm text-slate-400">暂无记录</div>
+          <EmptyState
+            icon={Link2}
+            title="暂无 Webhook 记录"
+            description="当推荐或歌单同步出现缺失歌曲，并且开启 allow_missing 与 Webhook 后，这里会出现通知记录。"
+            actionLabel="检查服务连接"
+            actionTo="/settings/connections"
+          />
         )}
         {batches.map((b: any) => (
           <BatchCard
@@ -210,7 +217,13 @@ export default function WebhooksPage() {
       {/* 桌面端表格 */}
       <div className="hidden md:block space-y-3">
         {batches.length === 0 && (
-          <div className="card card-padding text-center text-sm text-slate-400">暂无记录</div>
+          <EmptyState
+            icon={Link2}
+            title="暂无 Webhook 记录"
+            description="当推荐或歌单同步出现缺失歌曲，并且开启 allow_missing 与 Webhook 后，这里会出现通知记录。"
+            actionLabel="检查服务连接"
+            actionTo="/settings/connections"
+          />
         )}
 
         {batches.map((b: any) => (

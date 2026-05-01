@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { formatRelativeTime } from '@/lib/date'
 import { Clock, CheckCircle, XCircle, RotateCw, List } from 'lucide-react'
+import EmptyState from '@/components/ui/EmptyState'
 
 const PAGE_SIZE = 15
 
@@ -112,7 +113,13 @@ export default function HistoryPage() {
       {/* 移动端卡片列表 */}
       <div className="md:hidden space-y-2">
         {filteredRuns.length === 0 && (
-          <div className="card card-padding text-center text-slate-400 text-sm">暂无记录</div>
+          <EmptyState
+            icon={List}
+            title="暂无推荐历史"
+            description="还没有执行过推荐任务。你可以先去任务执行页生成第一组歌单。"
+            actionLabel="去执行推荐"
+            actionTo="/jobs"
+          />
         )}
         {filteredRuns.map((r: any) => (
           <RunCard key={r.id} run={r} />
@@ -121,7 +128,13 @@ export default function HistoryPage() {
 
       {/* 桌面端列表 */}
       <div className="hidden md:block card overflow-hidden">
-        {runs.length === 0 && <p className="p-6 text-slate-400 text-center text-sm">暂无记录</p>}
+        {runs.length === 0 && <EmptyState
+          icon={List}
+          title="暂无推荐历史"
+          description="还没有执行过推荐任务。你可以先去任务执行页生成第一组歌单。"
+          actionLabel="去执行推荐"
+          actionTo="/jobs"
+        />}
         <div className="divide-y divide-border/50">
           {runs.map((r: any) => (
             <Link key={r.id} to={`/history/run/${r.id}`} className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-900 transition">

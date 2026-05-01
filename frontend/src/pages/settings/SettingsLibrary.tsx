@@ -9,6 +9,7 @@ import {
   useSettingsForm,
 } from './SettingsShared'
 import { CheckCircle, RefreshCcw, Search, XCircle, Wrench, ListFilter, FileSearch, UserCheck, ScrollText, Database, AlertTriangle } from 'lucide-react'
+import EmptyState from '@/components/ui/EmptyState'
 
 const PAGE_SIZE = 20
 
@@ -626,7 +627,7 @@ function MissedTracksCard() {
             </thead>
             <tbody>
               {((missedData as any)?.items || []).length === 0 && (
-                <tr><td colSpan={4} className="p-6 text-center text-slate-400">暂无未命中歌曲</td></tr>
+                <tr><td colSpan={4} className="p-6 text-center"><EmptyState icon={AlertTriangle} title="暂无未命中歌曲" description="当前没有待处理的缺失歌曲，说明最近匹配状态良好。" /></td></tr>
               )}
               {((missedData as any)?.items || []).map((item: any) => (
                 <tr key={item.id} className="border-t border-border hover:bg-slate-50 dark:hover:bg-slate-900">
@@ -991,7 +992,7 @@ export default function SettingsLibrary() {
               </thead>
               <tbody>
                 {((songsData as any)?.items || []).length === 0 && (
-                  <tr><td colSpan={4} className="p-6 text-center text-slate-400">暂无歌曲</td></tr>
+                  <tr><td colSpan={4} className="p-6 text-center"><EmptyState icon={Search} title="暂无歌曲" description="曲库索引为空，请先同步 Navidrome 曲库。" actionLabel="同步曲库" action={() => {}} /></td></tr>
                 )}
                 {((songsData as any)?.items || []).map((item: any) => (
                   <tr key={item.id} className="border-t border-border hover:bg-slate-50 dark:hover:bg-slate-900">
@@ -1130,7 +1131,7 @@ export default function SettingsLibrary() {
               </thead>
               <tbody>
                 {((manualData as any)?.items || []).length === 0 && (
-                  <tr><td colSpan={4} className="p-6 text-center text-slate-400">暂无人工匹配</td></tr>
+                  <tr><td colSpan={4} className="p-6 text-center"><EmptyState icon={UserCheck} title="暂无人工匹配" description="还没有人工匹配的歌曲。自动匹配无法命中的歌曲可以在诊断后手动关联。" /></td></tr>
                 )}
                 {((manualData as any)?.items || []).map((item: any) => (
                   <tr key={item.id} className="border-t border-border hover:bg-slate-50 dark:hover:bg-slate-900">
@@ -1191,7 +1192,7 @@ export default function SettingsLibrary() {
               </thead>
               <tbody>
                 {((logsData as any)?.items || []).length === 0 && (
-                  <tr><td colSpan={5} className="p-6 text-center text-slate-400">暂无匹配日志</td></tr>
+                  <tr><td colSpan={5} className="p-6 text-center"><EmptyState icon={ScrollText} title="暂无匹配日志" description="执行推荐、热榜同步或歌单导入后，这里会显示匹配记录。" /></td></tr>
                 )}
                 {((logsData as any)?.items || []).map((item: any) => {
                   const hasRawJson = !!item.raw_json
