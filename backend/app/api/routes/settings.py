@@ -51,6 +51,7 @@ class SettingsResponse(BaseModel):
     max_concurrent_tasks: int | None = None
     cron_enabled: bool
     cron_expression: str | None
+    recommendation_cron_run_type: str | None = "full"
     # Hotboard scheduled sync
     hotboard_cron_enabled: bool | None = False
     hotboard_cron_expression: str | None = None
@@ -124,6 +125,7 @@ class SettingsUpdate(BaseModel):
     max_concurrent_tasks: int | None = Field(default=None, ge=1, le=5)
     cron_enabled: bool | None = None
     cron_expression: str | None = None
+    recommendation_cron_run_type: str | None = None
     # Hotboard scheduled sync
     hotboard_cron_enabled: bool | None = False
     hotboard_cron_expression: str | None = None
@@ -190,6 +192,8 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
             raise HTTPException(status_code=400, detail="match_mode must be one of: full, local_only")
         if key == "missed_track_retry_mode" and value not in {"local", "api"}:
             raise HTTPException(status_code=400, detail="missed_track_retry_mode must be one of: local, api")
+        if key == "recommendation_cron_run_type" and value not in {"full", "similar_tracks", "similar_artists"}:
+            raise HTTPException(status_code=400, detail="recommendation_cron_run_type must be one of: full, similar_tracks, similar_artists")
         if (key.endswith("_cron_expression") or key.endswith("_cron")) and value:
             parts = str(value).split()
             if len(parts) != 5:
@@ -303,6 +307,7 @@ async def import_settings(
         "top_period": {"7day", "1month", "3month", "6month", "12month", "overall"},
         "match_mode": {"full", "local_only"},
         "missed_track_retry_mode": {"local", "api"},
+        "recommendation_cron_run_type": {"full", "similar_tracks", "similar_artists"},
     }
 
     updated_fields = []

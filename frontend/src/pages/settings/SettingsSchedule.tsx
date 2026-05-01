@@ -20,7 +20,11 @@ export default function SettingsSchedule() {
 
   return (
     <div className="space-y-4">
-      <SectionCard title="推荐定时任务">
+      <SectionCard title="Last.fm 推荐歌单定时生成">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          定时基于 Last.fm 听歌数据生成推荐歌单，可选择完整推荐、仅相似曲目或仅相邻艺术家。
+        </p>
+
         <label className="flex items-center gap-2 mb-3">
           <input
             type="checkbox"
@@ -28,8 +32,19 @@ export default function SettingsSchedule() {
             onChange={e => handleChange('cron_enabled', e.target.checked)}
             className="w-4 h-4 accent-blue-500"
           />
-          <span className="text-sm text-slate-700 dark:text-slate-200">启用定时推荐</span>
+          <span className="text-sm text-slate-700 dark:text-slate-200">
+            启用 Last.fm 推荐定时生成
+          </span>
         </label>
+
+        <div className="mb-3">
+          <FieldInput
+            fieldKey="recommendation_cron_run_type"
+            value={s.recommendation_cron_run_type ?? 'full'}
+            onChange={v => handleChange('recommendation_cron_run_type', v)}
+          />
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
             Cron 表达式<Tooltip text="分 时 日 月 周" />

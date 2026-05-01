@@ -93,6 +93,60 @@ function ResultTip({
   return null
 }
 
+/* ---------- Last.fm 操作行 ---------- */
+function LastfmActionRow({
+  icon: Icon,
+  title,
+  description,
+  buttonLabel,
+  onClick,
+  loading,
+  success,
+  error,
+}: {
+  icon: React.ElementType
+  title: string
+  description: string
+  buttonLabel: string
+  onClick: () => void
+  loading: boolean
+  success: boolean
+  error: unknown
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-slate-50/70 dark:bg-slate-900/60 p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex items-start gap-2.5 min-w-0">
+        <div className="w-8 h-8 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0">
+          <Icon className="w-4 h-4 text-cyan-600 dark:text-cyan-300" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            {title}
+          </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {description}
+          </div>
+          <ResultTip isSuccess={success} isError={!!error} error={error} />
+        </div>
+      </div>
+
+      <button
+        onClick={onClick}
+        disabled={loading}
+        className="btn-primary w-full sm:w-auto shrink-0"
+      >
+        {loading ? '执行中...' : success ? (
+          <><CheckCircle className="w-4 h-4 mr-1" />已提交</>
+        ) : error ? (
+          <><XCircle className="w-4 h-4 mr-1" />失败，重试</>
+        ) : (
+          buttonLabel
+        )}
+      </button>
+    </div>
+  )
+}
+
 /* ---------- Range Slider ---------- */
 function RangeSlider({
   label,
@@ -215,7 +269,7 @@ export default function JobsPage() {
 
       {/* Preflight check */}
       <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5">
-        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">执行前检查</div>
+        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">全局服务状态</div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className={`flex items-center gap-1.5 text-xs ${!!settings?.lastfm_api_key ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
             {!!settings?.lastfm_api_key ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
@@ -236,50 +290,69 @@ export default function JobsPage() {
         </div>
       </div>
 
-      {/* 推荐任务卡片 */}
-      <ActionCard icon={Sparkles} title="执行全部推荐" description="基于 Last.fm 数据，为当前用户生成相似曲目歌单和相邻艺术家歌单">
-        <div className="flex flex-col gap-2">
-          <button
+      {/* Last.fm 推荐歌单生成 */}
+      <ActionCard
+        icon={Sparkles}
+        title="Last.fm 推荐歌单生成"
+        description="基于 Last.fm 听歌数据生成推荐歌单，并同步到 Navidrome"
+      >
+        <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5 mb-3">
+          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+            全局服务状态
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className={`flex items-center gap-1.5 text-xs ${!!settings?.lastfm_api_key ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+              {!!settings?.lastfm_api_key ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+              Last.fm API Key
+            </div>
+            <div className={`flex items-center gap-1.5 text-xs ${!!settings?.lastfm_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+              {!!settings?.lastfm_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+              Last.fm 用户名
+            </div>
+            <div className={`flex items-center gap-1.5 text-xs ${!!settings?.navidrome_url && !!settings?.navidrome_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+              {!!settings?.navidrome_url && !!settings?.navidrome_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+              Navidrome 配置
+            </div>
+            <div className={`flex items-center gap-1.5 text-xs ${!!settings?.match_mode ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+              {!!settings?.match_mode ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+              匹配模式：{labelOf(MATCH_MODE_LABELS, settings?.match_mode)}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <LastfmActionRow
+            icon={Zap}
+            title="完整推荐"
+            description="同时生成相似曲目和相邻艺术家两个推荐歌单"
+            buttonLabel="执行完整推荐"
             onClick={() => allMutation.mutate()}
-            disabled={allMutation.isPending}
-            className="btn-primary w-full"
-          >
-            {allMutation.isPending ? '执行中...' : allMutation.isSuccess ? (
-              <><CheckCircle className="w-4 h-4 mr-1" />已提交</>
-            ) : allMutation.isError ? (
-              <><XCircle className="w-4 h-4 mr-1" />失败，重试</>
-            ) : (
-              <><Zap className="w-4 h-4 mr-1" />执行全部推荐</>
-            )}
-          </button>
-          <ResultTip isSuccess={allMutation.isSuccess} isError={allMutation.isError} error={allMutation.error} />
+            loading={allMutation.isPending}
+            success={allMutation.isSuccess}
+            error={allMutation.error}
+          />
+          <LastfmActionRow
+            icon={AudioLines}
+            title="相似曲目"
+            description="基于用户常听曲目，生成相似歌曲歌单"
+            buttonLabel="仅生成相似曲目"
+            onClick={() => tracksMutation.mutate()}
+            loading={tracksMutation.isPending}
+            success={tracksMutation.isSuccess}
+            error={tracksMutation.error}
+          />
+          <LastfmActionRow
+            icon={Users}
+            title="相邻艺术家"
+            description="基于用户喜爱的艺术家，生成相邻艺术家热门歌曲歌单"
+            buttonLabel="仅生成相邻艺术家"
+            onClick={() => artistsMutation.mutate()}
+            loading={artistsMutation.isPending}
+            success={artistsMutation.isSuccess}
+            error={artistsMutation.error}
+          />
         </div>
       </ActionCard>
-
-      {/* 相似曲目 / 相邻艺术家 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <ActionCard icon={AudioLines} title="仅相似曲目" description="基于用户听歌历史，生成相似曲目歌单">
-          <button
-            onClick={() => tracksMutation.mutate()}
-            disabled={tracksMutation.isPending}
-            className="btn-primary w-full"
-          >
-            {tracksMutation.isPending ? '执行中...' : tracksMutation.isSuccess ? <><CheckCircle className="w-4 h-4 mr-1" />已提交</> : tracksMutation.isError ? <><XCircle className="w-4 h-4 mr-1" />失败</> : '执行相似曲目'}
-          </button>
-          <ResultTip isSuccess={tracksMutation.isSuccess} isError={tracksMutation.isError} error={tracksMutation.error} />
-        </ActionCard>
-
-        <ActionCard icon={Users} title="仅相邻艺术家" description="基于用户喜爱的艺术家，生成相邻艺术家热门歌单">
-          <button
-            onClick={() => artistsMutation.mutate()}
-            disabled={artistsMutation.isPending}
-            className="btn-primary w-full"
-          >
-            {artistsMutation.isPending ? '执行中...' : artistsMutation.isSuccess ? <><CheckCircle className="w-4 h-4 mr-1" />已提交</> : artistsMutation.isError ? <><XCircle className="w-4 h-4 mr-1" />失败</> : '执行相邻艺术家'}
-          </button>
-          <ResultTip isSuccess={artistsMutation.isSuccess} isError={artistsMutation.isError} error={artistsMutation.error} />
-        </ActionCard>
-      </div>
 
       {/* 网易云热榜同步 */}
       <ActionCard icon={Star} title="网易云热榜同步" description="抓取网易云音乐热榜歌曲，同步到 Navidrome">

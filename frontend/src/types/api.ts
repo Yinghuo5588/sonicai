@@ -143,6 +143,7 @@ export interface Settings {
   search_concurrency: number | null
   cron_enabled: boolean
   cron_expression: string | null
+  recommendation_cron_run_type: 'full' | 'similar_tracks' | 'similar_artists' | null
   // Hotboard scheduled sync
   hotboard_cron_enabled: boolean
   hotboard_cron_expression: string | null

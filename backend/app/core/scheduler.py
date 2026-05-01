@@ -54,6 +54,15 @@ async def load_cron_schedule(db: AsyncSession):
             parts = config.cron_expression.split()
             if len(parts) >= 5:
                 tz = config.timezone if config and config.timezone else settings.app_timezone
+
+                run_type = getattr(config, "recommendation_cron_run_type", None) or "full"
+                if run_type not in {"full", "similar_tracks", "similar_artists"}:
+                    logger.warning(
+                        "Invalid recommendation_cron_run_type '%s', fallback to full",
+                        run_type,
+                    )
+                    run_type = "full"
+
                 sched.add_job(
                     run_recommendation_job,
                     CronTrigger(
@@ -67,8 +76,15 @@ async def load_cron_schedule(db: AsyncSession):
                     id="recommendation_cron",
                     replace_existing=True,
                     misfire_grace_time=60,
+                    kwargs={"run_type": run_type},
                 )
-                logger.info(f"Recommendation cron loaded: {config.cron_expression}")
+                logger.info(
+                    "Recommendation cron loaded: %s, run_type=%s",
+                    config.cron_expression,
+                    run_type,
+                )
+        except Exception as e:
+            logger.warning(f"Invalid cron expression '{config.cron_expression}': {e}")
         except Exception as e:
             logger.warning(f"Invalid cron expression '{config.cron_expression}': {e}")
 

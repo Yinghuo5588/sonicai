@@ -9,6 +9,7 @@ import {
   SEED_SOURCE_MODE_LABELS,
   TOP_PERIOD_LABELS,
   MISSED_RETRY_MODE_LABELS,
+  RECOMMENDATION_CRON_RUN_TYPE_LABELS,
   labelOf,
 } from '@/lib/labels'
 
@@ -224,6 +225,15 @@ export const FIELD_LABELS: Record<string, { label: string; type?: string; toolti
       '▸ 第三方歌单解析服务的地址\n' +
       ' 配置后可导入网易云、QQ 音乐等平台歌单',
   },
+  recommendation_cron_run_type: {
+    label: '定时推荐类型',
+    type: 'select',
+    tooltip:
+      '▸ 控制定时任务执行哪一种 Last.fm 推荐\n' +
+      ' · 完整推荐 — 同时生成相似曲目和相邻艺术家歌单\n' +
+      ' · 仅相似曲目 — 只生成相似曲目歌单\n' +
+      ' · 仅相邻艺术家 — 只生成相邻艺术家歌单',
+  },
 }
 
 export function Tooltip({ text }: { text: string }) {
@@ -303,6 +313,7 @@ export function FieldInput({
       top_period: ['7day', '1month', '3month', '6month', '12month', 'overall'],
       match_mode: ['full', 'local_only'],
       missed_track_retry_mode: ['local', 'api'],
+      recommendation_cron_run_type: ['full', 'similar_tracks', 'similar_artists'],
     }
 
     const labelMaps: Record<string, Record<string, string>> = {
@@ -311,6 +322,7 @@ export function FieldInput({
       top_period: TOP_PERIOD_LABELS,
       match_mode: MATCH_MODE_LABELS,
       missed_track_retry_mode: MISSED_RETRY_MODE_LABELS,
+      recommendation_cron_run_type: RECOMMENDATION_CRON_RUN_TYPE_LABELS,
     }
 
     const opts = options[fieldKey] || []

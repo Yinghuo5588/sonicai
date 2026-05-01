@@ -39,6 +39,11 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=6)
 
 
+class ChangeUsernameRequest(BaseModel):
+    password: str
+    new_username: str = Field(min_length=3, max_length=50)
+
+
 class UserInfo(BaseModel):
     id: int
     username: str
@@ -142,6 +147,48 @@ async def change_password(body: ChangePasswordRequest, current_user: CurrentUser
     )
     await db.commit()
     return {"message": "Password updated"}
+
+
+@router.post("/change-username", response_model=UserInfo)
+async def change_username(
+    body: ChangeUsernameRequest,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    new_username = body.new_username.strip()
+    if not new_username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New username is required",
+        )
+
+    result = await db.execute(select(User).where(User.id == current_user.id))
+    user = result.scalar_one()
+
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is incorrect",
+        )
+
+    existing_result = await db.execute(
+        select(User).where(
+            User.username == new_username,
+            User.id != current_user.id,
+        )
+    )
+    existing = existing_result.scalar_one_or_none()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already exists",
+        )
+
+    user.username = new_username
+    await db.commit()
+    await db.refresh(user)
+
+    return UserInfo.model_validate(user)
 
 
 @router.post("/logout")

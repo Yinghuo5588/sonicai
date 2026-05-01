@@ -1,28 +1,34 @@
 export const RUN_TYPE_LABELS: Record<string, string> = {
+  full: 'Last.fm 完整推荐',
+  similar_tracks: 'Last.fm 相似曲目',
+  similar_artists: 'Last.fm 相邻艺术家',
+  hotboard: '网易云热榜同步',
+  playlist: '第三方歌单同步',
+}
+
+export const RECOMMENDATION_CRON_RUN_TYPE_LABELS: Record<string, string> = {
   full: '完整推荐',
-  similar_tracks: '相似曲目',
-  similar_artists: '相邻艺术家',
-  hotboard: '网易云热榜',
-  playlist: '歌单同步',
+  similar_tracks: '仅相似曲目',
+  similar_artists: '仅相邻艺术家',
 }
 
 export const PLAYLIST_TYPE_LABELS: Record<string, string> = {
-  similar_tracks: '相似曲目',
-  similar_artists: '相邻艺术家',
+  similar_tracks: 'Last.fm 相似曲目',
+  similar_artists: 'Last.fm 相邻艺术家',
   hotboard: '网易云热榜',
   playlist_netease: '网易云歌单',
   playlist_text: '文本歌单',
-  playlist_incremental: '增量歌单同步',
+  playlist_incremental: '歌单链接增量同步',
 }
 
 export const SOURCE_TYPE_LABELS: Record<string, string> = {
-  track_similarity: '相似曲目',
-  artist_similarity: '相似艺术家',
+  track_similarity: 'Last.fm 相似曲目',
+  artist_similarity: 'Last.fm 相邻艺术家',
   hotboard: '网易云热榜',
   playlist: '导入歌单',
   playlist_netease: '网易云歌单',
   playlist_text: '文本歌单',
-  playlist_incremental: '增量歌单',
+  playlist_incremental: '歌单链接增量',
 }
 
 export const LIBRARY_MODE_LABELS: Record<string, string> = {

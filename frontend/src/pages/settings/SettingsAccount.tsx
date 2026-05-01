@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CheckCircle, LogOut, XCircle } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { useAuthStore } from '@/hooks/useAuth'
-import { changePasswordSchema } from '@/lib/validators'
+import { changePasswordSchema, changeUsernameSchema } from '@/lib/validators'
 import { SectionCard } from './SettingsShared'
 import { useToast } from '@/components/ui/useToast'
 
@@ -14,10 +14,21 @@ export default function SettingsAccount() {
   const { logout } = useAuthStore()
   const toast = useToast()
 
+  const { data: currentUser } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => apiFetch('/auth/me'),
+  })
+
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [passwordResult, setPasswordResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  const [newUsername, setNewUsername] = useState('')
+  const [usernamePassword, setUsernamePassword] = useState('')
+  const [usernameLoading, setUsernameLoading] = useState(false)
+  const [usernameResult, setUsernameResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
   const [importResult, setImportResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   const handleChangePassword = async () => {
@@ -57,6 +68,45 @@ export default function SettingsAccount() {
       toast.error('密码修改失败', err.message)
     } finally {
       setPasswordLoading(false)
+    }
+  }
+
+  const handleChangeUsername = async () => {
+    setUsernameLoading(true)
+    setUsernameResult(null)
+
+    const validation = changeUsernameSchema.safeParse({
+      newUsername,
+      password: usernamePassword,
+    })
+
+    if (!validation.success) {
+      const msg = validation.error.errors[0].message
+      setUsernameResult({ ok: false, msg })
+      setUsernameLoading(false)
+      toast.error('用户名验证失败', msg)
+      return
+    }
+
+    try {
+      const result = await apiFetch('/auth/change-username', {
+        method: 'POST',
+        body: JSON.stringify({
+          new_username: validation.data.newUsername,
+          password: validation.data.password,
+        }),
+      })
+
+      setUsernameResult({ ok: true, msg: '用户名修改成功' })
+      setNewUsername('')
+      setUsernamePassword('')
+      queryClient.invalidateQueries({ queryKey: ['me'] })
+      toast.success('用户名已更新', `下次登录请使用新用户名：${(result as any).username}`)
+    } catch (err: any) {
+      setUsernameResult({ ok: false, msg: err.message })
+      toast.error('用户名修改失败', err.message)
+    } finally {
+      setUsernameLoading(false)
     }
   }
 
@@ -130,6 +180,75 @@ export default function SettingsAccount() {
 
   return (
     <div className="space-y-4">
+      <SectionCard title="修改用户名">
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+              当前用户名
+            </label>
+            <input
+              type="text"
+              value={String((currentUser as any)?.username ?? '')}
+              disabled
+              className="input opacity-60"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+              新用户名
+            </label>
+            <input
+              type="text"
+              value={newUsername}
+              onChange={e => setNewUsername(e.target.value)}
+              className="input"
+              placeholder="请输入新的登录用户名"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+              当前密码确认
+            </label>
+            <input
+              type="password"
+              value={usernamePassword}
+              onChange={e => setUsernamePassword(e.target.value)}
+              className="input"
+            />
+          </div>
+
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            修改后下次登录请使用新用户名，当前登录状态不会失效。
+          </p>
+
+          <button
+            onClick={handleChangeUsername}
+            disabled={!newUsername || !usernamePassword || usernameLoading}
+            className="btn-primary w-full sm:w-auto"
+          >
+            {usernameLoading ? '保存中...' : '保存用户名'}
+          </button>
+
+          {usernameResult && (
+            <p className={`text-sm ${usernameResult.ok ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+              {usernameResult.ok ? (
+                <>
+                  <CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />
+                  用户名修改成功
+                </>
+              ) : (
+                <>
+                  <XCircle className="inline w-4 h-4 text-red-500 mr-1" />
+                  {usernameResult.msg}
+                </>
+              )}
+            </p>
+          )}
+        </div>
+      </SectionCard>
+
       <SectionCard title="修改密码">
         <div className="space-y-3">
           <div>
@@ -202,7 +321,9 @@ export default function SettingsAccount() {
 
       <SectionCard title="配置备份">
         <p className="text-xs text-slate-400 mb-3">
-          导出或导入全部配置，JSON 格式。迁移时请注意备份 .env 中的 JWT_SECRET_KEY。
+          导出或导入全部配置，JSON 格式。导出文件不包含 .env。
+          迁移服务器或恢复数据库时，请务必同时保留 ENCRYPTION_KEY，
+          否则已保存的 Navidrome 密码等敏感配置将无法解密。
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3">

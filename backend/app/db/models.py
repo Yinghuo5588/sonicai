@@ -94,9 +94,10 @@ class SystemSettings(Base):
     # Task concurrency
     max_concurrent_tasks = Column(Integer, default=2)  # Global background task limit (1-5)
 
-    # Scheduler
+    # Scheduler - Last.fm recommendation
     cron_enabled = Column(Boolean, default=False)
     cron_expression = Column(String(100), nullable=True)
+    recommendation_cron_run_type = Column(String(30), default="full")  # full | similar_tracks | similar_artists
 
     # Hotboard scheduled sync
     hotboard_cron_enabled = Column(Boolean, default=False)

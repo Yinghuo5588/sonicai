@@ -43,7 +43,7 @@ const SETTINGS_SECTIONS = [
   {
     key: 'account',
     title: '账户与备份',
-    desc: '修改密码、退出登录、配置导入导出',
+    desc: '修改用户名、修改密码、退出登录、配置导入导出',
     icon: UserCog,
   },
   {
