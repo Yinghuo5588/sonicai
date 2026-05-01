@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Optional, Any
 import json
 import httpx
@@ -258,6 +259,8 @@ async def export_settings(current_user: CurrentUser, db: AsyncSessionLocal = Dep
         val = getattr(s, key)
         if isinstance(val, datetime):
             val = val.isoformat()
+        elif isinstance(val, Decimal):
+            val = float(val)
         data[key] = val
 
     # Remove metadata fields
