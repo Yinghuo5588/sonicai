@@ -506,8 +506,11 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
         if await _is_run_stopped(run_id, db):
             logger.info(f"[similar_artists] run_id={run_id} stopped, aborting")
             return
-        similar = await get_similar_artists(seed_name, limit=settings.similar_artist_limit)
-        for artist in similar[:5]:
+
+        similar_artist_limit = int(settings.similar_artist_limit or 30)
+        similar = await get_similar_artists(seed_name, limit=similar_artist_limit)
+
+        for artist in similar[:similar_artist_limit]:
             artist_name = artist.get("name", "")
             if not artist_name:
                 continue

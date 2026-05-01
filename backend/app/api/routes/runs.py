@@ -162,6 +162,7 @@ async def list_runs(
             {
                 "id": r.id,
                 "run_type": r.run_type,
+                "trigger_type": r.trigger_type,
                 "status": r.status,
                 "error_message": r.error_message,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
@@ -198,6 +199,7 @@ async def get_run(
     return {
         "id": run.id,
         "run_type": run.run_type,
+        "trigger_type": run.trigger_type,
         "status": run.status,
         "error_message": run.error_message,
         "created_at": run.created_at.isoformat() if run.created_at else None,
