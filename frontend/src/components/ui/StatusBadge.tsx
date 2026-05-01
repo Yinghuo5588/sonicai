@@ -5,20 +5,7 @@ import {
   RotateCw,
   XCircle,
 } from 'lucide-react'
-
-const STATUS_LABELS: Record<string, string> = {
-  success: '完成',
-  completed: '完成',
-  failed: '失败',
-  error: '失败',
-  running: '运行中',
-  pending: '等待中',
-  stopped: '已停止',
-  partial_success: '部分成功',
-  retrying: '重试中',
-  ignored: '已忽略',
-  matched: '已匹配',
-}
+import { COMMON_STATUS_LABELS, labelOf } from '@/lib/labels'
 
 export default function StatusBadge({
   status,
@@ -28,7 +15,7 @@ export default function StatusBadge({
   label?: string
 }) {
   const s = status || '-'
-  const text = label || STATUS_LABELS[s] || s
+  const text = label || labelOf(COMMON_STATUS_LABELS, s)
 
   if (s === 'success' || s === 'completed' || s === 'matched') {
     return (

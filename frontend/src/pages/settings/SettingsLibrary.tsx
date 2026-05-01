@@ -481,13 +481,6 @@ function DebugMatchResultView({ data }: { data: any }) {
 
 // ── Missed Tracks ─────────────────────────────────────────────────────────────
 
-const MISSED_STATUS_LABELS: Record<string, string> = {
-  pending: '待处理',
-  matched: '已匹配',
-  failed: '失败',
-  ignored: '已忽略',
-}
-
 function MissedTracksCard() {
   const queryClient = useQueryClient()
   const [missedStatus, setMissedStatus] = useState('pending')
@@ -645,7 +638,7 @@ function MissedTracksCard() {
                     {item.last_error && <div className="text-xs text-red-500 mt-1">{item.last_error}</div>}
                   </td>
                   <td className="p-3 hidden md:table-cell">
-                    <span className="badge-muted">{MISSED_STATUS_LABELS[item.status] || item.status}</span>
+                    <span className="badge-muted">{labelOf(MISSED_STATUS_LABELS, item.status)}</span>
                   </td>
                   <td className="p-3 hidden lg:table-cell text-slate-500">
                     出现 {item.seen_count ?? 0} 次 · 重试 {item.retry_count ?? 0}/{item.max_retries ?? 5}
