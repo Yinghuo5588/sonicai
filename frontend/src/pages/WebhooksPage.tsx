@@ -4,6 +4,11 @@ import apiFetch from '@/lib/api'
 import { CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Link2 } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
 import { useToast } from '@/components/ui/useToast'
+import {
+  PLAYLIST_TYPE_LABELS,
+  WEBHOOK_STATUS_LABELS,
+  labelOf,
+} from '@/lib/labels'
 
 const PAGE_SIZE = 5
 
@@ -21,10 +26,36 @@ async function retryBatch(id: number) {
 }
 
 function statusBadge(status: string) {
-  if (status === 'success') return <span className="badge badge-success flex items-center gap-1"><CheckCircle className="w-3 h-3" />成功</span>
-  if (status === 'failed') return <span className="badge badge-danger flex items-center gap-1"><XCircle className="w-3 h-3" />失败</span>
-  if (status === 'retrying') return <span className="badge badge-warning flex items-center gap-1"><RefreshCw className="w-3 h-3" />重试中</span>
-  return <span className="badge badge-muted">{status}</span>
+  const text = labelOf(WEBHOOK_STATUS_LABELS, status)
+
+  if (status === 'success') {
+    return (
+      <span className="badge badge-success flex items-center gap-1">
+        <CheckCircle className="w-3 h-3" />
+        {text}
+      </span>
+    )
+  }
+
+  if (status === 'failed') {
+    return (
+      <span className="badge badge-danger flex items-center gap-1">
+        <XCircle className="w-3 h-3" />
+        {text}
+      </span>
+    )
+  }
+
+  if (status === 'retrying') {
+    return (
+      <span className="badge badge-warning flex items-center gap-1">
+        <RefreshCw className="w-3 h-3" />
+        {text}
+      </span>
+    )
+  }
+
+  return <span className="badge badge-muted">{text}</span>
 }
 
 function BatchPreview({ batchId }: { batchId: number }) {
@@ -43,7 +74,9 @@ function BatchPreview({ batchId }: { batchId: number }) {
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
         <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">共 {items.length} 首</span>
-        <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">{(data as any).status}</span>
+        <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+          {labelOf(WEBHOOK_STATUS_LABELS, (data as any).status)}
+        </span>
         {(data as any).response_code && (
           <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">HTTP {(data as any).response_code}</span>
         )}
@@ -88,7 +121,7 @@ function BatchCard({
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">#{batch.id}</span>
               <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full break-all">
-                {batch.playlist_type}
+                {labelOf(PLAYLIST_TYPE_LABELS, batch.playlist_type)}
               </span>
               {statusBadge(batch.status)}
             </div>
@@ -239,7 +272,9 @@ export default function WebhooksPage() {
                 <div className="space-y-2 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">#{b.id}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 break-all">{b.playlist_type}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 break-all">
+                      {labelOf(PLAYLIST_TYPE_LABELS, b.playlist_type)}
+                    </span>
                     {statusBadge(b.status)}
                   </div>
 

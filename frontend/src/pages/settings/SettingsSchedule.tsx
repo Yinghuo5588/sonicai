@@ -225,6 +225,48 @@ export default function SettingsSchedule() {
         />
       </SectionCard>
 
+      <SectionCard title="歌曲缓存自动刷新">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          控制内存歌曲缓存是否启用，以及是否定时从曲库索引刷新。缓存状态请在「曲库索引」页查看。
+        </p>
+
+        <label className="flex items-center gap-2 mb-3">
+          <input
+            type="checkbox"
+            checked={!!s.song_cache_enabled}
+            onChange={e => handleChange('song_cache_enabled', e.target.checked)}
+            className="w-4 h-4 accent-blue-500"
+          />
+          <span className="text-sm text-slate-700 dark:text-slate-200">
+            启用歌曲缓存
+          </span>
+        </label>
+
+        <label className="flex items-center gap-2 mb-3">
+          <input
+            type="checkbox"
+            checked={!!s.song_cache_auto_refresh_enabled}
+            onChange={e => handleChange('song_cache_auto_refresh_enabled', e.target.checked)}
+            className="w-4 h-4 accent-blue-500"
+          />
+          <span className="text-sm text-slate-700 dark:text-slate-200">
+            启用缓存定时刷新
+          </span>
+        </label>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+            缓存刷新 Cron
+          </label>
+          <input
+            type="text"
+            value={String(s.song_cache_refresh_cron ?? '0 4 * * *')}
+            onChange={e => handleChange('song_cache_refresh_cron', e.target.value)}
+            className="input"
+          />
+        </div>
+      </SectionCard>
+
       <SectionCard title="任务管理">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FieldInput

@@ -14,6 +14,11 @@ import {
   ListMusic,
   AlertTriangle,
 } from 'lucide-react'
+import {
+  RUN_TYPE_LABELS,
+  PLAYLIST_TYPE_LABELS,
+  labelOf,
+} from '@/lib/labels'
 
 async function fetchRunDetail(runId: number) {
   return apiFetch(`/runs/${runId}`)
@@ -28,7 +33,11 @@ async function stopJob(runId: number) {
 }
 
 function runTypeLabel(type: string) {
-  return type === 'full' ? '完整推荐' : type === 'similar_tracks' ? '相似曲目' : '相邻艺术家'
+  return labelOf(RUN_TYPE_LABELS, type)
+}
+
+function playlistTypeLabel(type: string) {
+  return labelOf(PLAYLIST_TYPE_LABELS, type)
 }
 
 function RunStatusBadge({ status }: { status: string }) {
@@ -78,11 +87,7 @@ function PlaylistCard({ playlist }: { playlist: any }) {
             <RunStatusBadge status={playlist.status} />
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            {playlist.playlist_type === 'similar_tracks' ? '相似曲目' :
-             playlist.playlist_type === 'similar_artists' ? '相邻艺术家' :
-             playlist.playlist_type === 'hotboard' ? '网易云热榜' :
-             playlist.playlist_type?.startsWith('playlist_') ? '导入歌单' :
-             playlist.playlist_type || '-'}
+            {playlistTypeLabel(playlist.playlist_type)}
             {playlist.navidrome_playlist_id ? ' · ✅ 已创建' : ' · ⚠️ 未创建'}
             {playlist.matched_count > 0 && ` · 命中 ${playlist.matched_count}`}
             {playlist.missing_count > 0 && ` · 缺失 ${playlist.missing_count}`}
@@ -355,7 +360,7 @@ export default function RunDetailPage() {
                   <RunStatusBadge status={pl.status} />
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {pl.playlist_type === 'similar_tracks' ? '相似曲目' : pl.playlist_type === 'similar_artists' ? '相邻艺术家' : pl.playlist_type === 'hotboard' ? '网易云热榜' : pl.playlist_type?.startsWith('playlist_') ? '导入歌单' : pl.playlist_type} ·{' '}
+                  {playlistTypeLabel(pl.playlist_type)} ·{' '}
                   {pl.navidrome_playlist_id ? '✅ 已创建' : '⚠️ 未创建'}
                   {pl.matched_count > 0 && ` · 命中 ${pl.matched_count}`}
                   {pl.missing_count > 0 && ` · 缺失 ${pl.missing_count}`}

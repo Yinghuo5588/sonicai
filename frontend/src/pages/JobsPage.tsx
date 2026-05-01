@@ -13,6 +13,7 @@ import {
   Users,
   Star,
 } from 'lucide-react'
+import { MATCH_MODE_LABELS, labelOf } from '@/lib/labels'
 
 async function fetchSettings() {
   return apiFetch('/settings')
@@ -230,7 +231,7 @@ export default function JobsPage() {
           </div>
           <div className={`flex items-center gap-1.5 text-xs ${!!settings?.match_mode ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
             {!!settings?.match_mode ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-            匹配模式：{settings?.match_mode || '-'}
+            匹配模式：{labelOf(MATCH_MODE_LABELS, settings?.match_mode)}
           </div>
         </div>
       </div>

@@ -42,13 +42,32 @@ export default function SettingsPlaylist() {
           onChange={v => handleChange('recommendation_balance', v)}
         />
 
-        <RecommendPreview
-          seedCount={Number(s.top_track_seed_limit) || 30}
-          similarPerSeed={Number(s.similar_track_limit) || 30}
-          playlistSize={Number(s.similar_playlist_size) || 30}
-          balance={Number(s.recommendation_balance) || 55}
-          threshold={Number(s.match_threshold) || 0.75}
-        />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <RecommendPreview
+            title="相似曲目预览"
+            seedLabel="种子曲目"
+            similarLabel="每曲相似曲目"
+            playlistLabel="歌单大小"
+            seedCount={Number(s.top_track_seed_limit) || 30}
+            similarPerSeed={Number(s.similar_track_limit) || 30}
+            playlistSize={Number(s.similar_playlist_size) || 30}
+            balance={Number(s.recommendation_balance) || 55}
+            threshold={Number(s.match_threshold) || 0.75}
+          />
+
+          <RecommendPreview
+            title="相邻艺术家预览"
+            seedLabel="种子艺术家"
+            similarLabel="相似艺术家 × 热门歌曲"
+            playlistLabel="歌单大小"
+            seedCount={Number(s.top_artist_seed_limit) || 30}
+            similarPerSeed={Number(s.similar_artist_limit) || 30}
+            extraMultiplier={Number(s.artist_top_track_limit) || 2}
+            playlistSize={Number(s.artist_playlist_size) || 30}
+            balance={Number(s.recommendation_balance) || 55}
+            threshold={Number(s.match_threshold) || 0.75}
+          />
+        </div>
       </SectionCard>
 
       <SectionCard title="匹配与搜索">

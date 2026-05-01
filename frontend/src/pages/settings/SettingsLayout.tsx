@@ -6,7 +6,6 @@ import {
   Clock,
   UserCog,
   Palette,
-  Database,
   Library,
 } from 'lucide-react'
 
@@ -32,14 +31,8 @@ const SETTINGS_SECTIONS = [
   {
     key: 'schedule',
     title: '调度设置',
-    desc: '定时任务、热榜同步与歌单同步',
+    desc: '定时任务、热榜同步、歌单同步与缓存刷新',
     icon: Clock,
-  },
-  {
-    key: 'cache',
-    title: '歌曲缓存',
-    desc: '缓存 Navidrome 曲库，加速匹配',
-    icon: Database,
   },
   {
     key: 'library',
@@ -71,7 +64,7 @@ export default function SettingsLayout() {
 
   return (
     <div className="page">
-      <div>
+      <div className="hidden md:block">
         <h1 className="page-title">设置</h1>
         <p className="page-subtitle mt-1">
           管理服务连接、推荐策略、调度任务、外观和账户安全。
@@ -83,7 +76,7 @@ export default function SettingsLayout() {
         {/* 侧边导航 */}
         <aside className="md:sticky md:top-6 space-y-3">
           {/* 移动端横向 Tab 栏（替代 select） */}
-          <div className="md:hidden overflow-x-auto overscroll-x-contain -mx-4 px-4 pt-1">
+          <div className="md:hidden overflow-x-auto overscroll-x-contain -mx-4 px-4 pt-1 pb-1">
             <div className="flex gap-2 min-w-max">
               {SETTINGS_SECTIONS.map(item => {
                 const Icon = item.icon
@@ -93,13 +86,13 @@ export default function SettingsLayout() {
                   <NavLink
                     key={item.key}
                     to={`/settings/${item.key}`}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300'
                         : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
+                    <Icon className="w-4 h-4" />
                     {item.title}
                   </NavLink>
                 )
@@ -139,7 +132,7 @@ export default function SettingsLayout() {
 
         {/* 内容区 */}
         <main className="min-w-0 space-y-4">
-          <div className="card card-padding">
+          <div className="hidden md:block card card-padding">
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0">
                 <activeSection.icon className="w-5 h-5 text-cyan-600 dark:text-cyan-300 mt-1" />

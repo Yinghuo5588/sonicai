@@ -2,6 +2,11 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
 import apiFetch from '@/lib/api'
 import { ArrowLeft } from 'lucide-react'
+import {
+  PLAYLIST_TYPE_LABELS,
+  SOURCE_TYPE_LABELS,
+  labelOf,
+} from '@/lib/labels'
 
 const PAGE_SIZE = 50
 
@@ -50,19 +55,11 @@ async function fetchPlaylistItems(playlistId: number, offset = 0): Promise<Playl
 }
 
 function playlistTypeLabel(type: string) {
-  if (type === 'similar_tracks') return '相似曲目'
-  if (type === 'similar_artists') return '相邻艺术家'
-  if (type === 'hotboard') return '网易云热榜'
-  if (type?.startsWith('playlist_')) return '导入歌单'
-  return type || '-'
+  return labelOf(PLAYLIST_TYPE_LABELS, type)
 }
 
 function sourceTypeLabel(type: string) {
-  if (type === 'track_similarity') return '相似曲目'
-  if (type === 'artist_similarity') return '相似艺术家'
-  if (type === 'hotboard') return '热榜'
-  if (type === 'playlist') return '歌单'
-  return type || '-'
+  return labelOf(SOURCE_TYPE_LABELS, type)
 }
 
 function sourceTypeClass(type: string) {

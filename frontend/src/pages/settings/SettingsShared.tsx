@@ -3,6 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle } from 'lucide-react'
 import apiFetch from '@/lib/api'
 import { useToast } from '@/components/ui/useToast'
+import {
+  LIBRARY_MODE_LABELS,
+  MATCH_MODE_LABELS,
+  SEED_SOURCE_MODE_LABELS,
+  TOP_PERIOD_LABELS,
+  MISSED_RETRY_MODE_LABELS,
+  labelOf,
+} from '@/lib/labels'
 
 export async function fetchSettings() {
   return apiFetch('/settings')
@@ -297,7 +305,16 @@ export function FieldInput({
       missed_track_retry_mode: ['local', 'api'],
     }
 
+    const labelMaps: Record<string, Record<string, string>> = {
+      library_mode_default: LIBRARY_MODE_LABELS,
+      seed_source_mode: SEED_SOURCE_MODE_LABELS,
+      top_period: TOP_PERIOD_LABELS,
+      match_mode: MATCH_MODE_LABELS,
+      missed_track_retry_mode: MISSED_RETRY_MODE_LABELS,
+    }
+
     const opts = options[fieldKey] || []
+    const labels = labelMaps[fieldKey] || {}
 
     return (
       <div>
@@ -312,7 +329,7 @@ export function FieldInput({
         >
           {opts.map(opt => (
             <option key={opt} value={opt}>
-              {opt}
+              {labelOf(labels, opt)}
             </option>
           ))}
         </select>

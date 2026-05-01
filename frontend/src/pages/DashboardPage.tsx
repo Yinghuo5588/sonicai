@@ -16,6 +16,7 @@ import {
   Music2,
   Clock,
 } from 'lucide-react'
+import { RUN_TYPE_LABELS, labelOf } from '@/lib/labels'
 
 async function fetchDashboard() {
   return apiFetch('/dashboard/summary')
@@ -362,7 +363,9 @@ export default function DashboardPage() {
             </h2>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{d.last_run.run_type}</p>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                  {labelOf(RUN_TYPE_LABELS, d.last_run.run_type)}
+                </p>
                 <p className={`text-xs mt-0.5 ${d.last_run.status === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>
                   {d.last_run.status === 'success' ? '已完成' : d.last_run.status === 'failed' ? '已失败' : d.last_run.status}
                 </p>

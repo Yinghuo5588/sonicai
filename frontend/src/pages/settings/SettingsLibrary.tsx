@@ -10,6 +10,12 @@ import {
 } from './SettingsShared'
 import { CheckCircle, RefreshCcw, Search, XCircle, Wrench, ListFilter, FileSearch, UserCheck, ScrollText, Database, AlertTriangle } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
+import {
+  MATCH_SOURCE_LABELS,
+  SONG_SOURCE_LABELS,
+  MISSED_STATUS_LABELS,
+  labelOf,
+} from '@/lib/labels'
 
 const PAGE_SIZE = 20
 
@@ -110,12 +116,12 @@ async function deleteMissedTrack(id: number) {
 // ── Match pipeline stepper ────────────────────────────────────────────────────
 
 const STEP_LABELS: Record<string, string> = {
-  manual_match: '人工',
-  match_cache: '缓存',
-  memory: '内存',
-  db_alias: '别名',
-  db_fuzzy: '模糊',
-  subsonic: 'Subsonic',
+  manual_match: '人工匹配',
+  match_cache: '匹配缓存',
+  memory: '内存索引',
+  db_alias: '别名索引',
+  db_fuzzy: '数据库模糊',
+  subsonic: '实时搜索',
 }
 
 function MatchPipeline({ steps }: { steps: any[] }) {
@@ -392,7 +398,9 @@ function DebugTraceView({ rawJson }: { rawJson: string | null | undefined }) {
           匹配链路追踪，共 {steps.length} 步
         </div>
         {result?.source && (
-          <span className="badge-muted">最终来源：{result.source}</span>
+          <span className="badge-muted">
+            最终来源：{labelOf(MATCH_SOURCE_LABELS, result.source)}
+          </span>
         )}
       </div>
 
@@ -413,7 +421,7 @@ function DebugTraceView({ rawJson }: { rawJson: string | null | undefined }) {
             <div>ID：{result.id || '-'}</div>
             <div>曲目：{result.title || '-'}</div>
             <div>艺术家：{result.artist || '-'}</div>
-            <div>来源：{result.source || '-'}</div>
+            <div>来源：{labelOf(MATCH_SOURCE_LABELS, result.source)}</div>
             <div>得分：{result.score != null ? Number(result.score).toFixed(4) : '-'}</div>
           </div>
         ) : (
@@ -440,7 +448,7 @@ function DebugMatchResultView({ data }: { data: any }) {
             <div>ID：{result.id || '-'}</div>
             <div>曲目：{result.title || '-'}</div>
             <div>艺术家：{result.artist || '-'}</div>
-            <div>来源：{result.source || '-'}</div>
+            <div>来源：{labelOf(MATCH_SOURCE_LABELS, result.source)}</div>
             <div>得分：{result.score != null ? Number(result.score).toFixed(4) : '-'}</div>
           </div>
         ) : (
@@ -841,19 +849,19 @@ export default function SettingsLibrary() {
     <div className="space-y-3">
 
       {/* 移动端工具箱 Tabs */}
-      <div className="md:hidden overflow-x-auto overscroll-x-contain -mx-4 px-4 pt-1">
+      <div className="md:hidden overflow-x-auto overscroll-x-contain -mx-4 px-4 pt-1 pb-1">
         <div className="flex gap-2 min-w-max">
           {TOOL_TABS.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTool(tab.key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium transition-colors ${
                 activeTool === tab.key
                   ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300'
                   : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
               }`}
             >
-              <tab.icon className="w-3.5 h-3.5" />
+              <tab.icon className="w-4 h-4" />
               {tab.label}
             </button>
           ))}
@@ -1003,7 +1011,9 @@ export default function SettingsLibrary() {
                     <td className="p-3 text-slate-600 dark:text-slate-300 hidden md:table-cell">{item.artist || '-'}</td>
                     <td className="p-3 text-slate-400 hidden lg:table-cell">{item.album || '-'}</td>
                     <td className="p-3 hidden lg:table-cell">
-                      <span className="badge-muted">{item.source || '-'}</span>
+                      <span className="badge-muted">
+                        {labelOf(SONG_SOURCE_LABELS, item.source)}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -1218,7 +1228,9 @@ export default function SettingsLibrary() {
                           )}
                         </td>
                         <td className="p-3 hidden md:table-cell">
-                          <span className="badge-muted">{item.source || '-'}</span>
+                          <span className="badge-muted">
+                            {labelOf(MATCH_SOURCE_LABELS, item.source)}
+                          </span>
                         </td>
                         <td className="p-3 text-slate-500 hidden lg:table-cell">
                           {item.confidence_score != null

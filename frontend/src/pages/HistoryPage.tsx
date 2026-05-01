@@ -5,6 +5,11 @@ import apiFetch from '@/lib/api'
 import { formatRelativeTime } from '@/lib/date'
 import { Clock, CheckCircle, XCircle, RotateCw, List } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
+import {
+  RUN_TYPE_LABELS,
+  TRIGGER_TYPE_LABELS,
+  labelOf,
+} from '@/lib/labels'
 
 const PAGE_SIZE = 15
 
@@ -13,7 +18,7 @@ async function fetchRuns(limit: number, offset: number) {
 }
 
 function runTypeLabel(type: string) {
-  return type === 'full' ? '完整推荐' : type === 'similar_tracks' ? '相似曲目' : type === 'similar_artists' ? '相邻艺术家' : type
+  return labelOf(RUN_TYPE_LABELS, type)
 }
 
 function RunStatusBadge({ status }: { status: string }) {
@@ -152,7 +157,7 @@ export default function HistoryPage() {
                 <div className="flex items-center gap-2">
                   {r.trigger_type && (
                     <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                      {r.trigger_type === 'manual' ? '手动' : r.trigger_type === 'scheduled' ? '定时' : r.trigger_type}
+                      {labelOf(TRIGGER_TYPE_LABELS, r.trigger_type)}
                     </span>
                   )}
                   <span className="text-cyan-600 dark:text-cyan-300 text-sm shrink-0">查看 →</span>
