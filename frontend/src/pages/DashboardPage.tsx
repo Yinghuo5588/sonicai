@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import apiFetch from '@/lib/api'
 import { formatRelativeTime } from '@/lib/date'
+import { CardSkeleton } from '@/components/ui/Skeleton'
 import {
   LayoutDashboard,
   Play,
@@ -261,7 +262,27 @@ function QuickActions() {
 export default function DashboardPage() {
   const { data, isLoading, error } = useQuery({ queryKey: ['dashboard'], queryFn: fetchDashboard })
 
-  if (isLoading) return <div className="page text-slate-500">加载中...</div>
+  if (isLoading) {
+    return (
+      <div className="page space-y-3">
+        <div className="card card-padding space-y-3">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-2xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <CardSkeleton /><CardSkeleton />
+        </div>
+      </div>
+    )
+  }
   if (error) return <div className="page text-red-500">加载失败</div>
 
   const d = data || {}

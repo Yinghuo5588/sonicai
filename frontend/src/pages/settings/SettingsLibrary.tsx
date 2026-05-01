@@ -106,6 +106,54 @@ async function deleteMissedTrack(id: number) {
   return apiFetch(`/missed-tracks/${id}`, { method: 'DELETE' })
 }
 
+// ── Match pipeline stepper ────────────────────────────────────────────────────
+
+const STEP_LABELS: Record<string, string> = {
+  manual_match: '人工',
+  match_cache: '缓存',
+  memory: '内存',
+  db_alias: '别名',
+  db_fuzzy: '模糊',
+  subsonic: 'Subsonic',
+}
+
+function MatchPipeline({ steps }: { steps: any[] }) {
+  if (!Array.isArray(steps) || steps.length === 0) return null
+
+  return (
+    <div className="rounded-2xl border border-border p-3 overflow-x-auto">
+      <div className="flex items-center gap-2 min-w-max">
+        {steps.map((step, index) => {
+          const hit = !!step.hit
+          const label = STEP_LABELS[step.step] || step.step || '-'
+
+          return (
+            <Fragment key={`${step.step}-${index}`}>
+              <div
+                className={`rounded-xl border px-3 py-2 text-xs ${
+                  hit
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300'
+                    : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                }`}
+              >
+                <div className="font-semibold">{label}</div>
+                <div className="mt-0.5 text-[10px] opacity-70">
+                  {hit ? '命中' : '未命中'}
+                  {step.duration_ms != null ? ` · ${step.duration_ms}ms` : ''}
+                </div>
+              </div>
+
+              {index < steps.length - 1 && (
+                <div className="h-px w-6 bg-border" />
+              )}
+            </Fragment>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatusCard({
@@ -347,6 +395,8 @@ function DebugTraceView({ rawJson }: { rawJson: string | null | undefined }) {
         )}
       </div>
 
+      <MatchPipeline steps={steps} />
+
       <div className="space-y-2">
         {steps.map((s: any, i: number) => (
           <StepDetail key={i} step={s} index={i + 1} />
@@ -398,10 +448,13 @@ function DebugMatchResultView({ data }: { data: any }) {
       </div>
 
       {steps.length > 0 ? (
-        <div className="rounded-xl border border-border p-3">
-          <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">
+        <div className="rounded-xl border border-border p-3 space-y-3">
+          <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
             匹配链路
           </div>
+
+          <MatchPipeline steps={steps} />
+
           <div className="space-y-2">
             {steps.map((s: any, i: number) => (
               <StepDetail key={i} step={s} index={i + 1} />
