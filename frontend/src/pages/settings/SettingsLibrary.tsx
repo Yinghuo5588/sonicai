@@ -761,12 +761,11 @@ export default function SettingsLibrary() {
   }
 
   /* 判断当前 section 是否应显示（移动端按 activeTool，桌面端始终显示） */
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
+
   const isSectionVisible = (title: string) => {
-    // 调试设置总是显示
-    if (title === '调试设置') return true
-    // 桌面端总是显示
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) return true
-    // 移动端按 activeTool 判断
+    if (isDesktop) return true
+    if (title === '调试设置') return activeTool === 'match'
     return toolSectionMap[activeTool] === title
   }
 
@@ -794,7 +793,7 @@ export default function SettingsLibrary() {
       </div>
 
       {/* ── 曲库索引状态 ── */}
-      <div className={activeTool === 'status' || typeof window !== 'undefined' && window.innerWidth >= 768 ? '' : 'hidden'}>
+      {isSectionVisible('曲库索引状态') && (
         <SectionCard title="曲库索引状态">
         {statusLoading ? (
           <div className="text-sm text-slate-500">加载曲库状态...</div>
@@ -860,10 +859,11 @@ export default function SettingsLibrary() {
         {syncMutation.isError && (
           <p className="text-sm text-red-500 mt-2">曲库同步失败: {(syncMutation.error as Error).message}</p>
         )}
-      </SectionCard>
-      </div>
+        </SectionCard>
+      )}
 
       {/* ── 调试设置 ── */}
+      {isSectionVisible('调试设置') && (
       <SectionCard title="调试设置">
         {settingsLoading ? (
           <div className="text-sm text-slate-500 dark:text-slate-400">加载调试设置...</div>
@@ -891,8 +891,10 @@ export default function SettingsLibrary() {
           </>
         )}
       </SectionCard>
+      )}
 
       {/* ── 歌曲搜索 ── */}
+      {isSectionVisible('歌曲搜索') && (
       <SectionCard title="歌曲搜索">
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
@@ -955,8 +957,10 @@ export default function SettingsLibrary() {
           onNext={() => setSongPage(p => Math.min(totalSongPages, p + 1))}
         />
       </SectionCard>
+      )}
 
       {/* ── 匹配诊断 ── */}
+      {isSectionVisible('匹配诊断') && (
       <SectionCard title="匹配诊断">
         <p className="text-xs text-slate-500 dark:text-slate-400">
           输入歌名和艺术家，查看标准化结果、别名、最终匹配来源和得分。
@@ -1006,8 +1010,10 @@ export default function SettingsLibrary() {
 
         {debugMutation.data && <DebugMatchResultView data={debugMutation.data} />}
       </SectionCard>
+      )}
 
       {/* ── 人工匹配 ── */}
+      {isSectionVisible('人工匹配') && (
       <SectionCard title="人工匹配">
         <p className="text-xs text-slate-500 dark:text-slate-400">
           当某首歌自动匹配总是错误时，可以在这里固定输入歌曲与 Navidrome 歌曲 ID 的对应关系。
@@ -1106,8 +1112,10 @@ export default function SettingsLibrary() {
           onNext={() => setManualPage(p => Math.min(totalManualPages, p + 1))}
         />
       </SectionCard>
+      )}
 
       {/* ── 匹配日志 ── */}
+      {isSectionVisible('匹配日志') && (
       <SectionCard title="匹配日志">
         <p className="text-xs text-slate-500 dark:text-slate-400">
           排查推荐、热榜、歌单导入时的匹配来源和失败原因。
@@ -1200,9 +1208,10 @@ export default function SettingsLibrary() {
           onNext={() => setLogPage(p => Math.min(totalLogPages, p + 1))}
         />
       </SectionCard>
+      )}
 
       {/* ── 未命中歌曲 ── */}
-      <MissedTracksCard />
+      {isSectionVisible('未命中歌曲') && <MissedTracksCard />}
 
     </div>
   )

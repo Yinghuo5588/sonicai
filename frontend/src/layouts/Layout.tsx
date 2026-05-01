@@ -29,7 +29,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Desktop sidebar - 半透明控制台侧栏 */}
-      <aside className="hidden md:flex w-62 bg-card/80 backdrop-blur-xl border-r border-border/70 flex-col fixed left-0 top-0 bottom-0 z-40">
+      <aside className="hidden md:flex w-64 bg-card/80 backdrop-blur-xl border-r border-border/70 flex-col fixed left-0 top-0 bottom-0 z-40">
         {/* Logo 区 - 蓝绿渐变图标 */}
         <div className="p-5 border-b border-border/70">
           <div className="flex items-center gap-3">
@@ -80,7 +80,7 @@ export default function Layout() {
         )}
       </aside>
 
-      <main className="min-h-screen pb-20 md:pb-0 md:ml-62">
+      <main className="min-h-screen pb-20 md:pb-0 md:ml-64">
         <Outlet />
       </main>
 
