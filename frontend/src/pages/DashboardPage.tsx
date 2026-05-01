@@ -17,6 +17,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { RUN_TYPE_LABELS, labelOf } from '@/lib/labels'
+import loginLogo from '@/assets/login-logo.webp'
 
 async function fetchDashboard() {
   return apiFetch('/dashboard/summary')
@@ -66,15 +67,7 @@ function HeroCard({ lastRun }: { lastRun?: Record<string, any> }) {
       <div className="absolute -bottom-6 -left-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
       <div className="relative flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
-            <Music2 className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-slate-50">SonicAI 控制台</h2>
-            <p className="text-xs text-slate-400">音乐推荐引擎</p>
-          </div>
-        </div>
+        <img src={loginLogo} alt="SonicAI" className="h-10 w-auto object-contain" />
 
         {lastRun ? (
           <div className="text-right">

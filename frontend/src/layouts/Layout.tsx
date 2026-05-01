@@ -8,8 +8,8 @@ import {
   ScrollText,
   Link2,
   Settings,
-  Music2,
 } from 'lucide-react'
+import loginLogo from '@/assets/login-logo.webp'
 
 const navItems = [
   { to: '/', label: '仪表盘', icon: LayoutDashboard },
@@ -30,17 +30,9 @@ export default function Layout() {
     <div className="min-h-screen bg-background text-foreground">
       {/* Desktop sidebar - 半透明控制台侧栏 */}
       <aside className="hidden md:flex w-64 bg-card/80 backdrop-blur-xl border-r border-border/70 flex-col fixed left-0 top-0 bottom-0 z-40">
-        {/* Logo 区 - 蓝绿渐变图标 */}
+        {/* Logo 区 */}
         <div className="p-5 border-b border-border/70">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-cyan-500/30">
-              <Music2 className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50">SonicAI</h1>
-              <p className="text-xs text-slate-400">Music Recommender</p>
-            </div>
-          </div>
+          <img src={loginLogo} alt="SonicAI" className="h-10 w-auto" />
         </div>
 
         {/* 导航区 - 左侧光条 active 状态 */}
