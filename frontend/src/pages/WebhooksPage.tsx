@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Link2 } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
+import { useToast } from '@/components/ui/useToast'
 
 const PAGE_SIZE = 5
 
@@ -132,6 +133,7 @@ function BatchCard({
 
 export default function WebhooksPage() {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [page, setPage] = useState(1)
   const [expanded, setExpanded] = useState<number | null>(null)
 
@@ -146,6 +148,10 @@ export default function WebhooksPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
       queryClient.invalidateQueries({ queryKey: ['webhook-batch'] })
+      toast.success('重试请求已提交', 'Webhook 将在后台重新发送')
+    },
+    onError: (error: Error) => {
+      toast.error('重试失败', error.message)
     },
   })
 

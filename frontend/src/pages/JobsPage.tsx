@@ -283,6 +283,24 @@ export default function JobsPage() {
       {/* 网易云热榜同步 */}
       <ActionCard icon={Star} title="网易云热榜同步" description="抓取网易云音乐热榜歌曲，同步到 Navidrome">
         <div className="space-y-3">
+          {/* Preflight */}
+          <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5">
+            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">执行前检查</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              <div className={`flex items-center gap-1.5 text-xs ${!!settings?.navidrome_url && !!settings?.navidrome_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {!!settings?.navidrome_url && !!settings?.navidrome_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                Navidrome 配置
+              </div>
+              <div className={`flex items-center gap-1.5 text-xs ${Number(limit) >= 1 && Number(limit) <= 200 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {Number(limit) >= 1 && Number(limit) <= 200 ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                抓取数量 1-200
+              </div>
+              <div className={`flex items-center gap-1.5 text-xs ${threshold >= 50 && threshold <= 95 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {threshold >= 50 && threshold <= 95 ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                匹配阈值 {threshold}%
+              </div>
+            </div>
+          </div>
           <div>
             <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">抓取热榜歌曲数</label>
             <input
@@ -328,6 +346,24 @@ export default function JobsPage() {
       {/* 第三方歌单同步 */}
       <ActionCard icon={Music} title="第三方歌单同步" description="导入网易云、QQ 音乐等平台歌单，同步到 Navidrome">
         <div className="space-y-3">
+          {/* Preflight */}
+          <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5">
+            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">执行前检查</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              <div className={`flex items-center gap-1.5 text-xs ${!!settings?.playlist_api_url ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {!!settings?.playlist_api_url ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                Playlist API 地址
+              </div>
+              <div className={`flex items-center gap-1.5 text-xs ${!!settings?.navidrome_url && !!settings?.navidrome_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {!!settings?.navidrome_url && !!settings?.navidrome_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                Navidrome 配置
+              </div>
+              <div className={`flex items-center gap-1.5 text-xs ${!!settings?.match_threshold ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {!!settings?.match_threshold ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                默认阈值：{Math.round(Number(settings?.match_threshold || 0.75) * 100)}%
+              </div>
+            </div>
+          </div>
           <div>
             <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单链接</label>
             <input
