@@ -8,7 +8,6 @@ import {
   ScrollText,
   Link2,
   Settings,
-  User,
   Music2,
 } from 'lucide-react'
 

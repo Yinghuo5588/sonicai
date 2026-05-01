@@ -7,7 +7,7 @@ import {
   SectionCard,
   useSettingsForm,
 } from './SettingsShared'
-import { CheckCircle, RefreshCcw, Search, XCircle } from 'lucide-react'
+import { CheckCircle, RefreshCcw, Search, XCircle, Wrench, ListFilter, FileSearch, UserCheck, ScrollText, Database, AlertTriangle } from 'lucide-react'
 
 const PAGE_SIZE = 20
 
@@ -737,11 +737,65 @@ export default function SettingsLibrary() {
 
   const cache = (status as any)?.cache || {}
 
+  /* ── 移动端工具箱 Tabs ── */
+  type ToolTab = 'status' | 'songs' | 'missed' | 'match' | 'manual' | 'logs'
+  const [activeTool, setActiveTool] = useState<ToolTab>('status')
+
+  const TOOL_TABS: { key: ToolTab; label: string; icon: React.ElementType }[] = [
+    { key: 'status', label: '状态', icon: Database },
+    { key: 'songs', label: '搜索', icon: Search },
+    { key: 'missed', label: '未命中', icon: AlertTriangle },
+    { key: 'match', label: '诊断', icon: FileSearch },
+    { key: 'manual', label: '人工', icon: UserCheck },
+    { key: 'logs', label: '日志', icon: ScrollText },
+  ]
+
+  /* 工具箱 section 映射 */
+  const toolSectionMap: Record<ToolTab, string> = {
+    status: '曲库索引状态',
+    songs: '歌曲搜索',
+    missed: '未命中歌曲',
+    match: '匹配诊断',
+    manual: '人工匹配',
+    logs: '匹配日志',
+  }
+
+  /* 判断当前 section 是否应显示（移动端按 activeTool，桌面端始终显示） */
+  const isSectionVisible = (title: string) => {
+    // 调试设置总是显示
+    if (title === '调试设置') return true
+    // 桌面端总是显示
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) return true
+    // 移动端按 activeTool 判断
+    return toolSectionMap[activeTool] === title
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+
+      {/* 移动端工具箱 Tabs */}
+      <div className="md:hidden overflow-x-auto overscroll-x-contain -mx-4 px-4 pt-1">
+        <div className="flex gap-2 min-w-max">
+          {TOOL_TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTool(tab.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                activeTool === tab.key
+                  ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300'
+                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+              }`}
+            >
+              <tab.icon className="w-3.5 h-3.5" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* ── 曲库索引状态 ── */}
-      <SectionCard title="曲库索引状态">
+      <div className={activeTool === 'status' || typeof window !== 'undefined' && window.innerWidth >= 768 ? '' : 'hidden'}>
+        <SectionCard title="曲库索引状态">
         {statusLoading ? (
           <div className="text-sm text-slate-500">加载曲库状态...</div>
         ) : statusError ? (
@@ -807,6 +861,7 @@ export default function SettingsLibrary() {
           <p className="text-sm text-red-500 mt-2">曲库同步失败: {(syncMutation.error as Error).message}</p>
         )}
       </SectionCard>
+      </div>
 
       {/* ── 调试设置 ── */}
       <SectionCard title="调试设置">
