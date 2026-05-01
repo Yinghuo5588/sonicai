@@ -1,7 +1,17 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
-import { Star, Music, FileText, CheckCircle, XCircle } from 'lucide-react'
+import {
+  Sparkles,
+  Music,
+  FileText,
+  CheckCircle,
+  XCircle,
+  Zap,
+  AudioLines,
+  Users,
+  Star,
+} from 'lucide-react'
 
 async function triggerJob(type: string) {
   const endpoint = type === 'full' ? 'all' : type
@@ -22,23 +32,118 @@ async function triggerPlaylistSync(url: string, threshold: number, playlistName:
   return apiFetch(`/playlist/sync?${params}`, { method: 'POST' })
 }
 
+/* ---------- 任务卡片组件 ---------- */
+function ActionCard({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ElementType
+  title: string
+  description: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="card card-padding space-y-3">
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0">
+          <Icon className="w-4 h-4 text-cyan-600 dark:text-cyan-300" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
+          <p className="text-[11px] text-slate-400">{description}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/* ---------- 结果提示 ---------- */
+function ResultTip({
+  isSuccess,
+  isError,
+  error,
+}: {
+  isSuccess: boolean
+  isError: boolean
+  error?: unknown
+}) {
+  if (isSuccess) {
+    return (
+      <p className="text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-1">
+        <CheckCircle className="w-3.5 h-3.5" />已提交，可在推荐历史查看进度
+      </p>
+    )
+  }
+  if (isError) {
+    return (
+      <p className="text-red-500 text-xs flex items-center gap-1">
+        <XCircle className="w-3.5 h-3.5" />{String((error as any)?.message || '操作失败')}
+      </p>
+    )
+  }
+  return null
+}
+
+/* ---------- Range Slider ---------- */
+function RangeSlider({
+  label,
+  value,
+  onChange,
+  min = 50,
+  max = 95,
+}: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+  min?: number
+  max?: number
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+        <span>{label}</span>
+        <span className="font-medium text-cyan-600 dark:text-cyan-300">{value}%</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg accent-cyan-500"
+      />
+    </div>
+  )
+}
+
 export default function JobsPage() {
+  /* 推荐任务 */
   const allMutation = useMutation({ mutationFn: () => triggerJob('all') })
   const tracksMutation = useMutation({ mutationFn: () => triggerJob('similar-tracks') })
   const artistsMutation = useMutation({ mutationFn: () => triggerJob('similar-artists') })
 
+  /* 网易云热榜 */
   const [limit, setLimit] = useState(50)
   const [threshold, setThreshold] = useState(75)
   const [hotboardName, setHotboardName] = useState('')
   const [hotboardOverwrite, setHotboardOverwrite] = useState(false)
-  const hotboardMutation = useMutation({ mutationFn: () => triggerHotboard(limit, threshold, hotboardName, hotboardOverwrite) })
+  const hotboardMutation = useMutation({
+    mutationFn: () => triggerHotboard(limit, threshold, hotboardName, hotboardOverwrite),
+  })
 
+  /* 第三方歌单 */
   const [playlistUrl, setPlaylistUrl] = useState('')
   const [playlistThreshold, setPlaylistThreshold] = useState(75)
   const [playlistName, setPlaylistName] = useState('')
   const [playlistOverwrite, setPlaylistOverwrite] = useState(false)
-  const playlistMutation = useMutation({ mutationFn: () => triggerPlaylistSync(playlistUrl, playlistThreshold / 100, playlistName, playlistOverwrite) })
+  const playlistMutation = useMutation({
+    mutationFn: () => triggerPlaylistSync(playlistUrl, playlistThreshold / 100, playlistName, playlistOverwrite),
+  })
 
+  /* 文本歌单 */
   const [textFile, setTextFile] = useState<File | null>(null)
   const [textThreshold, setTextThreshold] = useState(75)
   const [textPlaylistName, setTextPlaylistName] = useState('')
@@ -64,13 +169,9 @@ export default function JobsPage() {
     },
   })
 
-  const run = (mutation: ReturnType<typeof useMutation>, label: string) => (
-    <button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="btn-primary flex-1 w-full">
-      {mutation.isPending ? '执行中...' : mutation.isSuccess ? '✅ 已提交' : mutation.isError ? '失败，重试' : label}
-    </button>
-  )
-
-  const isPlaylistUrlValid = (v: string) => /https?:\/\//.test(v) && (v.includes('163') || v.includes('qq.com') || v.includes('qishui') || v.includes('douyin.com'))
+  const isPlaylistUrlValid = (v: string) =>
+    /https?:\/\//.test(v) &&
+    (v.includes('163') || v.includes('qq.com') || v.includes('qishui') || v.includes('douyin.com'))
 
   return (
     <div className="page">
@@ -79,91 +180,202 @@ export default function JobsPage() {
         <p className="page-subtitle mt-1">手动触发推荐任务、同步第三方歌单或上传文本歌单。</p>
       </div>
 
-      <div className="card card-padding space-y-4">
-        <h2 className="section-title flex items-center gap-2">手动执行推荐</h2>
+      {/* 推荐任务卡片 */}
+      <ActionCard icon={Sparkles} title="执行全部推荐" description="基于 Last.fm 数据，为当前用户生成相似曲目歌单和相邻艺术家歌单">
         <div className="flex flex-col gap-2">
-          {run(allMutation, '执行全部')}
-          {run(tracksMutation, '仅相似曲目')}
-          {run(artistsMutation, '仅相邻艺术家')}
+          <button
+            onClick={() => allMutation.mutate()}
+            disabled={allMutation.isPending}
+            className="btn-primary w-full"
+          >
+            {allMutation.isPending ? '执行中...' : allMutation.isSuccess ? (
+              <><CheckCircle className="w-4 h-4 mr-1" />已提交</>
+            ) : allMutation.isError ? (
+              <><XCircle className="w-4 h-4 mr-1" />失败，重试</>
+            ) : (
+              <><Zap className="w-4 h-4 mr-1" />执行全部推荐</>
+            )}
+          </button>
+          <ResultTip isSuccess={allMutation.isSuccess} isError={allMutation.isError} error={allMutation.error} />
         </div>
+      </ActionCard>
+
+      {/* 相似曲目 / 相邻艺术家 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <ActionCard icon={AudioLines} title="仅相似曲目" description="基于用户听歌历史，生成相似曲目歌单">
+          <button
+            onClick={() => tracksMutation.mutate()}
+            disabled={tracksMutation.isPending}
+            className="btn-primary w-full"
+          >
+            {tracksMutation.isPending ? '执行中...' : tracksMutation.isSuccess ? <><CheckCircle className="w-4 h-4 mr-1" />已提交</> : tracksMutation.isError ? <><XCircle className="w-4 h-4 mr-1" />失败</> : '执行相似曲目'}
+          </button>
+          <ResultTip isSuccess={tracksMutation.isSuccess} isError={tracksMutation.isError} error={tracksMutation.error} />
+        </ActionCard>
+
+        <ActionCard icon={Users} title="仅相邻艺术家" description="基于用户喜爱的艺术家，生成相邻艺术家热门歌单">
+          <button
+            onClick={() => artistsMutation.mutate()}
+            disabled={artistsMutation.isPending}
+            className="btn-primary w-full"
+          >
+            {artistsMutation.isPending ? '执行中...' : artistsMutation.isSuccess ? <><CheckCircle className="w-4 h-4 mr-1" />已提交</> : artistsMutation.isError ? <><XCircle className="w-4 h-4 mr-1" />失败</> : '执行相邻艺术家'}
+          </button>
+          <ResultTip isSuccess={artistsMutation.isSuccess} isError={artistsMutation.isError} error={artistsMutation.error} />
+        </ActionCard>
       </div>
 
-      <div className="card card-padding space-y-4">
-        <h2 className="section-title flex items-center gap-2"><Star className="w-4 h-4" />网易云热榜同步</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* 网易云热榜同步 */}
+      <ActionCard icon={Star} title="网易云热榜同步" description="抓取网易云音乐热榜歌曲，同步到 Navidrome">
+        <div className="space-y-3">
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">抓取热榜歌曲数</label>
-            <input type="number" min={1} max={200} value={limit} onChange={e => setLimit(Number(e.target.value))} className="input" />
+            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">抓取热榜歌曲数</label>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={limit}
+              onChange={e => setLimit(Number(e.target.value))}
+              className="input"
+            />
           </div>
+          <RangeSlider label="匹配阈值" value={threshold} onChange={setThreshold} />
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">匹配阈值 ({threshold}%)</label>
-            <input type="range" min={50} max={95} value={threshold} onChange={e => setThreshold(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg accent-blue-500" />
+            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空则自动生成）</label>
+            <input
+              type="text"
+              value={hotboardName}
+              onChange={e => setHotboardName(e.target.value)}
+              placeholder="网易云热榜 - 2026-04-25"
+              className="input"
+            />
           </div>
+          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={hotboardOverwrite}
+              onChange={e => setHotboardOverwrite(e.target.checked)}
+              className="w-4 h-4 accent-cyan-500 rounded"
+            />
+            覆盖同名歌单
+          </label>
+          <button
+            onClick={() => hotboardMutation.mutate()}
+            disabled={hotboardMutation.isPending}
+            className="btn-primary w-full"
+          >
+            {hotboardMutation.isPending ? '同步中...' : hotboardMutation.isSuccess ? <><CheckCircle className="w-4 h-4 mr-1" />已提交</> : hotboardMutation.isError ? <><XCircle className="w-4 h-4 mr-1" />失败</> : '同步网易云热榜'}
+          </button>
+          <ResultTip isSuccess={hotboardMutation.isSuccess} isError={hotboardMutation.isError} error={hotboardMutation.error} />
         </div>
-        <div>
-          <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空则自动生成）</label>
-          <input type="text" value={hotboardName} onChange={e => setHotboardName(e.target.value)} placeholder="网易云热榜 - 2026-04-25" className="input" />
-        </div>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-          <input type="checkbox" checked={hotboardOverwrite} onChange={e => setHotboardOverwrite(e.target.checked)} className="w-4 h-4 accent-blue-500" />
-          覆盖同名歌单
-        </label>
-        {run(hotboardMutation, '🌟 网易云热榜同步')}
-        {hotboardMutation.isSuccess && <p className="text-green-600 text-sm"><CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />已提交，可在推荐历史查看进度</p>}
-        {hotboardMutation.isError && <p className="text-red-500 text-sm"><XCircle className="inline w-4 h-4 text-red-500 mr-1" />{String(hotboardMutation.error?.message)}</p>}
-      </div>
+      </ActionCard>
 
-      <div className="card card-padding space-y-4">
-        <h2 className="section-title flex items-center gap-2"><Music className="w-4 h-4" />第三方歌单同步</h2>
-        <div>
-          <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">歌单链接</label>
-          <input type="text" value={playlistUrl} onChange={e => setPlaylistUrl(e.target.value)} placeholder="https://music.163.com/playlist?id=xxx" className="input" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* 第三方歌单同步 */}
+      <ActionCard icon={Music} title="第三方歌单同步" description="导入网易云、QQ 音乐等平台歌单，同步到 Navidrome">
+        <div className="space-y-3">
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">匹配阈值 ({playlistThreshold}%)</label>
-            <input type="range" min={50} max={95} value={playlistThreshold} onChange={e => setPlaylistThreshold(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg accent-blue-500" />
+            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单链接</label>
+            <input
+              type="text"
+              value={playlistUrl}
+              onChange={e => setPlaylistUrl(e.target.value)}
+              placeholder="https://music.163.com/playlist?id=xxx"
+              className="input"
+            />
           </div>
+          <RangeSlider label="匹配阈值" value={playlistThreshold} onChange={setPlaylistThreshold} />
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空自动）</label>
-            <input type="text" value={playlistName} onChange={e => setPlaylistName(e.target.value)} placeholder="自动从歌单名" className="input" />
+            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空自动）</label>
+            <input
+              type="text"
+              value={playlistName}
+              onChange={e => setPlaylistName(e.target.value)}
+              placeholder="自动从歌单名"
+              className="input"
+            />
           </div>
+          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={playlistOverwrite}
+              onChange={e => setPlaylistOverwrite(e.target.checked)}
+              className="w-4 h-4 accent-cyan-500 rounded"
+            />
+            覆盖同名歌单
+          </label>
+          <button
+            onClick={() => playlistMutation.mutate()}
+            disabled={!isPlaylistUrlValid(playlistUrl) || playlistMutation.isPending}
+            className="btn-primary w-full"
+          >
+            {playlistMutation.isPending ? '解析中...' : playlistMutation.isSuccess ? (
+              <><CheckCircle className="w-4 h-4 mr-1" />已提交</>
+            ) : playlistMutation.isError ? (
+              <><XCircle className="w-4 h-4 mr-1" />{String(playlistMutation.error?.message)}</>
+            ) : (
+              <><Music className="w-4 h-4 mr-1" />解析并同步到 Navidrome</>
+            )}
+          </button>
+          <ResultTip isSuccess={playlistMutation.isSuccess} isError={playlistMutation.isError} error={playlistMutation.error} />
         </div>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-          <input type="checkbox" checked={playlistOverwrite} onChange={e => setPlaylistOverwrite(e.target.checked)} className="w-4 h-4 accent-blue-500" />
-          覆盖同名歌单
-        </label>
-        <button onClick={() => playlistMutation.mutate()} disabled={!isPlaylistUrlValid(playlistUrl) || playlistMutation.isPending} className="btn-primary w-full">
-          {playlistMutation.isPending ? '解析中...' : playlistMutation.isSuccess ? <><CheckCircle className="inline w-4 h-4 mr-1" />已提交，可前往推荐历史查看</> : playlistMutation.isError ? <><XCircle className="inline w-4 h-4 mr-1" />{String(playlistMutation.error?.message)}</> : <><Music className="w-4 h-4 inline mr-1" />解析并同步到 Navidrome</>}
-        </button>
-      </div>
+      </ActionCard>
 
-      <div className="card card-padding space-y-4">
-        <h2 className="section-title flex items-center gap-2"><FileText className="w-4 h-4" />文本歌单上传</h2>
-        <p className="text-xs text-slate-400">上传 .txt 文件，每行格式：<code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">歌名 - 艺术家</code>，支持中/日/韩/英等任意语言</p>
-        <div>
-          <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">选择 .txt 文件</label>
-          <input type="file" accept=".txt" onChange={e => { setTextFile(e.target.files?.[0] || null); textMutation.reset() }} className="input" />
-          {textFile && <p className="text-xs text-slate-400 mt-1">已选择：{textFile.name}（{(textFile.size / 1024).toFixed(1)} KB）</p>}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* 文本歌单上传 */}
+      <ActionCard icon={FileText} title="文本歌单上传" description="上传 .txt 文件，每行格式：歌名 - 艺术家">
+        <div className="space-y-3">
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">匹配阈值 ({textThreshold}%)</label>
-            <input type="range" min={50} max={95} value={textThreshold} onChange={e => setTextThreshold(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg accent-blue-500" />
+            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">选择 .txt 文件</label>
+            <input
+              type="file"
+              accept=".txt"
+              onChange={e => {
+                setTextFile(e.target.files?.[0] || null)
+                textMutation.reset()
+              }}
+              className="input"
+            />
+            {textFile && (
+              <p className="text-[11px] text-slate-400 mt-1">
+                已选择：{textFile.name}（{(textFile.size / 1024).toFixed(1)} KB）
+              </p>
+            )}
           </div>
+          <RangeSlider label="匹配阈值" value={textThreshold} onChange={setTextThreshold} />
           <div>
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空自动）</label>
-            <input type="text" value={textPlaylistName} onChange={e => setTextPlaylistName(e.target.value)} placeholder="文本歌单" className="input" />
+            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空自动）</label>
+            <input
+              type="text"
+              value={textPlaylistName}
+              onChange={e => setTextPlaylistName(e.target.value)}
+              placeholder="文本歌单"
+              className="input"
+            />
           </div>
+          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={textOverwrite}
+              onChange={e => setTextOverwrite(e.target.checked)}
+              className="w-4 h-4 accent-cyan-500 rounded"
+            />
+            覆盖同名歌单
+          </label>
+          <button
+            onClick={() => textMutation.mutate()}
+            disabled={!textFile || textMutation.isPending}
+            className="btn-primary w-full"
+          >
+            {textMutation.isPending ? '上传中...' : textMutation.isSuccess ? (
+              <><CheckCircle className="w-4 h-4 mr-1" />已提交</>
+            ) : textMutation.isError ? (
+              <><XCircle className="w-4 h-4 mr-1" />{String(textMutation.error?.message)}</>
+            ) : (
+              <><FileText className="w-4 h-4 mr-1" />上传并同步到 Navidrome</>
+            )}
+          </button>
+          <ResultTip isSuccess={textMutation.isSuccess} isError={textMutation.isError} error={textMutation.error} />
         </div>
-        <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-          <input type="checkbox" checked={textOverwrite} onChange={e => setTextOverwrite(e.target.checked)} className="w-4 h-4 accent-blue-500" />
-          覆盖同名歌单
-        </label>
-        <button onClick={() => textMutation.mutate()} disabled={!textFile || textMutation.isPending} className="btn-primary w-full">
-          {textMutation.isPending ? '上传中...' : textMutation.isSuccess ? <><CheckCircle className="inline w-4 h-4 mr-1" />已提交</> : textMutation.isError ? <><XCircle className="inline w-4 h-4 mr-1" />{String(textMutation.error?.message)}</> : <><FileText className="w-4 h-4 inline mr-1" />上传并同步到 Navidrome</>}
-        </button>
-      </div>
+      </ActionCard>
     </div>
   )
 }
