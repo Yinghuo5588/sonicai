@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import apiFetch from '@/lib/api'
 import { formatRelativeTime } from '@/lib/date'
-import { CardSkeleton } from '@/components/ui/Skeleton'
+import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton'
 import {
   LayoutDashboard,
   Play,
