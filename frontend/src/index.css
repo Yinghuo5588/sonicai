@@ -4,44 +4,46 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
+    /* Sonic Console 浅色主题 - Cyan/Blue 主色系 */
+    --background: 210 20% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
+    --primary: 188 94% 47%; /* cyan-500 */
     --primary-foreground: 0 0% 98%;
-    --secondary: 210 40% 96%;
+    --secondary: 210 20% 96%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
+    --muted: 210 20% 96%;
     --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 188 94% 47%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 221 83% 53%;
+    --ring: 188 94% 47%;
     --radius: 0.75rem;
   }
 
   .dark {
+    /* Sonic Console 深色主题 - 深蓝黑背景 + 蓝绿光斑 */
     --background: 222 47% 7%;
     --foreground: 210 40% 98%;
     --card: 222 47% 10%;
     --card-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
+    --primary: 188 94% 47%; /* cyan-500 */
     --primary-foreground: 222 47% 11%;
     --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 188 94% 47%;
+    --accent-foreground: 222 47% 11%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
     --border: 217 33% 20%;
     --input: 217 33% 20%;
-    --ring: 224 76% 48%;
+    --ring: 188 76% 48%;
   }
 
   * {
@@ -58,20 +60,53 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    /* 浅色背景渐变光斑 */
+    background-image:
+      radial-gradient(circle at top left, rgba(34, 211, 238, 0.08), transparent 32rem),
+      radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.06), transparent 28rem);
+  }
+
+  .dark body {
+    /* 深色背景强化蓝绿光斑 */
+    background-image:
+      radial-gradient(circle at top left, rgba(34, 211, 238, 0.16), transparent 34rem),
+      radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.12), transparent 30rem);
   }
 }
 
 @layer components {
   .page {
     @apply p-4 md:p-6 space-y-4 md:space-y-6;
+    /* 移动端底部留出导航栏安全区 */
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  @screen md {
+    .page {
+      padding-bottom: 1.5rem;
+    }
   }
 
   .page-wide {
     @apply p-4 md:p-6 space-y-4 md:space-y-6 max-w-7xl mx-auto;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  @screen md {
+    .page-wide {
+      padding-bottom: 1.5rem;
+    }
   }
 
   .page-narrow {
     @apply p-4 md:p-6 space-y-4 md:space-y-6 max-w-3xl mx-auto;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  @screen md {
+    .page-narrow {
+      padding-bottom: 1.5rem;
+    }
   }
 
   .page-title {
@@ -82,8 +117,13 @@
     @apply text-sm text-slate-500 dark:text-slate-400;
   }
 
+  /* 轻玻璃质感卡片 */
   .card {
-    @apply bg-card text-card-foreground rounded-2xl border border-border shadow-sm;
+    @apply bg-card/90 text-card-foreground rounded-3xl border border-border/70 shadow-sm backdrop-blur;
+  }
+
+  .dark .card {
+    @apply bg-slate-950/60 border-white/10 shadow-black/30;
   }
 
   .card-padding {
@@ -101,22 +141,23 @@
   .input {
     @apply w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm
       text-slate-900 dark:text-slate-100 placeholder:text-slate-400
-      focus:outline-none focus:ring-2 focus:ring-primary/40;
+      focus:outline-none focus:ring-2 focus:ring-cyan-500/40;
   }
 
   .select {
     @apply w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm
       text-slate-900 dark:text-slate-100
-      focus:outline-none focus:ring-2 focus:ring-primary/40;
+      focus:outline-none focus:ring-2 focus:ring-cyan-500/40;
   }
 
+  /* 按钮统一高度 ≥44px 移动端友好 */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition
       disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-primary {
-    @apply btn bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600;
+    @apply btn bg-cyan-600 text-white hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-600;
   }
 
   .btn-secondary {
@@ -134,7 +175,7 @@
   }
 
   .badge-success {
-    @apply badge bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300;
+    @apply badge bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300;
   }
 
   .badge-danger {
@@ -142,7 +183,7 @@
   }
 
   .badge-info {
-    @apply badge bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300;
+    @apply badge bg-cyan-100 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300;
   }
 
   .badge-warning {
@@ -153,17 +194,30 @@
     @apply badge bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300;
   }
 
+  /* 移动端底部导航 - 半透明玻璃 + 安全区 */
   .mobile-nav {
-    @apply fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur border-t border-border flex md:hidden;
-    padding-bottom: env(safe-area-inset-bottom);
+    @apply fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/70 flex md:hidden px-2 pt-2;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
   }
 
   .mobile-nav-item {
-    @apply flex-1 flex flex-col items-center gap-0.5 py-2 text-[11px] text-slate-500
-      dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors;
+    @apply flex-1 flex flex-col items-center justify-center gap-1 rounded-2xl py-2 text-[11px] text-slate-500
+      dark:text-slate-400 transition-colors;
   }
 
   .mobile-nav-item.active {
-    @apply text-blue-600 dark:text-blue-400;
+    @apply bg-cyan-500/10 text-cyan-600 dark:text-cyan-300;
+  }
+
+  /* SaveBar 固定位置 - 避开底部导航 */
+  .save-bar {
+    @apply sticky z-30;
+    bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  @screen md {
+    .save-bar {
+      bottom: 1rem;
+    }
   }
 }

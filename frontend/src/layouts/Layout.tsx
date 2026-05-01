@@ -29,11 +29,12 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-56 bg-card border-r border-border flex-col fixed left-0 top-0 bottom-0 z-40">
-        <div className="p-5 border-b border-border">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-2xl bg-blue-600 text-white flex items-center justify-center">
+      {/* Desktop sidebar - 半透明控制台侧栏 */}
+      <aside className="hidden md:flex w-62 bg-card/80 backdrop-blur-xl border-r border-border/70 flex-col fixed left-0 top-0 bottom-0 z-40">
+        {/* Logo 区 - 蓝绿渐变图标 */}
+        <div className="p-5 border-b border-border/70">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-cyan-500/30">
               <Music2 className="w-5 h-5" />
             </div>
             <div>
@@ -42,6 +43,8 @@ export default function Layout() {
             </div>
           </div>
         </div>
+
+        {/* 导航区 - 左侧光条 active 状态 */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map(item => (
             <NavLink
@@ -50,10 +53,10 @@ export default function Layout() {
               end={item.to === '/'}
               className={({ isActive }) =>
                 clsx(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative',
                   isActive
-                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300'
-                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                    ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 shadow-sm before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-1 before:h-8 before:bg-cyan-500 before:rounded-r-full'
+                    : 'text-slate-600 hover:bg-slate-100/80 dark:text-slate-300 dark:hover:bg-slate-800/50'
                 )
               }
             >
@@ -62,11 +65,15 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        {/* 用户信息区 - 小卡片 */}
         {user && (
-          <div className="p-4 border-t border-border">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900">
-              <User className="w-4 h-4 text-slate-400" />
-              <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+          <div className="p-4 border-t border-border/70">
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-900/60 backdrop-blur">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                {((user as any).username || 'U')[0].toUpperCase()}
+              </div>
+              <span className="text-xs text-slate-600 dark:text-slate-300 truncate font-medium">
                 {(user as any).username}
               </span>
             </div>
@@ -74,11 +81,11 @@ export default function Layout() {
         )}
       </aside>
 
-      <main className="min-h-screen pb-20 md:pb-0 md:ml-56">
+      <main className="min-h-screen pb-20 md:pb-0 md:ml-62">
         <Outlet />
       </main>
 
-      {/* Mobile bottom tab bar */}
+      {/* Mobile bottom tab bar - 胶囊 active 背景 */}
       <nav className="mobile-nav">
         {navItems.map(item => (
           <NavLink

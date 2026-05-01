@@ -228,7 +228,7 @@ export function Tooltip({ text }: { text: string }) {
     <span className="relative inline-block ml-1.5 align-middle">
       <button
         type="button"
-        className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600 text-[10px] font-bold flex items-center justify-center transition-colors dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
+        className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 hover:bg-cyan-50 hover:text-cyan-600 text-[10px] font-bold flex items-center justify-center transition-colors dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-cyan-950/40 dark:hover:text-cyan-300"
         onClick={e => {
           e.stopPropagation()
           setOpen(v => !v)
@@ -239,7 +239,7 @@ export function Tooltip({ text }: { text: string }) {
       </button>
 
       {open && (
-        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-card text-card-foreground text-xs rounded-xl p-3 shadow-xl border border-border pointer-events-auto">
+        <div className="absolute z-[60] bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 max-w-[calc(100vw-2rem)] bg-card text-card-foreground text-xs rounded-xl p-3 shadow-xl border border-border pointer-events-auto">
           <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-border" />
           {lines.map((line, i) => (
             <p key={i} className="leading-relaxed">
@@ -281,7 +281,7 @@ export function FieldInput({
             onChange={e => onChange(e.target.checked)}
             className="sr-only peer"
           />
-          <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
+          <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:bg-cyan-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
         </label>
       </div>
     )
@@ -343,7 +343,7 @@ export function FieldInput({
             const next = Number(e.target.value)
             onChange(isFloatField ? next / 100 : next)
           }}
-          className="w-full accent-orange-500"
+          className="w-full accent-cyan-500"
         />
       </div>
     )
@@ -449,7 +449,7 @@ export function SaveBar({
   onSave: () => void
 }) {
   return (
-    <div className="sticky bottom-4 z-20">
+    <div className="save-bar">
       <div className="card card-padding flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg">
         <div>
           <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
@@ -470,8 +470,8 @@ export function SaveBar({
       </div>
 
       {isSuccess && (
-        <p className="mt-2 text-green-600 text-sm">
-          <CheckCircle className="inline w-4 h-4 text-green-500 mr-1" />
+        <p className="mt-2 text-emerald-600 dark:text-emerald-400 text-sm flex items-center gap-1">
+          <CheckCircle className="w-4 h-4" />
           已保存
         </p>
       )}
