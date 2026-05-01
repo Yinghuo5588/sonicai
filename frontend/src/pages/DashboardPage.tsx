@@ -67,7 +67,7 @@ function HeroCard({ lastRun }: { lastRun?: Record<string, any> }) {
       <div className="absolute -bottom-6 -left-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
       <div className="relative flex items-center justify-between gap-4">
-        <img src={loginLogo} alt="SonicAI" className="h-10 w-auto object-contain" />
+        <img src={loginLogo} alt="SonicAI" className="h-12 w-auto object-contain" />
 
         {lastRun ? (
           <div className="text-right">

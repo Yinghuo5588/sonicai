@@ -32,7 +32,7 @@ export default function Layout() {
       <aside className="hidden md:flex w-64 bg-card/80 backdrop-blur-xl border-r border-border/70 flex-col fixed left-0 top-0 bottom-0 z-40">
         {/* Logo 区 */}
         <div className="p-5 border-b border-border/70">
-          <img src={loginLogo} alt="SonicAI" className="h-10 w-auto" />
+          <img src={loginLogo} alt="SonicAI" className="h-12 w-auto" />
         </div>
 
         {/* 导航区 - 左侧光条 active 状态 */}
