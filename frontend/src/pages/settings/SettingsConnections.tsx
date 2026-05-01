@@ -9,6 +9,7 @@ import {
   testWebhook,
   useSettingsForm,
 } from './SettingsShared'
+import { useToast } from '@/components/ui/useToast'
 
 export default function SettingsConnections() {
   const {
@@ -20,6 +21,7 @@ export default function SettingsConnections() {
     save,
   } = useSettingsForm()
 
+  const toast = useToast()
   const [navidromeResult, setNavidromeResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [navidromeLoading, setNavidromeLoading] = useState(false)
 
@@ -35,8 +37,10 @@ export default function SettingsConnections() {
     try {
       const result = await testNavidrome()
       setNavidromeResult({ ok: true, msg: result.message || '连接成功' })
+      toast.success('Navidrome 连接成功', result.message || '服务正常')
     } catch (err: any) {
       setNavidromeResult({ ok: false, msg: err.message })
+      toast.error('Navidrome 连接失败', err.message)
     } finally {
       setNavidromeLoading(false)
     }
@@ -49,8 +53,10 @@ export default function SettingsConnections() {
     try {
       const result = await testWebhook()
       setWebhookResult({ ok: true, msg: result.message || '连接成功' })
+      toast.success('Webhook 测试成功', result.message || '服务正常')
     } catch (err: any) {
       setWebhookResult({ ok: false, msg: err.message })
+      toast.error('Webhook 测试失败', err.message)
     } finally {
       setWebhookLoading(false)
     }

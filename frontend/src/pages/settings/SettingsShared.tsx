@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle } from 'lucide-react'
 import apiFetch from '@/lib/api'
+import { useToast } from '@/components/ui/useToast'
 
 export async function fetchSettings() {
   return apiFetch('/settings')
@@ -385,6 +386,7 @@ export function SectionCard({
 
 export function useSettingsForm() {
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const { data, isLoading } = useQuery({
     queryKey: ['settings'],
@@ -402,6 +404,10 @@ export function useSettingsForm() {
     onSuccess: () => {
       setForm({})
       queryClient.invalidateQueries({ queryKey: ['settings'] })
+      toast.success('配置已保存', '设置已成功更新')
+    },
+    onError: (error: Error) => {
+      toast.error('保存失败', error.message)
     },
   })
 

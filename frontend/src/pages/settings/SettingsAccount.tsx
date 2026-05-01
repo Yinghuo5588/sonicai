@@ -6,11 +6,13 @@ import apiFetch from '@/lib/api'
 import { useAuthStore } from '@/hooks/useAuth'
 import { changePasswordSchema } from '@/lib/validators'
 import { SectionCard } from './SettingsShared'
+import { useToast } from '@/components/ui/useToast'
 
 export default function SettingsAccount() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { logout } = useAuthStore()
+  const toast = useToast()
 
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -33,6 +35,7 @@ export default function SettingsAccount() {
         msg: validation.error.errors[0].message,
       })
       setPasswordLoading(false)
+      toast.error('密码验证失败', validation.error.errors[0].message)
       return
     }
 
@@ -48,8 +51,10 @@ export default function SettingsAccount() {
       setPasswordResult({ ok: true, msg: '密码修改成功' })
       setOldPassword('')
       setNewPassword('')
+      toast.success('密码已更新', '请使用新密码重新登录')
     } catch (err: any) {
       setPasswordResult({ ok: false, msg: err.message })
+      toast.error('密码修改失败', err.message)
     } finally {
       setPasswordLoading(false)
     }
@@ -78,8 +83,9 @@ export default function SettingsAccount() {
       a.click()
 
       URL.revokeObjectURL(url)
+      toast.success('配置已导出', '文件已保存到下载目录')
     } catch (err: any) {
-      alert('导出失败: ' + (err.message || '未知错误'))
+      toast.error('导出失败', err.message || '未知错误')
     }
   }
 
@@ -110,11 +116,13 @@ export default function SettingsAccount() {
       })
 
       queryClient.invalidateQueries({ queryKey: ['settings'] })
+      toast.success('配置已导入', `更新了 ${result.updated_fields.length} 个字段`)
     } catch (err: any) {
       setImportResult({
         ok: false,
         msg: '导入失败: ' + (err.message || '未知错误'),
       })
+      toast.error('导入失败', err.message || '未知错误')
     } finally {
       e.target.value = ''
     }
