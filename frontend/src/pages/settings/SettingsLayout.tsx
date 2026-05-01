@@ -78,52 +78,38 @@ export default function SettingsLayout() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 md:gap-6 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 md:gap-6 items-start">
+
+        {/* 侧边导航 */}
         <aside className="md:sticky md:top-6 space-y-3">
-          <div className="card card-padding md:hidden">
-            <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
-              当前设置页面
-            </label>
-            <select
-              value={activeSection.key}
-              onChange={e => navigate(`/settings/${e.target.value}`)}
-              className="select"
-            >
-              {SETTINGS_SECTIONS.map(item => (
-                <option key={item.key} value={item.key}>
-                  {item.title}
-                </option>
-              ))}
-            </select>
+          {/* 移动端横向 Tab 栏（替代 select） */}
+          <div className="md:hidden overflow-x-auto overscroll-x-contain -mx-4 px-4 pt-1">
+            <div className="flex gap-2 min-w-max">
+              {SETTINGS_SECTIONS.map(item => {
+                const Icon = item.icon
+                const isActive = activeKey === item.key
+
+                return (
+                  <NavLink
+                    key={item.key}
+                    to={`/settings/${item.key}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                      isActive
+                        ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {item.title}
+                  </NavLink>
+                )
+              })}
+            </div>
           </div>
 
-          <div className="card overflow-hidden">
-            <div className="md:hidden overflow-x-auto overscroll-x-contain p-2">
-              <div className="flex gap-2 min-w-max">
-                {SETTINGS_SECTIONS.map(item => {
-                  const Icon = item.icon
-
-                  return (
-                    <NavLink
-                      key={item.key}
-                      to={`/settings/${item.key}`}
-                      className={({ isActive }) =>
-                        `inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm whitespace-nowrap transition ${
-                          isActive
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
-                        }`
-                      }
-                    >
-                      <Icon className="w-4 h-4" />
-                      {item.title}
-                    </NavLink>
-                  )
-                })}
-              </div>
-            </div>
-
-            <nav className="hidden md:block p-2">
+          {/* 桌面端导航卡片 */}
+          <div className="hidden md:block card overflow-hidden">
+            <nav className="p-2 space-y-1">
               {SETTINGS_SECTIONS.map(item => {
                 const Icon = item.icon
 
@@ -132,17 +118,17 @@ export default function SettingsLayout() {
                     key={item.key}
                     to={`/settings/${item.key}`}
                     className={({ isActive }) =>
-                      `flex items-start gap-3 rounded-2xl px-4 py-3 transition ${
+                      `flex items-start gap-3 px-4 py-3 rounded-2xl transition-all relative ${
                         isActive
-                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
-                          : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
+                          ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-1 before:h-7 before:bg-cyan-500 before:rounded-r-full'
+                          : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900/50'
                       }`
                     }
                   >
                     <Icon className="w-5 h-5 mt-0.5 shrink-0" />
                     <span>
                       <span className="block text-sm font-semibold">{item.title}</span>
-                      <span className="block text-xs opacity-70 mt-0.5">{item.desc}</span>
+                      <span className="block text-[11px] opacity-70 mt-0.5">{item.desc}</span>
                     </span>
                   </NavLink>
                 )
@@ -151,15 +137,18 @@ export default function SettingsLayout() {
           </div>
         </aside>
 
+        {/* 内容区 */}
         <main className="min-w-0 space-y-4">
           <div className="card card-padding">
             <div className="flex items-start gap-3">
-              <activeSection.icon className="w-6 h-6 text-blue-600 dark:text-blue-400 mt-1" />
+              <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0">
+                <activeSection.icon className="w-5 h-5 text-cyan-600 dark:text-cyan-300 mt-1" />
+              </div>
               <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
                   {activeSection.title}
                 </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                   {activeSection.desc}
                 </p>
               </div>

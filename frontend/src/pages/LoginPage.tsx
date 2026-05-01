@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { loginSchema } from '@/lib/validators'
+import { Music2, Loader2 } from 'lucide-react'
 
 interface LoginForm {
   username: string
@@ -45,40 +46,66 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="card card-padding w-full max-w-sm">
-        <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl">🎵</span>
+    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+      {/* 背景光斑 */}
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="card card-padding w-full max-w-sm relative z-10">
+        {/* Logo */}
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center mx-auto mb-5 shadow-lg shadow-cyan-500/30">
+          <Music2 className="w-7 h-7" />
         </div>
-        <h1 className="text-2xl font-bold text-center text-slate-900 dark:text-slate-50 mb-6">SonicAI</h1>
+
+        <h1 className="text-2xl font-bold text-center text-slate-900 dark:text-slate-50 mb-1">
+          SonicAI
+        </h1>
+        <p className="text-xs text-slate-400 text-center mb-6">Music Recommender</p>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">用户名</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">
+              用户名
+            </label>
             <input
               type="text"
               value={form.username}
               onChange={e => setForm({ ...form, username: e.target.value })}
               className="input"
               required
+              autoComplete="username"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">密码</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">
+              密码
+            </label>
             <input
               type="password"
               value={form.password}
               onChange={e => setForm({ ...form, password: e.target.value })}
               className="input"
               required
+              autoComplete="current-password"
             />
           </div>
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+
+          {error && (
+            <div className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900 p-3 text-xs text-red-600 dark:text-red-300">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
             className="btn-primary w-full"
           >
-            {loading ? '登录中...' : '登录'}
+            {loading ? (
+              <><Loader2 className="w-4 h-4 animate-spin" />登录中...</>
+            ) : (
+              '登录'
+            )}
           </button>
         </form>
       </div>
