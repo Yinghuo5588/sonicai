@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { loginSchema } from '@/lib/validators'
-import { Music2, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 interface LoginForm {
   username: string
@@ -52,16 +52,6 @@ export default function LoginPage() {
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="card card-padding w-full max-w-sm relative z-10">
-        {/* Logo */}
-        <div className="sonic-logo-glow w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center mx-auto mb-5 shadow-lg shadow-cyan-500/30">
-          <Music2 className="w-7 h-7" />
-        </div>
-
-        <h1 className="text-2xl font-bold text-center text-slate-900 dark:text-slate-50 mb-1">
-          SonicAI
-        </h1>
-        <p className="text-xs text-slate-400 text-center mb-6">Music Recommender</p>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">
