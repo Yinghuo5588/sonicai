@@ -9,7 +9,7 @@ import {
   Link2,
   Settings,
 } from 'lucide-react'
-import loginLogo from '@/assets/login-logo.png'
+import loginLogo from '@/assets/login-logo.webp'
 
 const navItems = [
   { to: '/', label: '仪表盘', icon: LayoutDashboard },
