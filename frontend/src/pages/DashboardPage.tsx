@@ -59,7 +59,7 @@ function HeroCard({ lastRun }: { lastRun?: Record<string, any> }) {
     : 'text-slate-400'
 
   return (
-    <div className="card card-padding relative overflow-hidden">
+    <div className="card card-padding relative overflow-hidden waveform-bg">
       {/* 背景光斑 */}
       <div className="absolute -top-8 -right-8 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none" />
       <div className="absolute -bottom-6 -left-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />

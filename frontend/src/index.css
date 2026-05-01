@@ -60,17 +60,31 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    /* 浅色背景渐变光斑 */
+    /* 浅色背景：细网格 + 渐变光斑 */
     background-image:
+      linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
       radial-gradient(circle at top left, rgba(34, 211, 238, 0.08), transparent 32rem),
       radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.06), transparent 28rem);
+    background-size:
+      32px 32px,
+      32px 32px,
+      auto,
+      auto;
   }
 
   .dark body {
-    /* 深色背景强化蓝绿光斑 */
+    /* 深色背景：细网格 + 强化光斑 */
     background-image:
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
       radial-gradient(circle at top left, rgba(34, 211, 238, 0.16), transparent 34rem),
       radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.12), transparent 30rem);
+    background-size:
+      32px 32px,
+      32px 32px,
+      auto,
+      auto;
   }
 }
 
@@ -141,19 +155,22 @@
   .input {
     @apply w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm
       text-slate-900 dark:text-slate-100 placeholder:text-slate-400
-      focus:outline-none focus:ring-2 focus:ring-cyan-500/40;
+      focus:outline-none focus:ring-2 focus:ring-cyan-500/40
+      disabled:opacity-60 disabled:cursor-not-allowed;
   }
 
   .select {
     @apply w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm
       text-slate-900 dark:text-slate-100
-      focus:outline-none focus:ring-2 focus:ring-cyan-500/40;
+      focus:outline-none focus:ring-2 focus:ring-cyan-500/40
+      disabled:opacity-60 disabled:cursor-not-allowed;
   }
 
-  /* 按钮统一高度 ≥44px 移动端友好 */
+  /* 按钮统一高度 ≥44px 移动端友好 + focus 样式 */
   .btn {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition
-      disabled:opacity-50 disabled:cursor-not-allowed;
+      disabled:opacity-50 disabled:cursor-not-allowed
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
   .btn-primary {
@@ -219,5 +236,25 @@
     .save-bar {
       bottom: 1rem;
     }
+  }
+
+  /* 音频波形装饰背景 */
+  .waveform-bg {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .waveform-bg::after {
+    content: "";
+    position: absolute;
+    inset: auto -10% -30% -10%;
+    height: 8rem;
+    pointer-events: none;
+    opacity: 0.22;
+    background:
+      linear-gradient(90deg, transparent 0 2%, rgba(34, 211, 238, 0.65) 2% 3%, transparent 3% 6%),
+      linear-gradient(90deg, transparent 0 6%, rgba(16, 185, 129, 0.55) 6% 7%, transparent 7% 10%);
+    background-size: 48px 100%, 72px 100%;
+    mask-image: linear-gradient(to top, black, transparent);
   }
 }
