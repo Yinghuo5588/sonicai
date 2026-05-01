@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
+import { useToast } from '@/components/ui/useToast'
 import {
   FieldInput,
   SaveBar,
@@ -630,6 +631,7 @@ function MissedTracksCard() {
 
 export default function SettingsLibrary() {
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   // Settings form
   const {
@@ -652,7 +654,11 @@ export default function SettingsLibrary() {
   const syncMutation = useMutation({
     mutationFn: triggerLibrarySync,
     onSuccess: () => {
+      toast.success('曲库同步任务已启动', '稍后会自动刷新曲库状态')
       queryClient.invalidateQueries({ queryKey: ['library-status'] })
+    },
+    onError: (error: Error) => {
+      toast.error('曲库同步启动失败', error.message)
     },
   })
 
@@ -687,11 +693,15 @@ export default function SettingsLibrary() {
   const createManualMutation = useMutation({
     mutationFn: createManualMatch,
     onSuccess: () => {
+      toast.success('人工匹配已保存')
       setManualTitle('')
       setManualArtist('')
       setManualNavidromeId('')
       setManualNote('')
       queryClient.invalidateQueries({ queryKey: ['library-manual-matches'] })
+    },
+    onError: (error: Error) => {
+      toast.error('人工匹配保存失败', error.message)
     },
   })
 
@@ -705,8 +715,12 @@ export default function SettingsLibrary() {
   const clearCacheMutation = useMutation({
     mutationFn: clearMatchCache,
     onSuccess: () => {
+      toast.success('匹配缓存已清空')
       queryClient.invalidateQueries({ queryKey: ['library-status'] })
       queryClient.invalidateQueries({ queryKey: ['library-match-logs'] })
+    },
+    onError: (error: Error) => {
+      toast.error('清空缓存失败', error.message)
     },
   })
 
@@ -853,12 +867,6 @@ export default function SettingsLibrary() {
           </button>
         </div>
 
-        {syncMutation.isSuccess && (
-          <p className="text-sm text-green-600 dark:text-green-400 mt-2">曲库同步任务已启动，稍后会自动刷新状态。</p>
-        )}
-        {syncMutation.isError && (
-          <p className="text-sm text-red-500 mt-2">曲库同步失败: {(syncMutation.error as Error).message}</p>
-        )}
         </SectionCard>
       )}
 
@@ -1053,13 +1061,6 @@ export default function SettingsLibrary() {
             清空自动匹配缓存
           </button>
         </div>
-
-        {createManualMutation.isSuccess && (
-          <p className="text-sm text-green-600 dark:text-green-400 mt-2">人工匹配已保存。</p>
-        )}
-        {createManualMutation.isError && (
-          <p className="text-sm text-red-500 mt-2">保存失败: {(createManualMutation.error as Error).message}</p>
-        )}
 
         <div className="card overflow-hidden mt-4">
           {manualLoading ? (
