@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { loginSchema } from '@/lib/validators'
 import { Loader2 } from 'lucide-react'
+import loginLogo from '@/assets/login-logo.webp'
 
 interface LoginForm {
   username: string
@@ -52,6 +53,11 @@ export default function LoginPage() {
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="card card-padding w-full max-w-sm relative z-10">
+        <img
+          src={loginLogo}
+          alt="SonicAI"
+          className="w-auto max-w-full max-h-24 mx-auto mb-6 object-contain"
+        />
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">
