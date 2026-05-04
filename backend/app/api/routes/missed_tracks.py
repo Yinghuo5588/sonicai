@@ -121,17 +121,26 @@ async def retry_one_missed_track(
     )
 
     mode = await _get_retry_mode()
-    if mode == "api":
-        match = await match_track(
-            title=row.title,
-            artist=row.artist or "",
-            threshold=float(row.match_threshold or 0.75),
-        )
-    else:
+    if mode == "local":
         match = await match_track_local_only(
             title=row.title,
             artist=row.artist or "",
             threshold=float(row.match_threshold or 0.75),
+        )
+    elif mode == "api":
+        match = await match_track(
+            title=row.title,
+            artist=row.artist or "",
+            threshold=float(row.match_threshold or 0.75),
+            force_mode="api",
+        )
+    else:
+        # "full" or unrecognized
+        match = await match_track(
+            title=row.title,
+            artist=row.artist or "",
+            threshold=float(row.match_threshold or 0.75),
+            force_mode="full",
         )
 
     now = datetime.now(timezone.utc)

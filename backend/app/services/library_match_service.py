@@ -47,7 +47,10 @@ from app.utils.text_normalizer import (
 # ── Config helpers ─────────────────────────────────────────────────────────────
 
 async def _get_match_mode() -> str:
-    """Query SystemSettings.match_mode."""
+    """Query SystemSettings.match_mode.
+    Returns "local", "api", or "full".
+    Handles legacy "local_only" -> "local" and "full" -> "full".
+    """
     try:
         from app.db.models import SystemSettings
 
@@ -55,7 +58,10 @@ async def _get_match_mode() -> str:
             result = await db.execute(select(SystemSettings))
             row = result.scalar_one_or_none()
             if row and getattr(row, "match_mode", None):
-                return str(row.match_mode)
+                raw = str(row.match_mode)
+                if raw == "local_only":
+                    return "local"
+                return raw  # "full" or newer values
     except Exception:
         pass
     return "full"
@@ -549,10 +555,18 @@ async def _match_track_internal(
     artist: str,
     threshold: float = 0.75,
     force_debug: bool = False,
+    force_mode: str | None = None,
 ) -> tuple[dict | None, list[dict] | None]:
     """
     Internal implementation of the full matching chain.
     Returns (match, steps).  steps is None when debug is disabled.
+
+    Args:
+        force_mode: override the match_mode setting for this call.
+            "local" -> skip Subsonic entirely (local-only)
+            "api"   -> skip local steps and call Subsonic directly
+            "full"  -> run the full local+Subsonic chain
+            None    -> use the match_mode setting from the database
     """
     debug_enabled = force_debug or await _is_debug_enabled()
     steps: list[dict] | None = [] if debug_enabled else None
@@ -690,14 +704,65 @@ async def _match_track_internal(
         await _write_match_log(title, artist, db_fuzzy, "db_fuzzy", steps)
         return db_fuzzy, steps
 
-    # ── Step 6: Subsonic fallback (gate: local_only skips this) ───────────
-    match_mode = await _get_match_mode()
+    # ── Step 6: Subsonic fallback (gated by match_mode or force_mode) ───────
+    if force_mode:
+        effective_mode = force_mode
+    else:
+        effective_mode = await _get_match_mode()
 
-    if match_mode == "local_only":
+    if effective_mode == "local":
         await _write_match_log(title, artist, None, "miss", steps)
-        await _record_miss(title, artist, threshold, source="local_only")
+        await _record_miss(title, artist, threshold, source="local")
         return None, steps
 
+    if effective_mode == "api":
+        # Skip local steps 1-5, go straight to Subsonic
+        t0 = time.time()
+        nav_results = await navidrome_multi_search(title, artist)
+        best = pick_best_match(title, artist, nav_results, threshold)
+        if debug_enabled and steps is not None:
+            subsonic_candidates = []
+            for r in nav_results:
+                scores = score_candidate(title, artist, r.get("title") or "", r.get("artist") or "")
+                subsonic_candidates.append({
+                    "id": r.get("id"), "title": r.get("title"), "artist": r.get("artist"),
+                    "album": r.get("album"), "duration": r.get("duration"),
+                    "score": scores["score"], "title_score": scores["title_score"],
+                    "title_core_score": scores["title_core_score"], "artist_score": scores["artist_score"],
+                    "query_label": r.get("_query_label"),
+                })
+            subsonic_candidates.sort(key=lambda x: x["score"], reverse=True)
+            steps.append(_step_info(
+                step="subsonic", hit=best is not None,
+                candidates_count=len(nav_results),
+                best_score=best.get("score") if best else (subsonic_candidates[0]["score"] if subsonic_candidates else None),
+                best_candidate=best or (subsonic_candidates[0] if subsonic_candidates else None),
+                top_candidates=subsonic_candidates[:5],
+                duration_ms=round((time.time() - t0) * 1000, 2), threshold=threshold,
+            ))
+        if best and best.get("id"):
+            from app.services.song_library_service import upsert_song_to_library
+            async with AsyncSessionLocal() as db:
+                await upsert_song_to_library(db, {
+                    "id": best.get("id"), "title": best.get("title"),
+                    "artist": best.get("artist"), "album": best.get("album"),
+                    "duration": best.get("duration"),
+                }, source="passive")
+                await db.commit()
+            await song_cache.add_song({
+                "id": best.get("id"), "title": best.get("title"),
+                "artist": best.get("artist"), "album": best.get("album"),
+                "duration": best.get("duration"),
+            }, source="passive")
+            best["source"] = "subsonic"
+            await _write_match_cache(title, artist, best, "subsonic")
+            await _write_match_log(title, artist, best, "subsonic", steps)
+            return best, steps
+        await _write_match_log(title, artist, None, "miss", steps)
+        await _record_miss(title, artist, threshold, source="api")
+        return None, steps
+
+    # effective_mode == "full" (default) – run full local chain first
     t0 = time.time()
     nav_results = await navidrome_multi_search(title, artist)
     best = pick_best_match(title, artist, nav_results, threshold)
@@ -840,16 +905,25 @@ async def match_track(
     title: str,
     artist: str,
     threshold: float = 0.75,
+    force_mode: str | None = None,
 ) -> dict | None:
     """
     Unified matching chain (original signature, backward-compatible).
     Returns a dict with id/title/artist/album/duration/score/source or None.
+
+    Args:
+        force_mode: override match_mode lookup.
+            "local"  -> local only (skip Subsonic)
+            "api"    -> Subsonic only (skip local steps)
+            "full"   -> local + Subsonic (same as full chain)
+            None    -> respect match_mode setting
     """
     match, _ = await _match_track_internal(
         title=title,
         artist=artist,
         threshold=threshold,
         force_debug=False,
+        force_mode=force_mode,
     )
     return match
 
@@ -869,6 +943,7 @@ async def match_track_debug(
         artist=artist,
         threshold=threshold,
         force_debug=True,
+        force_mode=None,
     )
     return {
         "result": match,

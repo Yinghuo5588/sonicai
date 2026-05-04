@@ -70,24 +70,32 @@ async def retry_missed_tracks_job(*, force: bool = False):
         logger.info("[missed-track-retry] no pending tracks")
         return
 
-    logger.info("[missed-track-retry] retrying %s tracks", len(rows))
+    logger.info("[missed-track-retry] retrying %s tracks (mode=%s)", len(rows), mode)
 
     for row in rows:
         now = datetime.now(timezone.utc)
 
         try:
-            if mode == "api":
-                from app.services.library_match_service import match_track
-                match = await match_track(
-                    title=row.title,
-                    artist=row.artist or "",
-                    threshold=float(row.match_threshold or 0.75),
-                )
-            else:
+            from app.services.library_match_service import match_track, match_track_local_only
+            if mode == "local":
                 match = await match_track_local_only(
                     title=row.title,
                     artist=row.artist or "",
                     threshold=float(row.match_threshold or 0.75),
+                )
+            elif mode == "api":
+                match = await match_track(
+                    title=row.title,
+                    artist=row.artist or "",
+                    threshold=float(row.match_threshold or 0.75),
+                    force_mode="api",
+                )
+            else:  # "full"
+                match = await match_track(
+                    title=row.title,
+                    artist=row.artist or "",
+                    threshold=float(row.match_threshold or 0.75),
+                    force_mode="full",
                 )
 
             async with AsyncSessionLocal() as db:

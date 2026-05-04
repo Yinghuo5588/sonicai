@@ -189,10 +189,10 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
             raise HTTPException(status_code=400, detail="seed_source_mode must be one of: recent_only, top_only, recent_plus_top")
         if key == "top_period" and value not in {"7day", "1month", "3month", "6month", "12month", "overall"}:
             raise HTTPException(status_code=400, detail="top_period must be one of: 7day, 1month, 3month, 6month, 12month, overall")
-        if key == "match_mode" and value not in {"full", "local_only"}:
-            raise HTTPException(status_code=400, detail="match_mode must be one of: full, local_only")
-        if key == "missed_track_retry_mode" and value not in {"local", "api"}:
-            raise HTTPException(status_code=400, detail="missed_track_retry_mode must be one of: local, api")
+        if key == "match_mode" and value not in {"local", "api", "full"}:
+            raise HTTPException(status_code=400, detail="match_mode must be one of: local, api, full")
+        if key == "missed_track_retry_mode" and value not in {"local", "api", "full"}:
+            raise HTTPException(status_code=400, detail="missed_track_retry_mode must be one of: local, api, full")
         if key == "recommendation_cron_run_type" and value not in {"full", "similar_tracks", "similar_artists"}:
             raise HTTPException(status_code=400, detail="recommendation_cron_run_type must be one of: full, similar_tracks, similar_artists")
         if (key.endswith("_cron_expression") or key.endswith("_cron")) and value:
@@ -308,8 +308,8 @@ async def import_settings(
         "library_mode_default": {"library_only", "allow_missing"},
         "seed_source_mode": {"recent_only", "top_only", "recent_plus_top"},
         "top_period": {"7day", "1month", "3month", "6month", "12month", "overall"},
-        "match_mode": {"full", "local_only"},
-        "missed_track_retry_mode": {"local", "api"},
+        "match_mode": {"local", "api", "full"},
+        "missed_track_retry_mode": {"local", "api", "full"},
         "recommendation_cron_run_type": {"full", "similar_tracks", "similar_artists"},
     }
 
