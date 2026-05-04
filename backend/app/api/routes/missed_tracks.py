@@ -109,18 +109,30 @@ async def retry_one_missed_track(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
-    """Retry a single missed track with local-only matching."""
+    """Retry a single missed track, respecting the system retry mode setting."""
     row = await db.get(MissedTrack, track_id)
     if not row:
         raise HTTPException(status_code=404, detail="Missed track not found")
 
-    from app.services.library_match_service import match_track_local_only
-
-    match = await match_track_local_only(
-        title=row.title,
-        artist=row.artist or "",
-        threshold=float(row.match_threshold or 0.75),
+    from app.services.library_match_service import (
+        match_track_local_only,
+        match_track,
+        _get_retry_mode,
     )
+
+    mode = await _get_retry_mode()
+    if mode == "api":
+        match = await match_track(
+            title=row.title,
+            artist=row.artist or "",
+            threshold=float(row.match_threshold or 0.75),
+        )
+    else:
+        match = await match_track_local_only(
+            title=row.title,
+            artist=row.artist or "",
+            threshold=float(row.match_threshold or 0.75),
+        )
 
     now = datetime.now(timezone.utc)
     row.last_retry_at = now

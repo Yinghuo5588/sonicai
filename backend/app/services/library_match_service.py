@@ -61,6 +61,21 @@ async def _get_match_mode() -> str:
     return "full"
 
 
+async def _get_retry_mode() -> str:
+    """Query SystemSettings.missed_track_retry_mode."""
+    try:
+        from app.db.models import SystemSettings
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(SystemSettings))
+            row = result.scalar_one_or_none()
+            if row and getattr(row, "missed_track_retry_mode", None):
+                return str(row.missed_track_retry_mode)
+    except Exception:
+        pass
+    return "local"
+
+
 # ── Miss helpers ───────────────────────────────────────────────────────────────
 
 async def _record_miss(
