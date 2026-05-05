@@ -125,14 +125,14 @@ class SystemSettings(Base):
     match_debug_enabled = Column(Boolean, default=False)
 
     # Matching mode
-    match_mode = Column(String(20), default="full")  # full | local_only
+    match_mode = Column(String(20), default="full")  # full | local | api
 
     # Missed track retry
     missed_track_retry_enabled = Column(Boolean, default=False)
     missed_track_retry_cron = Column(String(100), default="0 3 * * *")
     missed_track_retry_limit = Column(Integer, default=100)
     missed_track_retry_refresh_library = Column(Boolean, default=True)
-    missed_track_retry_mode = Column(String(20), default="local")  # local | api
+    missed_track_retry_mode = Column(String(20), default="local")  # local | api | full
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

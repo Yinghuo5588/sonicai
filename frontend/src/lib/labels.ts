@@ -37,8 +37,15 @@ export const LIBRARY_MODE_LABELS: Record<string, string> = {
 }
 
 export const MATCH_MODE_LABELS: Record<string, string> = {
+  full: '完整匹配（本地 + Subsonic）',
+  local: '仅本地索引',
+  api: '仅 Subsonic',
+}
+
+export const RETRY_MODE_LABELS: Record<string, string> = {
+  local: '仅本地索引',
+  api: '仅 Subsonic',
   full: '完整匹配',
-  local_only: '仅本地索引',
 }
 
 export const SEED_SOURCE_MODE_LABELS: Record<string, string> = {
@@ -57,8 +64,9 @@ export const TOP_PERIOD_LABELS: Record<string, string> = {
 }
 
 export const MISSED_RETRY_MODE_LABELS: Record<string, string> = {
-  local: '本地索引重试',
-  api: '实时搜索重试',
+  local: '仅本地索引',
+  api: '仅 Subsonic',
+  full: '完整匹配（本地+Subsonic）',
 }
 
 export const TRIGGER_TYPE_LABELS: Record<string, string> = {

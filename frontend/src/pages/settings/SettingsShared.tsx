@@ -156,7 +156,7 @@ export const FIELD_LABELS: Record<string, { label: string; type?: string; toolti
     tooltip:
       '▸ 控制本地未命中后是否继续请求 Navidrome/Subsonic\n' +
       ' · full — 完整匹配,包含 Subsonic 实时兜底\n' +
-      ' · local_only — 仅本地索引,未命中直接进入缺失清单',
+      ' · local — 仅本地索引, api — 仅 Subsonic, full — 本地+Subsonic 完整匹配',
   },
   missed_track_retry_enabled: {
     label: '启用缺失歌曲定时重试',
@@ -311,8 +311,8 @@ export function FieldInput({
       library_mode_default: ['library_only', 'allow_missing'],
       seed_source_mode: ['recent_only', 'top_only', 'recent_plus_top'],
       top_period: ['7day', '1month', '3month', '6month', '12month', 'overall'],
-      match_mode: ['full', 'local_only'],
-      missed_track_retry_mode: ['local', 'api'],
+      match_mode: ['full', 'local', 'api'],
+      missed_track_retry_mode: ['local', 'api', 'full'],
       recommendation_cron_run_type: ['full', 'similar_tracks', 'similar_artists'],
     }
 
