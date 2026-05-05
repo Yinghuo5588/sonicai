@@ -13,6 +13,7 @@ from app.db.models import (
     RecommendationItem, NavidromeMatch, WebhookBatch, WebhookBatchItem,
 )
 from app.services.concurrent_search import batch_search_and_match
+from app.services.library_match_service import MatchConfig
 from app.services.playlist_parser import parse_playlist_url
 from app.services.navidrome_service import (
     navidrome_create_playlist,
@@ -69,7 +70,7 @@ async def run_incremental_playlist_sync(
 
     last_hash = settings.playlist_sync_last_hash
     api_base = settings.playlist_api_url
-    search_concurrency = max(1, min(20, int(getattr(settings, "search_concurrency", 5) or 5))
+    search_concurrency = max(1, min(20, int(getattr(settings, "search_concurrency", 5) or 5)))
 
     # Parse playlist
     try:
@@ -154,10 +155,10 @@ async def run_incremental_playlist_sync(
             if done % 20 == 0:
                 logger.info(f"[playlist_incr] matching progress: {done}/{total}")
 
+        match_cfg = MatchConfig(threshold=match_threshold, concurrency=search_concurrency)
         search_results = await batch_search_and_match(
             tracks=songs,
-            threshold=match_threshold,
-            concurrency=search_concurrency,
+            config=match_cfg,
             progress_callback=_log_progress,
         )
 

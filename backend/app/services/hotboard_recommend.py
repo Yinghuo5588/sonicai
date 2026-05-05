@@ -12,6 +12,7 @@ from app.db.models import (
     RecommendationItem, NavidromeMatch, WebhookBatch, WebhookBatchItem,
 )
 from app.services.concurrent_search import batch_search_and_match
+from app.services.library_match_service import MatchConfig
 from app.services.hotboard_service import fetch_netease_hotboard
 from app.services.navidrome_service import (
     navidrome_create_playlist,
@@ -102,10 +103,10 @@ async def run_hotboard_sync(
                 if done % 20 == 0:
                     logger.info(f"[hotboard] matching progress: {done}/{total}")
 
+            match_cfg = MatchConfig(threshold=match_threshold, concurrency=search_concurrency)
             search_results = await batch_search_and_match(
                 tracks=search_tracks,
-                threshold=match_threshold,
-                concurrency=search_concurrency,
+                config=match_cfg,
                 progress_callback=_log_progress,
             )
 

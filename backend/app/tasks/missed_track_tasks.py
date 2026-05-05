@@ -1,6 +1,7 @@
 """missed_track_tasks - scheduled retry of unmatched tracks."""
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -8,43 +9,90 @@ from sqlalchemy import select
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class RetryConfig:
+    """
+    Configuration for missed-track retry jobs.
+
+    Attributes:
+        max_retries:       Maximum retry attempts per track (default 3).
+        refresh_library:   Whether to refresh song_library before retry (default True).
+        match_config:      MatchConfig instance for matching behavior.
+        force_mode:        Override match_mode for retry runs:
+                             "local" / "api" / "full" / None (use global setting).
+    """
+    max_retries: int = 3
+    refresh_library: bool = True
+    match_config = None          # filled in from_settings()
+    force_mode: str | None = None
+
+
+async def _build_retry_config(force: bool = False) -> RetryConfig:
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import SystemSettings, MissedTrack
+    from app.services.library_match_service import MatchConfig
+
+    cfg = RetryConfig()
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(SystemSettings))
+        settings = result.scalar_one_or_none()
+
+    if not settings:
+        return cfg
+
+    cfg.max_retries = int(getattr(settings, "missed_track_retry_limit", 100) or 100)
+    cfg.max_retries = max(1, min(cfg.max_retries, 1000))
+    cfg.refresh_library = bool(getattr(settings, "missed_track_retry_refresh_library", True))
+
+    mode = getattr(settings, "missed_track_retry_mode", "local") or "local"
+    cfg.force_mode = mode if mode in ("local", "api", "full") else None
+
+    cfg.match_config = MatchConfig(
+        threshold=float(getattr(settings, "match_threshold", 0.75) or 0.75),
+        force_mode=cfg.force_mode,
+        concurrency=max(1, min(20, int(settings.search_concurrency or 5))),
+        write_cache=True,
+        record_miss=False,          # retry must NOT re-record miss (avoid loop)
+    )
+
+    return cfg
+
+
 async def retry_missed_tracks_job(*, force: bool = False):
     """
     Retry pending missed tracks.
 
     Flow:
-    1. Read settings; skip if disabled (unless force=True).
+    1. Build RetryConfig; skip if disabled (unless force=True).
     2. Optional: refresh song_library + song_cache.
     3. Fetch pending rows (retry_count < max_retries), oldest first.
-    4. For each: run match_track_local_only().
+    4. For each: run match_track_with_config() using RetryConfig.
        - Matched  -> status = matched, record navidrome_id.
        - Unmatched: retry_count++, if >= max_retries -> status = failed.
        - Error    : record last_error, mark failed if exhausted.
-
-    Args:
-        force: If True, skip the missed_track_retry_enabled setting check.
-               Used for manual batch retries triggered from the API.
     """
     from app.db.session import AsyncSessionLocal
-    from app.db.models import SystemSettings, MissedTrack
-    from app.services.library_match_service import match_track_local_only
+    from app.db.models import MissedTrack
 
-    # 1. Load settings
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(SystemSettings))
-        settings = result.scalar_one_or_none()
+    # 1. Build config
+    cfg = await _build_retry_config(force=force)
 
-    if not force and (not settings or not getattr(settings, "missed_track_retry_enabled", False)):
-        logger.info("[missed-track-retry] disabled or no settings")
-        return
+    if not force and cfg.match_config is None:
+        # means settings not initialized or retry disabled
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(SystemSettings))
+            settings = result.scalar_one_or_none()
+        if not settings or not getattr(settings, "missed_track_retry_enabled", False):
+            logger.info("[missed-track-retry] disabled or no settings")
+            return
+        # re-build with actual settings
+        cfg = await _build_retry_config(force=force)
 
-    limit = int(getattr(settings, "missed_track_retry_limit", 100) or 100)
-    limit = max(1, min(limit, 1000))
-
-    mode = getattr(settings, "missed_track_retry_mode", "local") or "local"
+    limit = cfg.max_retries  # used as limit for batch size; actual per-row limit is in row.max_retries
 
     # 2. Optional library refresh (only in local mode)
-    if mode == "local" and getattr(settings, "missed_track_retry_refresh_library", True):
+    if cfg.refresh_library and cfg.match_config and cfg.match_config.force_mode != "api":
         try:
             from app.services.song_library_service import sync_navidrome_to_song_library
             from app.services.song_cache import song_cache
@@ -70,33 +118,30 @@ async def retry_missed_tracks_job(*, force: bool = False):
         logger.info("[missed-track-retry] no pending tracks")
         return
 
-    logger.info("[missed-track-retry] retrying %s tracks (mode=%s)", len(rows), mode)
+    logger.info("[missed-track-retry] retrying %s tracks (mode=%s)", len(rows), cfg.force_mode or "global")
 
     for row in rows:
         now = datetime.now(timezone.utc)
+        row_threshold = float(row.match_threshold or 0.75)
 
         try:
-            from app.services.library_match_service import match_track, match_track_local_only
-            if mode == "local":
-                match = await match_track_local_only(
-                    title=row.title,
-                    artist=row.artist or "",
-                    threshold=float(row.match_threshold or 0.75),
-                )
-            elif mode == "api":
-                match = await match_track(
-                    title=row.title,
-                    artist=row.artist or "",
-                    threshold=float(row.match_threshold or 0.75),
-                    force_mode="api",
-                )
-            else:  # "full"
-                match = await match_track(
-                    title=row.title,
-                    artist=row.artist or "",
-                    threshold=float(row.match_threshold or 0.75),
-                    force_mode="full",
-                )
+            from app.services.library_match_service import match_track_with_config
+
+            # Use per-row threshold if available, else from config
+            match_cfg = cfg.match_config or MatchConfig(threshold=row_threshold)
+            match_cfg = MatchConfig(
+                threshold=row_threshold,
+                force_mode=match_cfg.force_mode,
+                concurrency=match_cfg.concurrency,
+                write_cache=True,
+                record_miss=False,
+            )
+
+            match = await match_track_with_config(
+                title=row.title,
+                artist=row.artist or "",
+                config=match_cfg,
+            )
 
             async with AsyncSessionLocal() as db:
                 fresh = await db.get(MissedTrack, row.id)

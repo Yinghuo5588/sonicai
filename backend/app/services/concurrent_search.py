@@ -4,7 +4,10 @@ import asyncio
 import logging
 from typing import Callable, Awaitable
 
-from app.services.library_match_service import match_track
+from app.services.library_match_service import (
+    MatchConfig,
+    match_track_with_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -13,21 +16,19 @@ async def _search_one(
     index: int,
     title: str,
     artist: str,
-    threshold: float,
+    config: MatchConfig,
     semaphore: asyncio.Semaphore,
 ) -> dict:
     """
-    Search and match a single track through the unified library matching pipeline.
-
-    Chain: manual_match -> match_cache -> memory index
-           -> db alias exact -> db fuzzy -> Subsonic
+    Search and match a single track through the unified library matching pipeline
+    using MatchConfig.
     """
     async with semaphore:
         try:
-            best = await match_track(
+            best = await match_track_with_config(
                 title=title,
                 artist=artist,
-                threshold=threshold,
+                config=config,
             )
 
             return {
@@ -53,23 +54,23 @@ async def _search_one(
 
 async def batch_search_and_match(
     tracks: list[dict],
-    threshold: float,
-    concurrency: int = 5,
+    config: MatchConfig,
     progress_callback: Callable[[int, int], Awaitable[None]] | None = None,
 ) -> list[dict]:
     """
-    Concurrently search and match a list of tracks against Navidrome.
+    Concurrently search and match a list of tracks against Navidrome
+    using MatchConfig.
 
     Args:
-        tracks: List of {"title": ..., "artist": ...}
-        threshold: Minimum match score to accept
-        concurrency: Max concurrent requests (clamped 1-20)
+        tracks:            List of {"title": ..., "artist": ...}
+        config:           MatchConfig instance (threshold, concurrency, ...).
         progress_callback: Optional async callback(done, total)
 
     Returns:
-        List of results in original order, each with "index", "title", "artist", "best_match"
+        List of results in original order,
+        each with "index", "title", "artist", "best_match".
     """
-    concurrency = max(1, min(20, concurrency))
+    concurrency = max(1, min(20, config.concurrency))
     semaphore = asyncio.Semaphore(concurrency)
     total = len(tracks)
 
@@ -79,11 +80,9 @@ async def batch_search_and_match(
         artist = t.get("artist", "")
         if not title:
             continue
-        tasks.append(
-            _search_one(i, title, artist, threshold, semaphore)
-        )
+        tasks.append(_search_one(i, title, artist, config, semaphore))
 
-    results: list[dict] = [None] * total  # type: ignore
+    results: list[dict | None] = [None] * total  # type: ignore
     done_count = 0
 
     for coro in asyncio.as_completed(tasks):

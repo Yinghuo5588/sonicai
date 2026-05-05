@@ -622,15 +622,22 @@ async def _filter_recent(db: AsyncSession, candidates: list[dict], avoid_days: i
 
 async def _match_to_navidrome(db: AsyncSession, item_data: dict, settings) -> dict | None:
     """
-    Match recommendation item through the unified library matching pipeline.
+    Match recommendation item through the unified library matching pipeline
+    using MatchConfig from SystemSettings.
     """
-    from app.services.library_match_service import match_track
+    from app.services.library_match_service import MatchConfig, match_track
 
-    title = item_data["title"]
-    artist = item_data["artist"]
     threshold = float(settings.match_threshold) if settings.match_threshold is not None else 0.75
+    cfg = MatchConfig(
+        threshold=threshold,
+        concurrency=max(1, min(20, int(settings.search_concurrency or 5))),
+    )
 
-    best = await match_track(title=title, artist=artist, threshold=threshold)
+    best = await match_track(
+        title=item_data["title"],
+        artist=item_data["artist"],
+        threshold=cfg.threshold,
+    )
 
     if not best:
         return None

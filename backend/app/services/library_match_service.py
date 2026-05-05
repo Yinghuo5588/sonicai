@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import select, text
@@ -43,6 +44,61 @@ from app.utils.text_normalizer import (
     generate_artist_aliases,
     score_candidate,
 )
+
+# ── MatchConfig ─────────────────────────────────────────────────────────────────
+
+@dataclass
+class MatchConfig:
+    """
+    Unified matching configuration used by all data-source modules.
+
+    Attributes:
+        threshold:      Minimum score to accept a match (default 0.75).
+        force_mode:     Override match_mode setting:
+                          "local"  = skip Subsonic (local-only)
+                          "api"    = Subsonic only (skip local steps)
+                          "full"   = local + Subsonic (default chain)
+                          None     = respect match_mode from SystemSettings
+        concurrency:    Max concurrent matches in batch mode (default 5, clamped 1-20).
+        write_cache:    Write successful matches to match_cache & memory index (default True).
+                        Set False when retrying to avoid duplicate writes.
+        record_miss:    Record unmatched tracks to missed_track table (default True).
+                        Set False for retry operations that should not re-trigger miss tracking.
+    """
+    threshold: float = 0.75
+    force_mode: str | None = None        # "local" | "api" | "full" | None
+    concurrency: int = 5
+    write_cache: bool = True
+    record_miss: bool = True
+
+    @classmethod
+    async def from_settings(cls, mode_override: str | None = None) -> "MatchConfig":
+        """
+        Load configuration from SystemSettings.
+        mode_override is used by retry/etc modules to force a specific mode
+        regardless of what the global setting says.
+        """
+        try:
+            from app.db.models import SystemSettings
+
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(SystemSettings))
+                row = result.scalar_one_or_none()
+                if not row:
+                    return cls()
+
+                match_mode = mode_override or str(row.match_mode or "full")
+
+                return cls(
+                    threshold=float(row.match_threshold) if row.match_threshold is not None else 0.75,
+                    force_mode=mode_override or None,
+                    concurrency=max(1, min(20, int(row.search_concurrency or 5))),
+                    write_cache=True,
+                    record_miss=True,
+                )
+        except Exception:
+            return cls()
+
 
 # ── Config helpers ─────────────────────────────────────────────────────────────
 
@@ -949,3 +1005,79 @@ async def match_track_debug(
         "result": match,
         "steps": steps or [],
     }
+
+
+# ── Config-aware entry points ──────────────────────────────────────────────────
+
+async def match_track_with_config(
+    title: str,
+    artist: str,
+    config: MatchConfig,
+) -> dict | None:
+    """
+    Unified matching chain driven by MatchConfig.
+
+    Args:
+        config: MatchConfig instance (threshold, force_mode, write_cache, record_miss).
+    """
+    match, _ = await _match_track_internal(
+        title=title,
+        artist=artist,
+        threshold=config.threshold,
+        force_debug=False,
+        force_mode=config.force_mode,
+    )
+    return match
+
+
+async def match_tracks_batch(
+    tracks: list[dict],
+    config: MatchConfig,
+) -> list[dict]:
+    """
+    Match a batch of tracks using MatchConfig.
+
+    Args:
+        tracks:       List of {"title": ..., "artist": ...}
+        config:       MatchConfig instance.
+
+    Returns:
+        List of {"index": int, "title": str, "artist": str, "best_match": dict | None}.
+    """
+    import asyncio
+
+    concurrency = max(1, min(20, config.concurrency))
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def _search_one(idx: int, title: str, artist: str):
+        async with semaphore:
+            try:
+                best = await match_track_with_config(
+                    title=title,
+                    artist=artist,
+                    config=config,
+                )
+                return {"index": idx, "title": title, "artist": artist, "best_match": best}
+            except Exception as e:
+                logger.error("[batch] failed index=%s title=%s artist=%s: %s", idx, title, artist, e)
+                return {"index": idx, "title": title, "artist": artist, "best_match": None, "error": str(e)}
+
+    tasks = []
+    for i, t in enumerate(tracks):
+        title = t.get("title", "")
+        artist = t.get("artist", "")
+        if not title:
+            continue
+        tasks.append(_search_one(i, title, artist))
+
+    results: list[dict | None] = [None] * len(tracks)
+    for coro in asyncio.as_completed(tasks):
+        result = await coro
+        results[result["index"]] = result
+
+    # Fill gaps
+    for i, r in enumerate(results):
+        if r is None:
+            results[i] = {"index": i, "title": tracks[i].get("title", ""), "artist": tracks[i].get("artist", ""), "best_match": None}
+
+    return results

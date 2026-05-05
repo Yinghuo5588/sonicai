@@ -115,33 +115,26 @@ async def retry_one_missed_track(
         raise HTTPException(status_code=404, detail="Missed track not found")
 
     from app.services.library_match_service import (
-        match_track_local_only,
-        match_track,
+        match_track_with_config,
         _get_retry_mode,
     )
+    from app.services.library_match_service import MatchConfig
 
     mode = await _get_retry_mode()
-    if mode == "local":
-        match = await match_track_local_only(
-            title=row.title,
-            artist=row.artist or "",
-            threshold=float(row.match_threshold or 0.75),
-        )
-    elif mode == "api":
-        match = await match_track(
-            title=row.title,
-            artist=row.artist or "",
-            threshold=float(row.match_threshold or 0.75),
-            force_mode="api",
-        )
-    else:
-        # "full" or unrecognized
-        match = await match_track(
-            title=row.title,
-            artist=row.artist or "",
-            threshold=float(row.match_threshold or 0.75),
-            force_mode="full",
-        )
+    force_mode = mode if mode in ("local", "api", "full") else None
+
+    match_cfg = MatchConfig(
+        threshold=float(row.match_threshold or 0.75),
+        force_mode=force_mode,
+        concurrency=5,
+        write_cache=True,
+        record_miss=False,
+    )
+    match = await match_track_with_config(
+        title=row.title,
+        artist=row.artist or "",
+        config=match_cfg,
+    )
 
     now = datetime.now(timezone.utc)
     row.last_retry_at = now
