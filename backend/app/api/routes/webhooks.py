@@ -1,6 +1,7 @@
 """Webhook batch routes."""
 
 from fastapi import APIRouter, HTTPException, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import select, func
 
 from app.db.session import get_db, AsyncSessionLocal
@@ -117,4 +118,36 @@ async def delete_batch(
     return {
         "message": "Webhook batch deleted",
         "batch_id": batch_id,
+    }
+
+
+class BatchDeleteRequest(BaseModel):
+    ids: list[int]
+
+
+@router.post("/batches/delete")
+async def delete_batches(
+    body: BatchDeleteRequest,
+    current_user: CurrentUser,
+    db: AsyncSessionLocal = Depends(get_db),
+):
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="ids is required")
+
+    result = await db.execute(
+        select(WebhookBatch).where(WebhookBatch.id.in_(body.ids))
+    )
+    batches = result.scalars().all()
+
+    deleted = 0
+    for batch in batches:
+        await db.delete(batch)
+        deleted += 1
+
+    await db.commit()
+
+    return {
+        "message": "Webhook batches deleted",
+        "requested": len(body.ids),
+        "deleted": deleted,
     }
