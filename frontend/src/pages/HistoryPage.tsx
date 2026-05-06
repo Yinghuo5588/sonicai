@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { formatRelativeTime } from '@/lib/date'
 import { Clock, CheckCircle, XCircle, RotateCw, List } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
+import { useToast } from '@/components/ui/useToast'
 import {
   RUN_TYPE_LABELS,
   TRIGGER_TYPE_LABELS,
@@ -15,6 +16,10 @@ const PAGE_SIZE = 15
 
 async function fetchRuns(limit: number, offset: number) {
   return apiFetch(`/runs?limit=${limit}&offset=${offset}`)
+}
+
+async function deleteRun(id: number) {
+  return apiFetch(`/runs/${id}`, { method: 'DELETE' })
 }
 
 function runTypeLabel(type: string) {
@@ -31,13 +36,14 @@ function RunStatusBadge({ status }: { status: string }) {
 }
 
 /* ---------- 移动端运行记录卡片 ---------- */
-function RunCard({ run }: { run: any }) {
+function RunCard({ run, onDelete, isDeleting }: { run: any; onDelete: () => void; isDeleting: boolean }) {
+  const canDelete = run.status !== 'running' && run.status !== 'pending'
   return (
-    <Link
-      to={`/history/run/${run.id}`}
-      className="card card-padding flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors"
-    >
-      <div className="flex items-start gap-3 flex-1 min-w-0">
+    <div className="card card-padding flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors">
+      <Link
+        to={`/history/run/${run.id}`}
+        className="flex items-start gap-3 flex-1 min-w-0"
+      >
         <div className="w-8 h-8 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0 mt-0.5">
           <Clock className="w-4 h-4 text-cyan-600 dark:text-cyan-300" />
         </div>
@@ -51,9 +57,26 @@ function RunCard({ run }: { run: any }) {
             {formatRelativeTime(run.created_at)}
           </p>
         </div>
+      </Link>
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        <Link
+          to={`/history/run/${run.id}`}
+          className="text-cyan-600 dark:text-cyan-300 text-sm"
+        >
+          查看 →
+        </Link>
+        {canDelete && (
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={onDelete}
+            className="text-xs text-red-500 hover:underline disabled:opacity-50"
+          >
+            {isDeleting ? '删除中' : '删除'}
+          </button>
+        )}
       </div>
-      <span className="text-cyan-600 dark:text-cyan-300 text-sm shrink-0">查看 →</span>
-    </Link>
+    </div>
   )
 }
 
@@ -68,10 +91,23 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 export default function HistoryPage() {
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState<FilterTab>('all')
+  const queryClient = useQueryClient()
+  const toast = useToast()
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['runs', page, filter],
     queryFn: () => fetchRuns(PAGE_SIZE, (page - 1) * PAGE_SIZE),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteRun,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['runs'] })
+      toast.success('推荐历史已删除')
+    },
+    onError: (error: Error) => {
+      toast.error('删除失败', error.message)
+    },
   })
 
   if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
@@ -127,7 +163,15 @@ export default function HistoryPage() {
           />
         )}
         {filteredRuns.map((r: any) => (
-          <RunCard key={r.id} run={r} />
+          <RunCard
+            key={r.id}
+            run={r}
+            isDeleting={deleteMutation.isPending}
+            onDelete={() => {
+              if (!confirm('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。')) return
+              deleteMutation.mutate(r.id)
+            }}
+          />
         ))}
       </div>
 
@@ -141,30 +185,51 @@ export default function HistoryPage() {
           actionTo="/jobs"
         />}
         <div className="divide-y divide-border/50">
-          {runs.map((r: any) => (
-            <Link key={r.id} to={`/history/run/${r.id}`} className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-900 transition">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">{runTypeLabel(r.run_type)}</span>
-                    <RunStatusBadge status={r.status} />
+          {runs.map((r: any) => {
+            const canDelete = r.status !== 'running' && r.status !== 'pending'
+            return (
+              <div key={r.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-900 transition">
+                <div className="flex items-start justify-between gap-3">
+                  <Link to={`/history/run/${r.id}`} className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">{runTypeLabel(r.run_type)}</span>
+                      <RunStatusBadge status={r.status} />
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {formatRelativeTime(r.created_at)}
+                    </p>
+                  </Link>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {r.trigger_type && (
+                      <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                        {labelOf(TRIGGER_TYPE_LABELS, r.trigger_type)}
+                      </span>
+                    )}
+                    <Link
+                      to={`/history/run/${r.id}`}
+                      className="text-cyan-600 dark:text-cyan-300 text-sm"
+                    >
+                      查看 →
+                    </Link>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => {
+                          if (!confirm('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。')) return
+                          deleteMutation.mutate(r.id)
+                        }}
+                        className="text-sm text-red-500 hover:underline disabled:opacity-50"
+                      >
+                        删除
+                      </button>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {formatRelativeTime(r.created_at)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {r.trigger_type && (
-                    <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                      {labelOf(TRIGGER_TYPE_LABELS, r.trigger_type)}
-                    </span>
-                  )}
-                  <span className="text-cyan-600 dark:text-cyan-300 text-sm shrink-0">查看 →</span>
                 </div>
               </div>
-            </Link>
-          ))}
+            )
+          })}
         </div>
       </div>
 
