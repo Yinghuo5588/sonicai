@@ -22,6 +22,13 @@ async function deleteRun(id: number) {
   return apiFetch(`/runs/${id}`, { method: 'DELETE' })
 }
 
+async function batchDeleteRuns(ids: number[]) {
+  return apiFetch('/runs/delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  })
+}
+
 function runTypeLabel(type: string) {
   return labelOf(RUN_TYPE_LABELS, type)
 }
@@ -91,6 +98,7 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 export default function HistoryPage() {
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [selected, setSelected] = useState<Set<number>>(new Set())
   const queryClient = useQueryClient()
   const toast = useToast()
 
@@ -107,6 +115,18 @@ export default function HistoryPage() {
     },
     onError: (error: Error) => {
       toast.error('删除失败', error.message)
+    },
+  })
+
+  const batchDeleteMutation = useMutation({
+    mutationFn: batchDeleteRuns,
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['runs'] })
+      toast.success(`已删除 ${res.deleted} 条推荐历史`)
+      setSelected(new Set())
+    },
+    onError: (error: Error) => {
+      toast.error('批量删除失败', error.message)
     },
   })
 
@@ -127,9 +147,27 @@ export default function HistoryPage() {
 
   return (
     <div className="page">
-      <div>
-        <h1 className="page-title">推荐历史</h1>
-        <p className="page-subtitle mt-1">查看每次推荐、同步任务的执行状态和详情。</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="page-title">推荐历史</h1>
+          <p className="page-subtitle mt-1">查看每次推荐、同步任务的执行状态和详情。</p>
+        </div>
+        {selected.size > 0 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-cyan-600 font-medium">已选 {selected.size} 条</span>
+            <button
+              onClick={() => {
+                if (!confirm(`确定删除选中的 ${selected.size} 条推荐历史吗？`)) return
+                batchDeleteMutation.mutate(Array.from(selected))
+              }}
+              disabled={batchDeleteMutation.isPending}
+              className="btn btn-danger text-xs"
+            >
+              {batchDeleteMutation.isPending ? '删除中...' : `删除${selected.size}条`}
+            </button>
+            <button onClick={() => setSelected(new Set())} className="btn-secondary text-xs">取消</button>
+          </div>
+        )}
       </div>
 
       {/* 移动端状态筛选 tabs */}
@@ -184,22 +222,49 @@ export default function HistoryPage() {
           actionLabel="去执行推荐"
           actionTo="/jobs"
         />}
+        {runs.length > 0 && (
+          <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 dark:bg-slate-900 border-b border-border/50">
+            <input
+              type="checkbox"
+              checked={selected.size === runs.length && runs.length > 0}
+              onChange={e => {
+                if (e.target.checked) setSelected(new Set(runs.map((r: any) => r.id)))
+                else setSelected(new Set())
+              }}
+              className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+            />
+            <span className="text-xs text-slate-500 dark:text-slate-400">全选本页</span>
+          </div>
+        )}
         <div className="divide-y divide-border/50">
           {runs.map((r: any) => {
             const canDelete = r.status !== 'running' && r.status !== 'pending'
             return (
               <div key={r.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-900 transition">
                 <div className="flex items-start justify-between gap-3">
-                  <Link to={`/history/run/${r.id}`} className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">{runTypeLabel(r.run_type)}</span>
-                      <RunStatusBadge status={r.status} />
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {formatRelativeTime(r.created_at)}
-                    </p>
-                  </Link>
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(r.id)}
+                      onChange={e => {
+                        const next = new Set(selected)
+                        if (e.target.checked) next.add(r.id)
+                        else next.delete(r.id)
+                        setSelected(next)
+                      }}
+                      className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 mt-0.5 shrink-0"
+                    />
+                    <Link to={`/history/run/${r.id}`} className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">{runTypeLabel(r.run_type)}</span>
+                        <RunStatusBadge status={r.status} />
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatRelativeTime(r.created_at)}
+                      </p>
+                    </Link>
+                  </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {r.trigger_type && (
                       <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
