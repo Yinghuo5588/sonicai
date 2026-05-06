@@ -96,3 +96,25 @@ async def retry_batch(batch_id: int, current_user: CurrentUser, db: AsyncSession
         raise HTTPException(status_code=404, detail="Batch not found")
     create_background_task(send_webhook_batch(batch_id), name=f"webhook-retry-{batch_id}")
     return {"message": "Retry scheduled", "batch_id": batch_id}
+
+
+@router.delete("/batches/{batch_id}")
+async def delete_batch(
+    batch_id: int,
+    current_user: CurrentUser,
+    db: AsyncSessionLocal = Depends(get_db),
+):
+    result = await db.execute(
+        select(WebhookBatch).where(WebhookBatch.id == batch_id)
+    )
+    batch = result.scalar_one_or_none()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    await db.delete(batch)
+    await db.commit()
+
+    return {
+        "message": "Webhook batch deleted",
+        "batch_id": batch_id,
+    }
