@@ -110,7 +110,7 @@ function BatchPreview({ batchId }: { batchId: number }) {
   )
 }
 
-/* --- Mobile Webhook Batch Card --- */
+/* ---------- 移动端 Webhook 批次卡片 ---------- */
 function BatchCard({
   batch,
   expanded,
@@ -298,7 +298,7 @@ export default function WebhooksPage() {
         </div>
       </div>
 
-      {/* mobile card list */}
+      {/* 移动端卡片列表 */}
       <div className="md:hidden space-y-3">
         {batches.length === 0 && (
           <EmptyState
@@ -326,7 +326,7 @@ export default function WebhooksPage() {
         ))}
       </div>
 
-      {/* desktop table */}
+      {/* 桌面端表格 */}
       <div className="hidden md:block space-y-3">
         {batches.length === 0 && (
           <EmptyState
@@ -445,7 +445,7 @@ export default function WebhooksPage() {
         ))}
       </div>
 
-      {/* pagination */}
+      {/* 分页 */}
       {totalPages > 1 && (
         <div className="card card-padding flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="text-xs text-slate-500 dark:text-slate-400 text-center sm:text-left">
