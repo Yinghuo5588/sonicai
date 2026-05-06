@@ -28,7 +28,7 @@ async def run_recommendation_job(run_type: str = "full"):
     try:
         run_id = await create_pending_run(
             run_type=run_type,
-            current_user_id=None,
+            current_user_id=settings.cron_created_by_user_id,
             trigger_type="scheduled",
             conflict_types=conflict_types,
             lock_scope="recommendation",
@@ -118,7 +118,7 @@ async def run_hotboard_cron_job():
     try:
         run_id = await create_pending_run(
             run_type="hotboard",
-            current_user_id=None,
+            current_user_id=settings.cron_created_by_user_id,
             trigger_type="scheduled",
             conflict_types=["hotboard"],
             lock_scope="hotboard",
@@ -182,7 +182,7 @@ async def run_playlist_sync_cron_job():
     try:
         run_id = await create_pending_run(
             run_type="playlist",
-            current_user_id=None,
+            current_user_id=settings.cron_created_by_user_id,
             trigger_type="scheduled",
             conflict_types=["playlist"],
             lock_scope="playlist",
