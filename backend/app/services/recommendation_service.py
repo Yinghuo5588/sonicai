@@ -650,7 +650,7 @@ async def _match_to_navidrome(db: AsyncSession, item_data: dict, settings) -> di
         "confidence_score": best.get("score"),
         "title_score": best.get("title_score"),
         "artist_score": best.get("artist_score"),
-        "search_query": f"{title} {artist}",
+        "search_query": f"{item_data['title']} {item_data['artist']}",
         "raw_response": best,
     }
 
