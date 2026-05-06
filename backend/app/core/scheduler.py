@@ -46,6 +46,7 @@ async def load_cron_schedule(db: AsyncSession):
             "playlist_sync_cron",
             "song_cache_refresh",
             "missed_track_retry_cron",
+            "history_cleanup",
         ):
             job.remove()
 
@@ -206,6 +207,7 @@ async def load_cron_schedule(db: AsyncSession):
 
     _register_cache_cleanup(sched)
     _register_match_log_cleanup(sched)
+    _register_history_cleanup(sched)
 
 
 def start_scheduler():
@@ -253,3 +255,19 @@ def _register_match_log_cleanup(sched):
             misfire_grace_time=300,
         )
         logger.info("Match log cleanup job registered (every 24 hours)")
+
+
+def _register_history_cleanup(sched):
+    from app.tasks.recommendation_tasks import cleanup_old_history
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    existing = [j for j in sched.get_jobs() if j.id == "history_cleanup"]
+    if not existing:
+        sched.add_job(
+            cleanup_old_history,
+            IntervalTrigger(hours=24),
+            id="history_cleanup",
+            replace_existing=True,
+            misfire_grace_time=300,
+        )
+        logger.info("History cleanup job registered (every 24 hours)")
