@@ -6,7 +6,7 @@ from app.core.rate_limit import limiter
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.db.session import get_db
+from app.db.session import get_db, AsyncSessionLocal
 from app.db.models import RecommendationRun
 from app.api.deps import CurrentUser
 from app.services.job_run_service import create_pending_run
@@ -50,6 +50,66 @@ async def sync_playlist(
         ),
         name=f"playlist-sync-{run_id}",
     )
+
+    return {
+        "message": "Playlist sync queued",
+        "run_id": run_id,
+        "url": url,
+        "threshold": match_threshold,
+        "playlist_name": playlist_name or "(auto)",
+        "overwrite": overwrite,
+    }
+
+
+@router.post("/sync-incremental")
+@limiter.limit("3/minute")
+async def sync_playlist_incremental(
+    request: Request,
+    current_user: CurrentUser,
+):
+    """
+    Manually trigger an immediate incremental playlist sync.
+    Uses the configured playlist_sync_url from settings.
+    This is the same logic as the cron job, but triggered on-demand.
+    """
+    from app.services.playlist_incremental import run_incremental_playlist_sync
+    from app.db.models import SystemSettings
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(SystemSettings))
+        settings = result.scalar_one_or_none()
+
+    if not settings or not settings.playlist_sync_cron_enabled:
+        raise HTTPException(status_code=400, detail="增量同步未启用，请在设置中开启")
+    if not settings.playlist_sync_url:
+        raise HTTPException(status_code=400, detail="未配置歌单同步 URL")
+
+    run_id = await create_pending_run(
+        run_type="playlist",
+        current_user_id=current_user.id,
+        trigger_type="manual",
+        conflict_types=["playlist"],
+        lock_scope="playlist",
+        stale_after_minutes=10,
+    )
+
+    logger.info(f"[playlist_incremental] manual run_id={run_id} user_id={current_user.id}")
+    create_background_task(
+        run_incremental_playlist_sync(
+            run_id=run_id,
+            url=settings.playlist_sync_url,
+            match_threshold=float(settings.playlist_sync_threshold or 0.75),
+            playlist_name=settings.playlist_sync_name,
+            overwrite=settings.playlist_sync_overwrite or False,
+        ),
+        name=f"playlist-incremental-{run_id}",
+    )
+
+    return {
+        "message": "增量同步已提交",
+        "run_id": run_id,
+        "url": settings.playlist_sync_url,
+    }
 
     return {
         "message": "Playlist sync queued",

@@ -1,3 +1,7 @@
+import { useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import apiFetch from '@/lib/api'
+import { useToast } from '@/components/ui/useToast'
 import {
   FieldInput,
   SaveBar,
@@ -5,6 +9,7 @@ import {
   Tooltip,
   useSettingsForm,
 } from './SettingsShared'
+import { CheckCircle, XCircle, Zap } from 'lucide-react'
 
 export default function SettingsSchedule() {
   const {
@@ -196,6 +201,11 @@ export default function SettingsSchedule() {
             />
             每次全量覆盖（默认增量追加新歌）
           </label>
+
+          {/* 立即同步按钮 */}
+          {s.playlist_sync_cron_enabled && s.playlist_sync_url && (
+            <TriggerIncrementalSync />
+          )}
         </div>
       </SectionCard>
 
@@ -342,5 +352,37 @@ export default function SettingsSchedule() {
         onSave={save}
       />
     </div>
+  )
+}
+
+/* 立即触发增量同步按钮 */
+function TriggerIncrementalSync() {
+  const toast = useToast()
+  const mutation = useMutation({
+    mutationFn: () => apiFetch('/playlist/sync-incremental', { method: 'POST' }),
+    onSuccess: (data: any) => {
+      toast.success('增量同步已提交', `Run ID: ${data?.run_id ?? '-'}`)
+    },
+    onError: (err: any) => {
+      toast.error('同步失败', err?.detail || err?.message || '未知错误')
+    },
+  })
+
+  return (
+    <button
+      onClick={() => mutation.mutate()}
+      disabled={mutation.isPending}
+      className="btn btn-secondary text-xs flex items-center gap-1.5 mt-2"
+    >
+      {mutation.isPending ? (
+        <><Zap className="w-3.5 h-3.5 animate-pulse" />同步中...</>
+      ) : mutation.isSuccess ? (
+        <><CheckCircle className="w-3.5 h-3.5" />已提交</>
+      ) : mutation.isError ? (
+        <><XCircle className="w-3.5 h-3.5" />重试</>
+      ) : (
+        <><Zap className="w-3.5 h-3.5" />立即同步</>
+      )}
+    </button>
   )
 }
