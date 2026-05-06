@@ -29,6 +29,13 @@ async function deleteBatch(id: number) {
   return apiFetch(`/webhooks/batches/${id}`, { method: 'DELETE' })
 }
 
+async function batchDeleteBatches(ids: number[]) {
+  return apiFetch('/webhooks/batches/delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  })
+}
+
 function statusBadge(status: string) {
   const text = labelOf(WEBHOOK_STATUS_LABELS, status)
 
@@ -184,6 +191,7 @@ export default function WebhooksPage() {
   const toast = useToast()
   const [page, setPage] = useState(1)
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['webhooks', page],
@@ -213,6 +221,20 @@ export default function WebhooksPage() {
     },
     onError: (error: Error) => {
       toast.error('删除失败', error.message)
+    },
+  })
+
+  const batchDeleteMutation = useMutation({
+    mutationFn: batchDeleteBatches,
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] })
+      queryClient.invalidateQueries({ queryKey: ['webhook-batch'] })
+      toast.success(`已删除 ${res.deleted} 条 Webhook 记录`)
+      setSelected(new Set())
+      setExpanded(null)
+    },
+    onError: (error: Error) => {
+      toast.error('批量删除失败', error.message)
     },
   })
 
@@ -252,9 +274,27 @@ export default function WebhooksPage() {
           <h1 className="page-title">Webhook 记录</h1>
           <p className="page-subtitle mt-1">查看缺失歌曲通知的发送状态、响应码和重试记录。</p>
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400">
-          共 {total} 条 · 每页 {PAGE_SIZE} 条
-          {isFetching && <span className="ml-2 text-cyan-600">刷新中...</span>}
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            共 {total} 条 · 每页 {PAGE_SIZE} 条
+            {isFetching && <span className="ml-2 text-cyan-600">刷新中...</span>}
+          </div>
+          {selected.size > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-cyan-600 font-medium">已选 {selected.size} 条</span>
+              <button
+                onClick={() => {
+                  if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？`)) return
+                  batchDeleteMutation.mutate(Array.from(selected))
+                }}
+                disabled={batchDeleteMutation.isPending}
+                className="btn btn-danger text-xs"
+              >
+                {batchDeleteMutation.isPending ? '删除中...' : `删除${selected.size}条`}
+              </button>
+              <button onClick={() => setSelected(new Set())} className="btn-secondary text-xs">取消</button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -298,13 +338,58 @@ export default function WebhooksPage() {
           />
         )}
 
+        {batches.length > 0 && selected.size > 0 && (
+          <div className="flex items-center justify-between gap-3 bg-cyan-50 dark:bg-cyan-950/30 rounded-xl border border-cyan-200 dark:border-cyan-800 p-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={selected.size === batches.length}
+                onChange={e => {
+                  if (e.target.checked) setSelected(new Set(batches.map((b: any) => b.id)))
+                  else setSelected(new Set())
+                }}
+                className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+              />
+              <span className="text-xs text-cyan-700 dark:text-cyan-300 font-medium">
+                全选本页 ({batches.length})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-cyan-600 font-medium">已选 {selected.size} 条</span>
+              <button
+                onClick={() => {
+                  if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？`)) return
+                  batchDeleteMutation.mutate(Array.from(selected))
+                }}
+                disabled={batchDeleteMutation.isPending}
+                className="btn btn-danger text-xs"
+              >
+                {batchDeleteMutation.isPending ? '删除中...' : `删除${selected.size}条`}
+              </button>
+              <button onClick={() => setSelected(new Set())} className="btn-secondary text-xs">取消</button>
+            </div>
+          </div>
+        )}
+
         {batches.map((b: any) => (
           <div key={b.id} className="card overflow-hidden">
             <div className="p-5">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div className="space-y-2 min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">#{b.id}</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(b.id)}
+                    onChange={e => {
+                      const next = new Set(selected)
+                      if (e.target.checked) next.add(b.id)
+                      else next.delete(b.id)
+                      setSelected(next)
+                    }}
+                    className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                  />
+                  <div className="space-y-2 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">#{b.id}</span>
                     <span className="text-xs text-slate-500 dark:text-slate-400 break-all">
                       {labelOf(PLAYLIST_TYPE_LABELS, b.playlist_type)}
                     </span>
