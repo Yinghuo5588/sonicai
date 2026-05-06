@@ -297,6 +297,43 @@ export default function SettingsSchedule() {
         </div>
       </SectionCard>
 
+      <SectionCard title="历史记录清理">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          控制 SonicAI 数据库中的推荐历史和 Webhook 记录保留时间。
+          自动清理不会删除 Navidrome 中已经创建的歌单。
+        </p>
+
+        <FieldInput
+          fieldKey="history_cleanup_enabled"
+          value={s.history_cleanup_enabled}
+          onChange={v => handleChange('history_cleanup_enabled', v)}
+        />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          <FieldInput
+            fieldKey="run_history_keep_days"
+            value={s.run_history_keep_days}
+            onChange={v => handleChange('run_history_keep_days', v)}
+          />
+          <FieldInput
+            fieldKey="webhook_history_keep_days"
+            value={s.webhook_history_keep_days}
+            onChange={v => handleChange('webhook_history_keep_days', v)}
+          />
+        </div>
+
+        <FieldInput
+          fieldKey="keep_failed_history"
+          value={s.keep_failed_history}
+          onChange={v => handleChange('keep_failed_history', v)}
+        />
+
+        <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 p-3 text-xs text-amber-700 dark:text-amber-300 mt-3">
+          注意:这里清理的是 SonicAI 的数据库历史记录,不会自动删除 Navidrome 中已生成的歌单。
+          如果需要删除 Navidrome 歌单,请在推荐历史详情页手动选择删除。
+        </div>
+      </SectionCard>
+
       <SaveBar
         hasChanges={hasChanges}
         isPending={mutation.isPending}
