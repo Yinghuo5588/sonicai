@@ -80,6 +80,12 @@ class SettingsResponse(BaseModel):
     missed_track_retry_limit: int | None = 100
     missed_track_retry_refresh_library: bool | None = True
 
+    # History cleanup
+    history_cleanup_enabled: bool | None = False
+    run_history_keep_days: int | None = 90
+    webhook_history_keep_days: int | None = 30
+    keep_failed_history: bool | None = True
+
     match_debug_enabled: bool | None = False
 
     class Config:
@@ -153,6 +159,12 @@ class SettingsUpdate(BaseModel):
     missed_track_retry_limit: int | None = Field(default=None, ge=1, le=1000)
     missed_track_retry_refresh_library: bool | None = None
     missed_track_retry_mode: str | None = None
+
+    # History cleanup
+    history_cleanup_enabled: bool | None = None
+    run_history_keep_days: int | None = Field(default=None, ge=1, le=3650)
+    webhook_history_keep_days: int | None = Field(default=None, ge=1, le=3650)
+    keep_failed_history: bool | None = None
 
     match_debug_enabled: bool | None = None
 
@@ -300,7 +312,7 @@ async def import_settings(
         "recent_top_mix_ratio", "search_concurrency", "hotboard_limit",
         "match_threshold", "candidate_pool_multiplier_min", "candidate_pool_multiplier_max",
         "hotboard_match_threshold", "playlist_sync_threshold", "duplicate_avoid_days",
-        "missed_track_retry_limit",
+        "missed_track_retry_limit", "run_history_keep_days", "webhook_history_keep_days",
     }
 
     # Fields that are enum-validated
