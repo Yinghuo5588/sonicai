@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -211,6 +212,69 @@ async def get_run(
             "missing": total_missing,
             "percent": round((total_matched / total_candidates * 100) if total_candidates > 0 else 0, 1),
         },
+    }
+
+
+class RunDeleteRequest(BaseModel):
+    ids: list[int]
+    delete_navidrome_playlist: bool = False
+
+
+# NOTE: /delete MUST be before /{run_id} to prevent FastAPI matching "delete" as run_id
+@router.post("/delete")
+async def delete_runs(
+    body: RunDeleteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="ids is required")
+
+    result = await db.execute(
+        select(RecommendationRun).where(RecommendationRun.id.in_(body.ids))
+    )
+    runs = result.scalars().all()
+
+    deleted = 0
+    skipped_active = 0
+    deleted_navidrome_playlists: list[str] = []
+    failed_navidrome_playlists: list[str] = []
+
+    if body.delete_navidrome_playlist:
+        from app.services.navidrome_service import navidrome_delete_playlist
+
+    for run in runs:
+        if run.status in ["pending", "running"]:
+            skipped_active += 1
+            continue
+
+        if body.delete_navidrome_playlist:
+            playlists_result = await db.execute(
+                select(GeneratedPlaylist).where(GeneratedPlaylist.run_id == run.id)
+            )
+            playlists = playlists_result.scalars().all()
+            for pl in playlists:
+                if not pl.navidrome_playlist_id:
+                    continue
+                ok = await navidrome_delete_playlist(str(pl.navidrome_playlist_id))
+                if ok:
+                    deleted_navidrome_playlists.append(str(pl.navidrome_playlist_id))
+                else:
+                    failed_navidrome_playlists.append(str(pl.navidrome_playlist_id))
+
+        await db.delete(run)
+        deleted += 1
+
+    await db.commit()
+
+    return {
+        "message": "Runs deleted",
+        "requested": len(body.ids),
+        "deleted": deleted,
+        "skipped_active": skipped_active,
+        "delete_navidrome_playlist": body.delete_navidrome_playlist,
+        "deleted_navidrome_playlists": deleted_navidrome_playlists,
+        "failed_navidrome_playlists": failed_navidrome_playlists,
     }
 
 
