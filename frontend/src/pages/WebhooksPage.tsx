@@ -25,6 +25,10 @@ async function retryBatch(id: number) {
   return apiFetch(`/webhooks/batches/${id}/retry`, { method: 'POST' })
 }
 
+async function deleteBatch(id: number) {
+  return apiFetch(`/webhooks/batches/${id}`, { method: 'DELETE' })
+}
+
 function statusBadge(status: string) {
   const text = labelOf(WEBHOOK_STATUS_LABELS, status)
 
@@ -105,13 +109,17 @@ function BatchCard({
   expanded,
   onToggle,
   onRetry,
+  onDelete,
   isRetrying,
+  isDeleting,
 }: {
   batch: any
   expanded: boolean
   onToggle: () => void
   onRetry: () => void
+  onDelete: () => void
   isRetrying: boolean
+  isDeleting: boolean
 }) {
   return (
     <div className="card overflow-hidden">
@@ -152,6 +160,13 @@ function BatchCard({
             <RefreshCw className={`w-4 h-4 ${isRetrying ? 'animate-spin' : ''}`} />
             {isRetrying ? '重试中' : '重试'}
           </button>
+          <button
+            onClick={onDelete}
+            disabled={isDeleting}
+            className="btn btn-danger flex-1 flex items-center justify-center gap-1.5"
+          >
+            {isDeleting ? '删除中' : '删除'}
+          </button>
         </div>
       </div>
 
@@ -185,6 +200,19 @@ export default function WebhooksPage() {
     },
     onError: (error: Error) => {
       toast.error('重试失败', error.message)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteBatch,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] })
+      queryClient.invalidateQueries({ queryKey: ['webhook-batch'] })
+      toast.success('Webhook 记录已删除')
+      setExpanded(null)
+    },
+    onError: (error: Error) => {
+      toast.error('删除失败', error.message)
     },
   })
 
@@ -248,7 +276,12 @@ export default function WebhooksPage() {
             expanded={expanded === b.id}
             onToggle={() => setExpanded(expanded === b.id ? null : b.id)}
             onRetry={() => retryMutation.mutate(b.id)}
+            onDelete={() => {
+              if (!confirm('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return
+              deleteMutation.mutate(b.id)
+            }}
             isRetrying={retryMutation.isPending}
+            isDeleting={deleteMutation.isPending}
           />
         ))}
       </div>
@@ -303,6 +336,16 @@ export default function WebhooksPage() {
                     className="btn-primary flex-1 sm:flex-none"
                   >
                     重试
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!confirm('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return
+                      deleteMutation.mutate(b.id)
+                    }}
+                    disabled={deleteMutation.isPending}
+                    className="btn btn-danger flex-1 sm:flex-none"
+                  >
+                    删除
                   </button>
                 </div>
               </div>
