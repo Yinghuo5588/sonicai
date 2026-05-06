@@ -203,3 +203,82 @@ async def run_playlist_sync_cron_job():
         playlist_name=settings.playlist_sync_name,
         overwrite=settings.playlist_sync_overwrite or False,
     )
+
+
+async def cleanup_old_history():
+    """Clean up old recommendation runs and webhook batches based on retention settings.
+
+    This only deletes SonicAI internal database records — it never deletes
+    Navidrome playlists, even if the cleanup setting is enabled.
+    """
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import select, and_
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import SystemSettings, RecommendationRun, WebhookBatch
+
+    logger.info("[history-cleanup] scanning old history")
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(SystemSettings))
+        settings = result.scalar_one_or_none()
+
+        if not settings or not getattr(settings, "history_cleanup_enabled", False):
+            logger.info("[history-cleanup] disabled")
+            return
+
+        run_days = int(getattr(settings, "run_history_keep_days", 90) or 90)
+        webhook_days = int(getattr(settings, "webhook_history_keep_days", 30) or 30)
+        keep_failed = bool(getattr(settings, "keep_failed_history", True))
+
+        now = datetime.now(timezone.utc)
+        run_cutoff = now - timedelta(days=run_days)
+        webhook_cutoff = now - timedelta(days=webhook_days)
+
+        # 1. Clean up old recommendation runs
+        run_conditions = [
+            RecommendationRun.created_at < run_cutoff,
+            RecommendationRun.status.notin_(["pending", "running"]),
+        ]
+
+        if keep_failed:
+            run_conditions.append(
+                RecommendationRun.status.in_(["success", "completed", "partial_success"])
+            )
+
+        old_runs_result = await db.execute(
+            select(RecommendationRun).where(and_(*run_conditions))
+        )
+        old_runs = old_runs_result.scalars().all()
+
+        deleted_runs = 0
+        for run in old_runs:
+            await db.delete(run)
+            deleted_runs += 1
+
+        # 2. Clean up old webhook batches
+        webhook_conditions = [
+            WebhookBatch.created_at < webhook_cutoff,
+        ]
+
+        if keep_failed:
+            webhook_conditions.append(WebhookBatch.status == "success")
+        else:
+            webhook_conditions.append(WebhookBatch.status.notin_(["pending", "retrying"]))
+
+        old_webhooks_result = await db.execute(
+            select(WebhookBatch).where(and_(*webhook_conditions))
+        )
+        old_webhooks = old_webhooks_result.scalars().all()
+
+        deleted_webhooks = 0
+        for batch in old_webhooks:
+            await db.delete(batch)
+            deleted_webhooks += 1
+
+        await db.commit()
+
+        logger.info(
+            "[history-cleanup] deleted runs=%s webhooks=%s",
+            deleted_runs,
+            deleted_webhooks,
+        )
