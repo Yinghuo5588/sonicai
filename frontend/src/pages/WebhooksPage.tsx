@@ -293,7 +293,7 @@ export default function WebhooksPage() {
             onToggle={() => setExpanded(expanded === b.id ? null : b.id)}
             onRetry={() => retryMutation.mutate(b.id)}
             onDelete={() => {
-              if (!confirm('确定删除这条 Webhook 记录吗?')) return
+              if (!confirm('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return
               deleteMutation.mutate(b.id)
             }}
             isRetrying={retryMutation.isPending}
@@ -319,8 +319,18 @@ export default function WebhooksPage() {
                 }}
                 className="w-4 h-4 rounded border-slate-300 text-cyan-600"
               />
-              <span className="text-xs text-cyan-700 dark:text-cyan-300 font-medium">全选本页</span>
+              <span className="text-xs text-cyan-700 dark:text-cyan-300 font-medium">已选 {selected.size} 条</span>
             </div>
+            <button
+              onClick={() => {
+                if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。`)) return
+                batchDeleteMutation.mutate(Array.from(selected))
+              }}
+              disabled={batchDeleteMutation.isPending}
+              className="btn btn-danger text-xs"
+            >
+              {batchDeleteMutation.isPending ? '删除中...' : `删除 ${selected.size} 条`}
+            </button>
           </div>
         )}
         {batches.map((b: any) => (
@@ -357,7 +367,7 @@ export default function WebhooksPage() {
                   </button>
                   <button onClick={() => retryMutation.mutate(b.id)} disabled={retryMutation.isPending} className="btn-primary text-xs">重试</button>
                   <button 
-                    onClick={() => { if(confirm('确定删除?')) deleteMutation.mutate(b.id) }} 
+                    onClick={() => { if(!confirm('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return; deleteMutation.mutate(b.id) }} 
                     disabled={deleteMutation.isPending} 
                     className="btn btn-danger text-xs"
                   >
