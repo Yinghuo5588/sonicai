@@ -294,10 +294,13 @@ export default function RunDetailPage() {
   })
 
   const handleDelete = () => {
-    if (!confirm('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。')) {
+    if (!confirm('确定删除这条推荐历史吗？')) {
       return
     }
-    deleteMutation.mutate(false)
+    const deleteNavidrome = confirm(
+      '是否同时删除 Navidrome 中已创建的歌单？\n\n建议选择"取消"，只删除 SonicAI 历史记录。'
+    )
+    deleteMutation.mutate(deleteNavidrome)
   }
 
   if (runLoading) return <div className="page text-slate-500">加载中...</div>
