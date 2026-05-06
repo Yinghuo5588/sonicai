@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
@@ -12,6 +13,7 @@ import {
 
 const PAGE_SIZE = 5
 
+// API 函数
 async function fetchBatches(page: number) {
   const offset = (page - 1) * PAGE_SIZE
   return apiFetch(`/webhooks/batches?limit=${PAGE_SIZE}&offset=${offset}`)
@@ -36,9 +38,9 @@ async function batchDeleteBatches(ids: number[]) {
   })
 }
 
+// 辅助组件：状态徽章
 function statusBadge(status: string) {
   const text = labelOf(WEBHOOK_STATUS_LABELS, status)
-
   if (status === 'success') {
     return (
       <span className="badge badge-success flex items-center gap-1">
@@ -47,7 +49,6 @@ function statusBadge(status: string) {
       </span>
     )
   }
-
   if (status === 'failed') {
     return (
       <span className="badge badge-danger flex items-center gap-1">
@@ -56,7 +57,6 @@ function statusBadge(status: string) {
       </span>
     )
   }
-
   if (status === 'retrying') {
     return (
       <span className="badge badge-warning flex items-center gap-1">
@@ -65,10 +65,10 @@ function statusBadge(status: string) {
       </span>
     )
   }
-
   return <span className="badge badge-muted">{text}</span>
 }
 
+// 辅助组件：详情预览
 function BatchPreview({ batchId }: { batchId: number }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['webhook-batch', batchId],
@@ -92,7 +92,6 @@ function BatchPreview({ batchId }: { batchId: number }) {
           <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">HTTP {(data as any).response_code}</span>
         )}
       </div>
-
       {items.length > 0 && (
         <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1 max-h-48 overflow-y-auto pr-1">
           {items.slice(0, 20).map((item: any) => (
@@ -110,7 +109,7 @@ function BatchPreview({ batchId }: { batchId: number }) {
   )
 }
 
-/* ---------- 移动端 Webhook 批次卡片 ---------- */
+// 移动端卡片组件
 function BatchCard({
   batch,
   expanded,
@@ -140,7 +139,6 @@ function BatchCard({
               </span>
               {statusBadge(batch.status)}
             </div>
-
             <div className="flex flex-wrap gap-2 text-[11px] text-slate-500 dark:text-slate-400">
               <span className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 px-2 py-1 rounded-lg font-medium">
                 重试 {batch.retry_count}/{batch.max_retry_count}
@@ -151,32 +149,19 @@ function BatchCard({
             </div>
           </div>
         </div>
-
         <div className="flex gap-2">
-          <button
-            onClick={onToggle}
-            className="btn btn-secondary flex-1 flex items-center justify-center gap-1.5"
-          >
+          <button onClick={onToggle} className="btn btn-secondary flex-1 flex items-center justify-center gap-1.5">
             {expanded ? <><ChevronUp className="w-4 h-4" />收起</> : <><ChevronDown className="w-4 h-4" />预览</>}
           </button>
-          <button
-            onClick={onRetry}
-            disabled={isRetrying}
-            className="btn btn-primary flex-1 flex items-center justify-center gap-1.5"
-          >
+          <button onClick={onRetry} disabled={isRetrying} className="btn btn-primary flex-1 flex items-center justify-center gap-1.5">
             <RefreshCw className={`w-4 h-4 ${isRetrying ? 'animate-spin' : ''}`} />
             {isRetrying ? '重试中' : '重试'}
           </button>
-          <button
-            onClick={onDelete}
-            disabled={isDeleting}
-            className="btn btn-danger flex-1 flex items-center justify-center gap-1.5"
-          >
+          <button onClick={onDelete} disabled={isDeleting} className="btn btn-danger flex-1 flex items-center justify-center gap-1.5">
             {isDeleting ? '删除中' : '删除'}
           </button>
         </div>
       </div>
-
       {expanded && (
         <div className="border-t border-border/50 bg-slate-50/70 dark:bg-slate-950/40 p-4">
           <BatchPreview batchId={batch.id} />
@@ -186,6 +171,7 @@ function BatchCard({
   )
 }
 
+// 主页面组件
 export default function WebhooksPage() {
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -193,12 +179,14 @@ export default function WebhooksPage() {
   const [expanded, setExpanded] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
 
+  // 数据查询 [1]
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['webhooks', page],
     queryFn: () => fetchBatches(page),
     placeholderData: previous => previous,
   })
 
+  // 重试操作
   const retryMutation = useMutation({
     mutationFn: retryBatch,
     onSuccess: () => {
@@ -206,42 +194,37 @@ export default function WebhooksPage() {
       queryClient.invalidateQueries({ queryKey: ['webhook-batch'] })
       toast.success('重试请求已提交', 'Webhook 将在后台重新发送')
     },
-    onError: (error: Error) => {
-      toast.error('重试失败', error.message)
-    },
+    onError: (error: Error) => toast.error('重试失败', error.message),
   })
 
+  // 删除操作
   const deleteMutation = useMutation({
     mutationFn: deleteBatch,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
-      queryClient.invalidateQueries({ queryKey: ['webhook-batch'] })
       toast.success('Webhook 记录已删除')
       setExpanded(null)
     },
-    onError: (error: Error) => {
-      toast.error('删除失败', error.message)
-    },
+    onError: (error: Error) => toast.error('删除失败', error.message),
   })
 
+  // 批量删除操作 [1]
   const batchDeleteMutation = useMutation({
     mutationFn: batchDeleteBatches,
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
-      queryClient.invalidateQueries({ queryKey: ['webhook-batch'] })
       toast.success(`已删除 ${res.deleted} 条 Webhook 记录`)
       setSelected(new Set())
       setExpanded(null)
     },
-    onError: (error: Error) => {
-      toast.error('批量删除失败', error.message)
-    },
+    onError: (error: Error) => toast.error('批量删除失败', error.message),
   })
 
   const batches = data?.items || []
   const total = data?.total || 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
+  // 页面溢出校验
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages)
@@ -249,6 +232,7 @@ export default function WebhooksPage() {
     }
   }, [page, totalPages])
 
+  // 生成页码逻辑 [1]
   const pageNumbers = useMemo(() => {
     const pages: number[] = []
     const start = Math.max(1, page - 2)
@@ -263,9 +247,7 @@ export default function WebhooksPage() {
     setExpanded(null)
   }
 
-  if (isLoading) {
-    return <div className="p-6 text-slate-500">加载中...</div>
-  }
+  if (isLoading) return <div className="p-6 text-slate-500">加载中...</div>
 
   return (
     <div className="page">
@@ -284,7 +266,7 @@ export default function WebhooksPage() {
               <span className="text-xs text-cyan-600 font-medium">已选 {selected.size} 条</span>
               <button
                 onClick={() => {
-                  if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？`)) return
+                  if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗?`)) return
                   batchDeleteMutation.mutate(Array.from(selected))
                 }}
                 disabled={batchDeleteMutation.isPending}
@@ -299,15 +281,9 @@ export default function WebhooksPage() {
       </div>
 
       {/* 移动端卡片列表 */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-3 mt-4">
         {batches.length === 0 && (
-          <EmptyState
-            icon={Link2}
-            title="暂无 Webhook 记录"
-            description="当推荐或歌单同步出现缺失歌曲，并且开启 allow_missing 与 Webhook 后，这里会出现通知记录。"
-            actionLabel="检查服务连接"
-            actionTo="/settings/connections"
-          />
+          <EmptyState icon={Link2} title="暂无 Webhook 记录" description="当同步出现缺失歌曲并开启 Webhook 后，这里会出现记录。" actionTo="/settings/connections" />
         )}
         {batches.map((b: any) => (
           <BatchCard
@@ -317,7 +293,7 @@ export default function WebhooksPage() {
             onToggle={() => setExpanded(expanded === b.id ? null : b.id)}
             onRetry={() => retryMutation.mutate(b.id)}
             onDelete={() => {
-              if (!confirm('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return
+              if (!confirm('确定删除这条 Webhook 记录吗?')) return
               deleteMutation.mutate(b.id)
             }}
             isRetrying={retryMutation.isPending}
@@ -327,17 +303,10 @@ export default function WebhooksPage() {
       </div>
 
       {/* 桌面端表格 */}
-      <div className="hidden md:block space-y-3">
+      <div className="hidden md:block space-y-3 mt-4">
         {batches.length === 0 && (
-          <EmptyState
-            icon={Link2}
-            title="暂无 Webhook 记录"
-            description="当推荐或歌单同步出现缺失歌曲，并且开启 allow_missing 与 Webhook 后，这里会出现通知记录。"
-            actionLabel="检查服务连接"
-            actionTo="/settings/connections"
-          />
+          <EmptyState icon={Link2} title="暂无 Webhook 记录" description="当同步出现缺失歌曲并开启 Webhook 后，这里会出现记录。" />
         )}
-
         {batches.length > 0 && selected.size > 0 && (
           <div className="flex items-center justify-between gap-3 bg-cyan-50 dark:bg-cyan-950/30 rounded-xl border border-cyan-200 dark:border-cyan-800 p-3">
             <div className="flex items-center gap-2">
@@ -348,34 +317,17 @@ export default function WebhooksPage() {
                   if (e.target.checked) setSelected(new Set(batches.map((b: any) => b.id)))
                   else setSelected(new Set())
                 }}
-                className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                className="w-4 h-4 rounded border-slate-300 text-cyan-600"
               />
-              <span className="text-xs text-cyan-700 dark:text-cyan-300 font-medium">
-                全选本页 ({batches.length})
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-cyan-600 font-medium">已选 {selected.size} 条</span>
-              <button
-                onClick={() => {
-                  if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？`)) return
-                  batchDeleteMutation.mutate(Array.from(selected))
-                }}
-                disabled={batchDeleteMutation.isPending}
-                className="btn btn-danger text-xs"
-              >
-                {batchDeleteMutation.isPending ? '删除中...' : `删除${selected.size}条`}
-              </button>
-              <button onClick={() => setSelected(new Set())} className="btn-secondary text-xs">取消</button>
+              <span className="text-xs text-cyan-700 dark:text-cyan-300 font-medium">全选本页</span>
             </div>
           </div>
         )}
-
         {batches.map((b: any) => (
           <div key={b.id} className="card overflow-hidden">
             <div className="p-5">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div className="flex items-center gap-2">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-4 flex-1">
                   <input
                     type="checkbox"
                     checked={selected.has(b.id)}
@@ -385,121 +337,68 @@ export default function WebhooksPage() {
                       else next.delete(b.id)
                       setSelected(next)
                     }}
-                    className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                    className="w-4 h-4 rounded border-slate-300 text-cyan-600"
                   />
-                  <div className="space-y-2 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">#{b.id}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 break-all">
-                      {labelOf(PLAYLIST_TYPE_LABELS, b.playlist_type)}
-                    </span>
-                    {statusBadge(b.status)}
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-2.5">
-                      <div>重试</div>
-                      <div className="font-semibold text-slate-800 dark:text-slate-100">{b.retry_count}/{b.max_retry_count}</div>
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">#{b.id}</span>
+                      <span className="text-xs text-slate-500">{labelOf(PLAYLIST_TYPE_LABELS, b.playlist_type)}</span>
+                      {statusBadge(b.status)}
                     </div>
-                    <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-2.5">
-                      <div>响应码</div>
-                      <div className="font-semibold text-slate-800 dark:text-slate-100">{b.response_code ?? '-'}</div>
+                    <div className="flex gap-4 text-xs text-slate-500">
+                      <span>重试: {b.retry_count}/{b.max_retry_count}</span>
+                      <span>响应码: {b.response_code ?? '-'}</span>
                     </div>
                   </div>
                 </div>
-
-                <div className="flex gap-2 sm:justify-end shrink-0">
-                  <button
-                    onClick={() => setExpanded(expanded === b.id ? null : b.id)}
-                    className="btn-secondary flex-1 sm:flex-none"
-                  >
+                <div className="flex gap-2">
+                  <button onClick={() => setExpanded(expanded === b.id ? null : b.id)} className="btn-secondary text-xs">
                     {expanded === b.id ? '收起' : '预览'}
                   </button>
-                  <button
-                    onClick={() => retryMutation.mutate(b.id)}
-                    disabled={retryMutation.isPending}
-                    className="btn-primary flex-1 sm:flex-none"
-                  >
-                    重试
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!confirm('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return
-                      deleteMutation.mutate(b.id)
-                    }}
-                    disabled={deleteMutation.isPending}
-                    className="btn btn-danger flex-1 sm:flex-none"
+                  <button onClick={() => retryMutation.mutate(b.id)} disabled={retryMutation.isPending} className="btn-primary text-xs">重试</button>
+                  <button 
+                    onClick={() => { if(confirm('确定删除?')) deleteMutation.mutate(b.id) }} 
+                    disabled={deleteMutation.isPending} 
+                    className="btn btn-danger text-xs"
                   >
                     删除
                   </button>
                 </div>
               </div>
+              {expanded === b.id && (
+                <div className="mt-4 border-t pt-4">
+                  <BatchPreview batchId={b.id} />
+                </div>
+              )}
             </div>
-
-            {expanded === b.id && (
-              <div className="border-t border-border bg-slate-50/70 dark:bg-slate-950/40 p-5">
-                <BatchPreview batchId={b.id} />
-              </div>
-            )}
           </div>
-        ))
+        ))}
       </div>
 
-      {/* 分页 */}
+      {/* 分页组件 [1] */}
       {totalPages > 1 && (
-        <div className="card card-padding flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="text-xs text-slate-500 dark:text-slate-400 text-center sm:text-left">
-            第 {page} / {totalPages} 页
-          </div>
-
+        <div className="card card-padding mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="text-xs text-slate-500">第 {page} / {totalPages} 页</div>
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            <button
-              className="btn-secondary"
-              onClick={() => goPage(page - 1)}
-              disabled={page <= 1}
-            >
-              上一页
-            </button>
-
+            <button className="btn-secondary" onClick={() => goPage(page - 1)} disabled={page <= 1}>上一页</button>
             {pageNumbers[0] > 1 && (
               <>
-                <button onClick={() => goPage(1)} className="h-9 min-w-9 rounded-xl border border-border bg-card px-3 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900">
-                  1
-                </button>
+                <button onClick={() => goPage(1)} className="h-9 min-w-9 rounded-xl border border-border bg-card text-sm">1</button>
                 <span className="text-slate-400">...</span>
               </>
             )}
-
             {pageNumbers.map(p => (
               <button
                 key={p}
                 onClick={() => goPage(p)}
-                className={
-                  p === page
-                    ? 'h-9 min-w-9 rounded-xl bg-cyan-600 px-3 text-sm font-medium text-white'
-                    : 'h-9 min-w-9 rounded-xl border border-border bg-card px-3 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
-                }
+                className={p === page 
+                  ? 'h-9 min-w-9 rounded-xl bg-cyan-600 px-3 text-sm font-medium text-white' 
+                  : 'h-9 min-w-9 rounded-xl border border-border bg-card px-3 text-sm text-slate-600 hover:bg-slate-50'}
               >
                 {p}
               </button>
             ))}
-
-            {pageNumbers[pageNumbers.length - 1] < totalPages && (
-              <>
-                <span className="text-slate-400">...</span>
-                <button onClick={() => goPage(totalPages)} className="h-9 min-w-9 rounded-xl border border-border bg-card px-3 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900">
-                  {totalPages}
-                </button>
-              </>
-            )}
-
-            <button
-              className="btn-secondary"
-              onClick={() => goPage(page + 1)}
-              disabled={page >= totalPages}
-            >
-              下一页
-            </button>
+            <button className="btn-secondary" onClick={() => goPage(page + 1)} disabled={page >= totalPages}>下一页</button>
           </div>
         </div>
       )}
