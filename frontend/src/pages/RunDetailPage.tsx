@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import apiFetch from '@/lib/api'
 import { formatRelativeTime, formatDateTime } from '@/lib/date'
 import {
@@ -19,6 +19,7 @@ import {
   PLAYLIST_TYPE_LABELS,
   labelOf,
 } from '@/lib/labels'
+import { useToast } from '@/components/ui/useToast'
 
 async function fetchRunDetail(runId: number) {
   return apiFetch(`/runs/${runId}`)
@@ -30,6 +31,13 @@ async function fetchRunPlaylists(runId: number) {
 
 async function stopJob(runId: number) {
   return apiFetch(`/jobs/${runId}/stop`, { method: 'POST' })
+}
+
+async function deleteRun(runId: number, deleteNavidromePlaylist = false) {
+  return apiFetch(
+    `/runs/${runId}?delete_navidrome_playlist=${deleteNavidromePlaylist}`,
+    { method: 'DELETE' },
+  )
 }
 
 function runTypeLabel(type: string) {
@@ -232,6 +240,8 @@ export default function RunDetailPage() {
   const { run_id } = useParams<{ run_id: string }>()
   const rid = Number(run_id)
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const toast = useToast()
   const [stopping, setStopping] = useState(false)
 
   const { data: run, isLoading: runLoading, error: runError } = useQuery({
@@ -271,13 +281,32 @@ export default function RunDetailPage() {
     stopMutation.mutate()
   }
 
+  const deleteMutation = useMutation({
+    mutationFn: (deleteNavidromePlaylist: boolean) => deleteRun(rid, deleteNavidromePlaylist),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['runs'] })
+      toast.success('推荐历史已删除')
+      navigate('/history', { replace: true })
+    },
+    onError: (err: Error) => {
+      toast.error('删除失败', err.message)
+    },
+  })
+
+  const handleDelete = () => {
+    if (!confirm('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。')) {
+      return
+    }
+    deleteMutation.mutate(false)
+  }
+
   if (runLoading) return <div className="page text-slate-500">加载中...</div>
   if (runError) return <div className="page text-red-500">加载失败：{(runError as Error).message}</div>
   if (!run) return <div className="page text-slate-500">任务不存在</div>
 
   return (
     <div className="page">
-      {/* 返回 + 停止按钮 */}
+      {/* 返回 + 操作按钮 */}
       <div className="flex items-center justify-between gap-3">
         <Link
           to="/history"
@@ -285,19 +314,30 @@ export default function RunDetailPage() {
         >
           <ArrowLeft className="w-4 h-4" />推荐历史
         </Link>
-        {isActiveRun && (
-          <button
-            onClick={handleStop}
-            disabled={stopping || stopMutation.isPending}
-            className="btn btn-danger flex items-center gap-1.5"
-          >
-            {stopping || stopMutation.isPending ? (
-              <><RotateCw className="w-4 h-4 animate-spin" />停止中...</>
-            ) : (
-              <><StopCircle className="w-4 h-4" />停止任务</>
-            )}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {isActiveRun && (
+            <button
+              onClick={handleStop}
+              disabled={stopping || stopMutation.isPending}
+              className="btn btn-danger flex items-center gap-1.5"
+            >
+              {stopping || stopMutation.isPending ? (
+                <><RotateCw className="w-4 h-4 animate-spin" />停止中...</>
+              ) : (
+                <><StopCircle className="w-4 h-4" />停止任务</>
+              )}
+            </button>
+          )}
+          {!isActiveRun && (
+            <button
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="btn btn-danger flex items-center gap-1.5"
+            >
+              {deleteMutation.isPending ? '删除中...' : '删除历史'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 头部信息 */}
