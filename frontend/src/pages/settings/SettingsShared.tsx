@@ -201,6 +201,34 @@ export const FIELD_LABELS: Record<string, { label: string; type?: string; toolti
       '▸ 推荐歌单在 Navidrome 中保留多少天\n' +
       ' 0 = 永不过期（慎用）',
   },
+  history_cleanup_enabled: {
+    label: '启用历史自动清理',
+    type: 'boolean',
+    tooltip:
+      '▸ 开启后,系统每天自动清理超过保留天数的推荐历史和 Webhook 记录。\n' +
+      ' 默认关闭,避免升级后误删历史数据。',
+  },
+  run_history_keep_days: {
+    label: '推荐历史保留天数',
+    type: 'number',
+    tooltip:
+      '▸ 推荐历史在 SonicAI 数据库中保留多少天。\n' +
+      ' 只清理 SonicAI 内部历史记录,不会删除 Navidrome 中已创建的歌单。',
+  },
+  webhook_history_keep_days: {
+    label: 'Webhook 记录保留天数',
+    type: 'number',
+    tooltip:
+      '▸ Webhook 发送记录保留多少天。\n' +
+      ' 建议成功记录保留 30 天,失败记录可选择保留用于排查问题。',
+  },
+  keep_failed_history: {
+    label: '保留失败记录',
+    type: 'boolean',
+    tooltip:
+      '▸ 开启后,自动清理只删除成功记录。\n' +
+      ' 失败、停止、部分成功记录会保留,方便排查问题。',
+  },
   max_concurrent_tasks: {
     label: '任务并发数',
     type: 'number',
