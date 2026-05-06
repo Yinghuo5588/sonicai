@@ -116,6 +116,8 @@ function BatchCard({
   onToggle,
   onRetry,
   onDelete,
+  onToggleSelect,
+  isSelected,
   isRetrying,
   isDeleting,
 }: {
@@ -124,6 +126,8 @@ function BatchCard({
   onToggle: () => void
   onRetry: () => void
   onDelete: () => void
+  onToggleSelect: () => void
+  isSelected: boolean
   isRetrying: boolean
   isDeleting: boolean
 }) {
@@ -131,21 +135,29 @@ function BatchCard({
     <div className="card overflow-hidden">
       <div className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="space-y-2 min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">#{batch.id}</span>
-              <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full break-all">
-                {labelOf(PLAYLIST_TYPE_LABELS, batch.playlist_type)}
-              </span>
-              {statusBadge(batch.status)}
-            </div>
-            <div className="flex flex-wrap gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-              <span className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 px-2 py-1 rounded-lg font-medium">
-                重试 {batch.retry_count}/{batch.max_retry_count}
-              </span>
-              <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-                响应码 {batch.response_code ?? '-'}
-              </span>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onToggleSelect}
+              className="w-4 h-4 rounded border-slate-300 text-cyan-600"
+            />
+            <div className="space-y-2 min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">#{batch.id}</span>
+                <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full break-all">
+                  {labelOf(PLAYLIST_TYPE_LABELS, batch.playlist_type)}
+                </span>
+                {statusBadge(batch.status)}
+              </div>
+              <div className="flex flex-wrap gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 px-2 py-1 rounded-lg font-medium">
+                  重试 {batch.retry_count}/{batch.max_retry_count}
+                </span>
+                <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                  响应码 {batch.response_code ?? '-'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -266,7 +278,7 @@ export default function WebhooksPage() {
               <span className="text-xs text-cyan-600 font-medium">已选 {selected.size} 条</span>
               <button
                 onClick={() => {
-                  if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗?`)) return
+                  if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。`)) return
                   batchDeleteMutation.mutate(Array.from(selected))
                 }}
                 disabled={batchDeleteMutation.isPending}
@@ -285,6 +297,24 @@ export default function WebhooksPage() {
         {batches.length === 0 && (
           <EmptyState icon={Link2} title="暂无 Webhook 记录" description="当同步出现缺失歌曲并开启 Webhook 后，这里会出现记录。" actionTo="/settings/connections" />
         )}
+        {batches.length > 0 && selected.size > 0 && (
+          <div className="flex items-center justify-between gap-3 bg-cyan-50 dark:bg-cyan-950/30 rounded-xl border border-cyan-200 dark:border-cyan-800 p-3">
+            <span className="text-xs text-cyan-700 dark:text-cyan-300 font-medium">已选 {selected.size} 条</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。`)) return
+                  batchDeleteMutation.mutate(Array.from(selected))
+                }}
+                disabled={batchDeleteMutation.isPending}
+                className="btn btn-danger text-xs"
+              >
+                {batchDeleteMutation.isPending ? '删除中...' : `删除 ${selected.size} 条`}
+              </button>
+              <button onClick={() => setSelected(new Set())} className="btn-secondary text-xs">取消</button>
+            </div>
+          </div>
+        )}
         {batches.map((b: any) => (
           <BatchCard
             key={b.id}
@@ -296,6 +326,13 @@ export default function WebhooksPage() {
               if (!confirm('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return
               deleteMutation.mutate(b.id)
             }}
+            onToggleSelect={() => {
+              const next = new Set(selected)
+              if (next.has(b.id)) next.delete(b.id)
+              else next.add(b.id)
+              setSelected(next)
+            }}
+            isSelected={selected.has(b.id)}
             isRetrying={retryMutation.isPending}
             isDeleting={deleteMutation.isPending}
           />
