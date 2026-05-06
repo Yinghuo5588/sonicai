@@ -168,6 +168,11 @@ export interface Settings {
   missed_track_retry_limit: number | null
   missed_track_retry_refresh_library: boolean | null
   missed_track_retry_mode: string | null
+  // History cleanup
+  history_cleanup_enabled: boolean | null
+  run_history_keep_days: number | null
+  webhook_history_keep_days: number | null
+  keep_failed_history: boolean | null
   // Match debug
   match_debug_enabled: boolean | null
   max_concurrent_tasks: number | null
