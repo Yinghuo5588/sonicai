@@ -134,6 +134,12 @@ class SystemSettings(Base):
     missed_track_retry_refresh_library = Column(Boolean, default=True)
     missed_track_retry_mode = Column(String(20), default="local")  # local | api | full
 
+    # History cleanup
+    history_cleanup_enabled = Column(Boolean, default=False)
+    run_history_keep_days = Column(Integer, default=90)
+    webhook_history_keep_days = Column(Integer, default=30)
+    keep_failed_history = Column(Boolean, default=True)
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
