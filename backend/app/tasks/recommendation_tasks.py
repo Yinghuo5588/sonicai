@@ -135,7 +135,7 @@ async def run_hotboard_cron_job():
     await run_hotboard_sync(
         run_id=run_id,
         limit=settings.hotboard_limit or 50,
-        match_threshold=float(settings.hotboard_match_threshold),
+        match_threshold=float(settings.hotboard_match_threshold or 0.75),
         playlist_name=settings.hotboard_playlist_name,
         overwrite=settings.hotboard_overwrite if settings.hotboard_overwrite is not None else True,
         trigger_type="scheduled",
@@ -199,7 +199,7 @@ async def run_playlist_sync_cron_job():
     await run_incremental_playlist_sync(
         run_id=run_id,
         url=settings.playlist_sync_url,
-        match_threshold=float(settings.playlist_sync_threshold),
+        match_threshold=float(settings.playlist_sync_threshold or 0.75),
         playlist_name=settings.playlist_sync_name,
         overwrite=settings.playlist_sync_overwrite or False,
     )
