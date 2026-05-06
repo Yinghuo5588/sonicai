@@ -218,6 +218,17 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
                 raise HTTPException(status_code=400, detail="webhook_headers_json must be valid JSON")
         # All other fields (including None) are saved as-is
         setattr(s, key, value)
+
+    # Track who owns the cron config so background jobs run as that user
+    cron_keys = {
+        "cron_enabled", "cron_expression", "recommendation_cron_run_type",
+        "hotboard_cron_enabled", "hotboard_cron_expression",
+        "playlist_sync_cron_enabled", "playlist_sync_cron_expression",
+        "missed_track_retry_enabled", "missed_track_retry_cron",
+        "song_cache_auto_refresh_enabled", "song_cache_refresh_cron",
+    }
+    if set(body.model_dump(exclude_unset=True).keys()) & cron_keys:
+        s.cron_created_by_user_id = current_user.id
     await db.commit()
     await db.refresh(s)
 

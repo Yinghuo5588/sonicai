@@ -134,6 +134,9 @@ class SystemSettings(Base):
     missed_track_retry_refresh_library = Column(Boolean, default=True)
     missed_track_retry_mode = Column(String(20), default="local")  # local | api | full
 
+    # Cron ownership — remembers which user configured the cron jobs
+    cron_created_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     # History cleanup
     history_cleanup_enabled = Column(Boolean, default=False)
     run_history_keep_days = Column(Integer, default=90)
