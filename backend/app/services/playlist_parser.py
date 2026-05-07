@@ -110,7 +110,7 @@ def _normalize_url(url: str) -> str:
     # Normalize path: /m/playlist → /playlist for netease
     path = parsed.path.rstrip("/")
     if path.endswith("/m/playlist"):
-        path = path[:-6] + "/playlist"  # /m/playlist → /playlist
+        path = path.replace("/m/playlist", "/playlist")
 
     # Keep only `id` (strip creatorId, uin, etc.)
     id_params = [(k, v) for k, v in query if k == "id"]
