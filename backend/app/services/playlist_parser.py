@@ -56,7 +56,8 @@ async def parse_playlist_url(url: str, api_base: str) -> tuple[str, str, list[di
                 data={"url": clean_url},
                 headers={
                     "Accept": "application/json, text/plain, */*",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 },
             )
             resp.raise_for_status()
