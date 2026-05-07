@@ -8,13 +8,23 @@ logger = logging.getLogger(__name__)
 async def run_recommendation_job(run_type: str = "full"):
     """Async entry for APScheduler — creates pending run first, then executes."""
     from fastapi import HTTPException
-    from app.core.config import settings
+    from sqlalchemy import select
+    from app.db.session import AsyncSessionLocal
+    from app.db.models import SystemSettings
     from app.services.job_run_service import create_pending_run
     from app.services.recommendation_service import (
         run_full_recommendation,
         run_similar_tracks_only,
         run_similar_artists_only,
     )
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(SystemSettings))
+        settings = result.scalar_one_or_none()
+        if not settings:
+            logger.warning("[scheduler] no SystemSettings found, skipping job")
+            return
+        cron_user_id = settings.cron_created_by_user_id
 
     if run_type == "full":
         conflict_types = ["full", "similar_tracks", "similar_artists"]
@@ -29,7 +39,7 @@ async def run_recommendation_job(run_type: str = "full"):
     try:
         run_id = await create_pending_run(
             run_type=run_type,
-            current_user_id=settings.cron_created_by_user_id,
+            current_user_id=cron_user_id,
             trigger_type="scheduled",
             conflict_types=conflict_types,
             lock_scope="recommendation",
@@ -107,20 +117,20 @@ async def run_hotboard_cron_job():
     from sqlalchemy import select
     from app.db.session import AsyncSessionLocal
     from app.db.models import SystemSettings
-    from app.core.config import settings as app_settings
     from app.services.job_run_service import create_pending_run
     from app.services.hotboard_recommend import run_hotboard_sync
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
-        settings = result.scalar_one_or_none()
-        if not settings or not settings.hotboard_cron_enabled:
+        settings_row = result.scalar_one_or_none()
+        if not settings_row or not settings_row.hotboard_cron_enabled:
             return
+        cron_user_id = settings_row.cron_created_by_user_id
 
     try:
         run_id = await create_pending_run(
             run_type="hotboard",
-            current_user_id=app_settings.cron_created_by_user_id,
+            current_user_id=cron_user_id,
             trigger_type="scheduled",
             conflict_types=["hotboard"],
             lock_scope="hotboard",
@@ -136,10 +146,10 @@ async def run_hotboard_cron_job():
 
     await run_hotboard_sync(
         run_id=run_id,
-        limit=settings.hotboard_limit or 50,
-        match_threshold=float(settings.hotboard_match_threshold or 0.75),
-        playlist_name=settings.hotboard_playlist_name,
-        overwrite=settings.hotboard_overwrite if settings.hotboard_overwrite is not None else True,
+        limit=settings_row.hotboard_limit or 50,
+        match_threshold=float(settings_row.hotboard_match_threshold or 0.75),
+        playlist_name=settings_row.hotboard_playlist_name,
+        overwrite=settings_row.hotboard_overwrite if settings_row.hotboard_overwrite is not None else True,
         trigger_type="scheduled",
     )
 
@@ -169,23 +179,23 @@ async def run_playlist_sync_cron_job():
     from sqlalchemy import select
     from app.db.session import AsyncSessionLocal
     from app.db.models import SystemSettings
-    from app.core.config import settings as app_settings
     from app.services.job_run_service import create_pending_run
     from app.services.playlist_incremental import run_incremental_playlist_sync
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
-        settings = result.scalar_one_or_none()
-        if not settings or not settings.playlist_sync_cron_enabled:
+        settings_row = result.scalar_one_or_none()
+        if not settings_row or not settings_row.playlist_sync_cron_enabled:
             return
-        if not settings.playlist_sync_url:
+        if not settings_row.playlist_sync_url:
             logger.warning("[scheduler] playlist_sync_cron enabled but no URL configured, skipping")
             return
+        cron_user_id = settings_row.cron_created_by_user_id
 
     try:
         run_id = await create_pending_run(
             run_type="playlist",
-            current_user_id=app_settings.cron_created_by_user_id,
+            current_user_id=cron_user_id,
             trigger_type="scheduled",
             conflict_types=["playlist"],
             lock_scope="playlist",
@@ -201,10 +211,10 @@ async def run_playlist_sync_cron_job():
 
     await run_incremental_playlist_sync(
         run_id=run_id,
-        url=settings.playlist_sync_url,
-        match_threshold=float(settings.playlist_sync_threshold or 0.75),
-        playlist_name=settings.playlist_sync_name,
-        overwrite=settings.playlist_sync_overwrite or False,
+        url=settings_row.playlist_sync_url,
+        match_threshold=float(settings_row.playlist_sync_threshold or 0.75),
+        playlist_name=settings_row.playlist_sync_name,
+        overwrite=settings_row.playlist_sync_overwrite or False,
     )
 
 
