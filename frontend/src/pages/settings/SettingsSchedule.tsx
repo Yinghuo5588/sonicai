@@ -481,6 +481,15 @@ function PlaylistLifecycleCard({
 
   const policies = (policiesData as any)?.items || []
 
+  const TYPE_LABELS: Record<string, string> = {
+    similar_tracks: 'Last.fm 相似曲目',
+    similar_artists: 'Last.fm 相邻艺术家',
+    hotboard: '网易云热榜',
+    playlist_netease: '第三方歌单',
+    playlist_text: '文本歌单',
+    playlist_incremental: '歌单链接增量同步',
+  }
+
   const updatePolicyField = (
     row: any,
     key: string,
@@ -575,7 +584,7 @@ function PlaylistLifecycleCard({
                 {policies.map((row: any) => (
                   <tr key={row.playlist_type} className="border-t border-border">
                     <td className="p-3 font-medium">
-                      {row.playlist_type}
+                      {TYPE_LABELS[row.playlist_type] ?? row.playlist_type}
                     </td>
 
                     <td className="p-3">
