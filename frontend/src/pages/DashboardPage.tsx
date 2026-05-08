@@ -16,6 +16,7 @@ import {
   Music2,
   Clock,
 } from 'lucide-react'
+import MetricCard from '@/components/ui/MetricCard'
 import { RUN_TYPE_LABELS, labelOf } from '@/lib/labels'
 import loginLogo from '@/assets/login-logo.webp'
 
@@ -292,57 +293,57 @@ export default function DashboardPage() {
 
       {/* 核心统计（桌面4列，移动2列） */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="总执行次数" value={d.total_runs ?? 0} icon={Play} />
-        <StatCard label="生成歌单" value={d.total_playlists ?? 0} icon={Music2} />
-        <StatCard label="命中歌曲" value={d.total_matched ?? 0} color="text-emerald-600" icon={TrendingUp} />
-        <StatCard
+        <MetricCard label="总执行次数" value={d.total_runs ?? 0} icon={Play} />
+        <MetricCard label="生成歌单" value={d.total_playlists ?? 0} icon={Music2} />
+        <MetricCard label="命中歌曲" value={d.total_matched ?? 0} tone="success" icon={TrendingUp} />
+        <MetricCard
           label="缺失歌曲"
           value={d.total_missing ?? 0}
-          color={(d.total_missing ?? 0) > 0 ? 'text-amber-600' : 'text-slate-700 dark:text-slate-50'}
+          tone={(d.total_missing ?? 0) > 0 ? 'warning' : 'default'}
           icon={TrendingDown}
         />
       </div>
 
       {/* Webhook 状态（桌面2列） */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard
+        <MetricCard
           label="Webhook 成功"
           value={d.webhook_success_count ?? 0}
-          color="text-emerald-600"
+          tone="success"
           icon={CheckCircle}
         />
-        <StatCard
+        <MetricCard
           label="Webhook 失败"
           value={d.webhook_failed_count ?? 0}
-          color={(d.webhook_failed_count ?? 0) > 0 ? 'text-red-500' : 'text-slate-700 dark:text-slate-50'}
+          tone={(d.webhook_failed_count ?? 0) > 0 ? 'danger' : 'default'}
           icon={XCircle}
         />
       </div>
 
       {/* 缺失歌曲追踪（桌面4列） */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard
+        <MetricCard
           label="待补库歌曲"
           value={d.missed_tracks_pending ?? 0}
-          color={(d.missed_tracks_pending ?? 0) > 0 ? 'text-amber-600' : 'text-slate-700 dark:text-slate-50'}
+          tone={(d.missed_tracks_pending ?? 0) > 0 ? 'warning' : 'default'}
           icon={AlertTriangle}
         />
-        <StatCard
+        <MetricCard
           label="补库后已匹配"
           value={d.missed_tracks_matched ?? 0}
-          color="text-emerald-600"
+          tone="success"
           icon={CheckCircle}
         />
-        <StatCard
+        <MetricCard
           label="补库重试失败"
           value={d.missed_tracks_failed ?? 0}
-          color={(d.missed_tracks_failed ?? 0) > 0 ? 'text-red-500' : 'text-slate-700 dark:text-slate-50'}
+          tone={(d.missed_tracks_failed ?? 0) > 0 ? 'danger' : 'default'}
           icon={XCircle}
         />
-        <StatCard
+        <MetricCard
           label="已忽略缺失"
           value={d.missed_tracks_ignored ?? 0}
-          color="text-slate-400"
+          tone="info"
         />
       </div>
 
