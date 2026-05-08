@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import apiFetch from '@/lib/api'
-import { useToast } from '@/components/ui/useToast'
+import { Link } from 'react-router-dom'
 import {
   Sparkles,
   Music,
@@ -14,29 +13,43 @@ import {
   Star,
 } from 'lucide-react'
 import { MATCH_MODE_LABELS, labelOf } from '@/lib/labels'
+import PageHeader from '@/components/ui/PageHeader'
+import { useToast } from '@/components/ui/useToast'
+import apiFetch from '@/lib/api'
 
-async function fetchSettings() {
-  return apiFetch('/settings')
-}
+type JobPanel = 'lastfm' | 'hotboard' | 'playlist' | 'text'
 
-async function triggerJob(type: string) {
-  const endpoint = type === 'full' ? 'all' : type
-  return apiFetch(`/jobs/run-${endpoint}`, { method: 'POST' })
-}
-
-async function triggerHotboard(limit: number, threshold: number, playlistName: string, overwrite: boolean) {
-  const params = new URLSearchParams({ limit: String(limit), match_threshold: String(threshold / 100) })
-  if (playlistName.trim()) params.set('playlist_name', playlistName.trim())
-  params.set('overwrite', String(overwrite))
-  return apiFetch(`/hotboard/sync?${params}`, { method: 'POST' })
-}
-
-async function triggerPlaylistSync(url: string, threshold: number, playlistName: string, overwrite: boolean) {
-  const params = new URLSearchParams({ url, match_threshold: String(threshold) })
-  if (playlistName.trim()) params.set('playlist_name', playlistName.trim())
-  params.set('overwrite', String(overwrite))
-  return apiFetch(`/playlist/sync?${params}`, { method: 'POST' })
-}
+const JOB_PANELS: {
+  key: JobPanel
+  title: string
+  desc: string
+  icon: React.ElementType
+}[] = [
+  {
+    key: 'lastfm',
+    title: 'Last.fm 推荐',
+    desc: '基于听歌数据生成推荐歌单',
+    icon: Sparkles,
+  },
+  {
+    key: 'hotboard',
+    title: '网易云热榜',
+    desc: '抓取热榜并同步到 Navidrome',
+    icon: Star,
+  },
+  {
+    key: 'playlist',
+    title: '歌单链接',
+    desc: '导入第三方平台歌单',
+    icon: Music,
+  },
+  {
+    key: 'text',
+    title: '文本歌单',
+    desc: '上传 txt 文本歌单',
+    icon: FileText,
+  },
+]
 
 /* ---------- 任务卡片组件 ---------- */
 function ActionCard({
@@ -179,8 +192,33 @@ function RangeSlider({
   )
 }
 
+async function fetchSettings() {
+  return apiFetch('/settings')
+}
+
+async function triggerJob(type: string) {
+  const endpoint = type === 'full' ? 'all' : type
+  return apiFetch(`/jobs/run-${endpoint}`, { method: 'POST' })
+}
+
+async function triggerHotboard(limit: number, threshold: number, playlistName: string, overwrite: boolean) {
+  const params = new URLSearchParams({ limit: String(limit), match_threshold: String(threshold / 100) })
+  if (playlistName.trim()) params.set('playlist_name', playlistName.trim())
+  params.set('overwrite', String(overwrite))
+  return apiFetch(`/hotboard/sync?${params}`, { method: 'POST' })
+}
+
+async function triggerPlaylistSync(url: string, threshold: number, playlistName: string, overwrite: boolean) {
+  const params = new URLSearchParams({ url, match_threshold: String(threshold) })
+  if (playlistName.trim()) params.set('playlist_name', playlistName.trim())
+  params.set('overwrite', String(overwrite))
+  return apiFetch(`/playlist/sync?${params}`, { method: 'POST' })
+}
+
 export default function JobsPage() {
   const toast = useToast()
+  const [activePanel, setActivePanel] = useState<JobPanel>('lastfm')
+  const [lastSubmittedRunId, setLastSubmittedRunId] = useState<number | null>(null)
 
   const { data: settings } = useQuery({
     queryKey: ['settings'],
@@ -191,6 +229,7 @@ export default function JobsPage() {
   const allMutation = useMutation({
     mutationFn: () => triggerJob('all'),
     onSuccess: (data: any) => {
+      setLastSubmittedRunId(data?.run_id ?? null)
       toast.success('推荐任务已提交', `Run ID: ${data?.run_id ?? '-'}`)
     },
     onError: (error: Error) => {
@@ -208,6 +247,7 @@ export default function JobsPage() {
   const hotboardMutation = useMutation({
     mutationFn: () => triggerHotboard(limit, threshold, hotboardName, hotboardOverwrite),
     onSuccess: (data: any) => {
+      setLastSubmittedRunId(data?.run_id ?? null)
       toast.success('热榜同步已提交', `Run ID: ${data?.run_id ?? '-'}`)
     },
     onError: (error: Error) => {
@@ -223,6 +263,7 @@ export default function JobsPage() {
   const playlistMutation = useMutation({
     mutationFn: () => triggerPlaylistSync(playlistUrl, playlistThreshold / 100, playlistName, playlistOverwrite),
     onSuccess: (data: any) => {
+      setLastSubmittedRunId(data?.run_id ?? null)
       toast.success('歌单同步已提交', `Run ID: ${data?.run_id ?? '-'}`)
     },
     onError: (error: Error) => {
@@ -262,12 +303,12 @@ export default function JobsPage() {
 
   return (
     <div className="page">
-      <div>
-        <h1 className="page-title">任务执行</h1>
-        <p className="page-subtitle mt-1">手动触发推荐任务、同步第三方歌单或上传文本歌单。</p>
-      </div>
+      <PageHeader
+        title="任务执行"
+        subtitle="选择任务类型，填写必要参数后提交执行。"
+      />
 
-      {/* Preflight check */}
+      {/* 全局服务状态 */}
       <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5">
         <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">全局服务状态</div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -290,257 +331,296 @@ export default function JobsPage() {
         </div>
       </div>
 
-      {/* Last.fm 推荐歌单生成 */}
-      <ActionCard
-        icon={Sparkles}
-        title="Last.fm 推荐歌单生成"
-        description="基于 Last.fm 听歌数据生成推荐歌单，并同步到 Navidrome"
-      >
-        <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5 mb-3">
-          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-            全局服务状态
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div className={`flex items-center gap-1.5 text-xs ${!!settings?.lastfm_api_key ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-              {!!settings?.lastfm_api_key ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-              Last.fm API Key
+      {/* 任务提交成功入口 */}
+      {lastSubmittedRunId && (
+        <div className="card card-padding flex flex-col gap-3 border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-950/20 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+              任务已提交
             </div>
-            <div className={`flex items-center gap-1.5 text-xs ${!!settings?.lastfm_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-              {!!settings?.lastfm_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-              Last.fm 用户名
-            </div>
-            <div className={`flex items-center gap-1.5 text-xs ${!!settings?.navidrome_url && !!settings?.navidrome_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-              {!!settings?.navidrome_url && !!settings?.navidrome_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-              Navidrome 配置
-            </div>
-            <div className={`flex items-center gap-1.5 text-xs ${!!settings?.match_mode ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-              {!!settings?.match_mode ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-              匹配模式：{labelOf(MATCH_MODE_LABELS, settings?.match_mode)}
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Run ID: {lastSubmittedRunId}，可前往推荐历史查看执行进度。
             </div>
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <LastfmActionRow
-            icon={Zap}
-            title="完整推荐"
-            description="同时生成相似曲目和相邻艺术家两个推荐歌单"
-            buttonLabel="执行完整推荐"
-            onClick={() => allMutation.mutate()}
-            loading={allMutation.isPending}
-            success={allMutation.isSuccess}
-            error={allMutation.error}
-          />
-          <LastfmActionRow
-            icon={AudioLines}
-            title="相似曲目"
-            description="基于用户常听曲目，生成相似歌曲歌单"
-            buttonLabel="仅生成相似曲目"
-            onClick={() => tracksMutation.mutate()}
-            loading={tracksMutation.isPending}
-            success={tracksMutation.isSuccess}
-            error={tracksMutation.error}
-          />
-          <LastfmActionRow
-            icon={Users}
-            title="相邻艺术家"
-            description="基于用户喜爱的艺术家，生成相邻艺术家热门歌曲歌单"
-            buttonLabel="仅生成相邻艺术家"
-            onClick={() => artistsMutation.mutate()}
-            loading={artistsMutation.isPending}
-            success={artistsMutation.isSuccess}
-            error={artistsMutation.error}
-          />
+          <Link
+            to={`/history/run/${lastSubmittedRunId}`}
+            className="btn-secondary w-full sm:w-auto"
+          >
+            查看任务详情
+          </Link>
         </div>
-      </ActionCard>
+      )}
+
+      {/* 任务类型选择卡片 */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {JOB_PANELS.map(item => {
+          const Icon = item.icon
+          const active = activePanel === item.key
+
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setActivePanel(item.key)}
+              className={`card card-padding text-left transition ${
+                active
+                  ? 'ring-2 ring-cyan-500 bg-cyan-50/70 dark:bg-cyan-950/30'
+                  : 'hover:bg-slate-50 dark:hover:bg-slate-900/60'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/10">
+                  <Icon className="h-5 w-5 text-cyan-600 dark:text-cyan-300" />
+                </div>
+
+                <div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {item.title}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {item.desc}
+                  </div>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Last.fm 推荐 */}
+      {activePanel === 'lastfm' && (
+        <ActionCard
+          icon={Sparkles}
+          title="Last.fm 推荐"
+          description="基于 Last.fm 听歌数据生成推荐歌单，并同步到 Navidrome。"
+        >
+          <div className="space-y-2">
+            <LastfmActionRow
+              icon={Zap}
+              title="完整推荐"
+              description="同时生成相似曲目和相邻艺术家两个推荐歌单"
+              buttonLabel="执行完整推荐"
+              onClick={() => allMutation.mutate()}
+              loading={allMutation.isPending}
+              success={allMutation.isSuccess}
+              error={allMutation.error}
+            />
+            <LastfmActionRow
+              icon={AudioLines}
+              title="相似曲目"
+              description="基于用户常听曲目，生成相似歌曲歌单"
+              buttonLabel="仅生成相似曲目"
+              onClick={() => tracksMutation.mutate()}
+              loading={tracksMutation.isPending}
+              success={tracksMutation.isSuccess}
+              error={tracksMutation.error}
+            />
+            <LastfmActionRow
+              icon={Users}
+              title="相邻艺术家"
+              description="基于用户喜爱的艺术家，生成相邻艺术家热门歌曲歌单"
+              buttonLabel="仅生成相邻艺术家"
+              onClick={() => artistsMutation.mutate()}
+              loading={artistsMutation.isPending}
+              success={artistsMutation.isSuccess}
+              error={artistsMutation.error}
+            />
+          </div>
+        </ActionCard>
+      )}
 
       {/* 网易云热榜同步 */}
-      <ActionCard icon={Star} title="网易云热榜同步" description="抓取网易云音乐热榜歌曲，同步到 Navidrome">
-        <div className="space-y-3">
-          {/* Preflight */}
-          <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5">
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">执行前检查</div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-              <div className={`flex items-center gap-1.5 text-xs ${!!settings?.navidrome_url && !!settings?.navidrome_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                {!!settings?.navidrome_url && !!settings?.navidrome_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-                Navidrome 配置
-              </div>
-              <div className={`flex items-center gap-1.5 text-xs ${Number(limit) >= 1 && Number(limit) <= 200 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                {Number(limit) >= 1 && Number(limit) <= 200 ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-                抓取数量 1-200
-              </div>
-              <div className={`flex items-center gap-1.5 text-xs ${threshold >= 50 && threshold <= 95 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                {threshold >= 50 && threshold <= 95 ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-                匹配阈值 {threshold}%
+      {activePanel === 'hotboard' && (
+        <ActionCard icon={Star} title="网易云热榜同步" description="抓取网易云音乐热榜歌曲，同步到 Navidrome。">
+          <div className="space-y-3">
+            <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5">
+              <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">执行前检查</div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                <div className={`flex items-center gap-1.5 text-xs ${!!settings?.navidrome_url && !!settings?.navidrome_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  {!!settings?.navidrome_url && !!settings?.navidrome_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                  Navidrome 配置
+                </div>
+                <div className={`flex items-center gap-1.5 text-xs ${Number(limit) >= 1 && Number(limit) <= 200 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  {Number(limit) >= 1 && Number(limit) <= 200 ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                  抓取数量 1-200
+                </div>
+                <div className={`flex items-center gap-1.5 text-xs ${threshold >= 50 && threshold <= 95 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  {threshold >= 50 && threshold <= 95 ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                  匹配阈值 {threshold}%
+                </div>
               </div>
             </div>
+            <div>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">抓取热榜歌曲数</label>
+              <input
+                type="number"
+                min={1}
+                max={200}
+                value={limit}
+                onChange={e => setLimit(Number(e.target.value))}
+                className="input"
+              />
+            </div>
+            <RangeSlider label="匹配阈值" value={threshold} onChange={setThreshold} />
+            <div>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空则自动生成）</label>
+              <input
+                type="text"
+                value={hotboardName}
+                onChange={e => setHotboardName(e.target.value)}
+                placeholder="网易云热榜 - 2026-04-25"
+                className="input"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hotboardOverwrite}
+                onChange={e => setHotboardOverwrite(e.target.checked)}
+                className="w-4 h-4 accent-cyan-500 rounded"
+              />
+              覆盖同名歌单
+            </label>
+            <button
+              onClick={() => hotboardMutation.mutate()}
+              disabled={hotboardMutation.isPending}
+              className="btn-primary w-full"
+            >
+              {hotboardMutation.isPending ? '同步中...' : hotboardMutation.isSuccess ? <><CheckCircle className="w-4 h-4 mr-1" />已提交</> : hotboardMutation.isError ? <><XCircle className="w-4 h-4 mr-1" />失败</> : '同步网易云热榜'}
+            </button>
+            <ResultTip isSuccess={hotboardMutation.isSuccess} isError={hotboardMutation.isError} error={hotboardMutation.error} />
           </div>
-          <div>
-            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">抓取热榜歌曲数</label>
-            <input
-              type="number"
-              min={1}
-              max={200}
-              value={limit}
-              onChange={e => setLimit(Number(e.target.value))}
-              className="input"
-            />
-          </div>
-          <RangeSlider label="匹配阈值" value={threshold} onChange={setThreshold} />
-          <div>
-            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空则自动生成）</label>
-            <input
-              type="text"
-              value={hotboardName}
-              onChange={e => setHotboardName(e.target.value)}
-              placeholder="网易云热榜 - 2026-04-25"
-              className="input"
-            />
-          </div>
-          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={hotboardOverwrite}
-              onChange={e => setHotboardOverwrite(e.target.checked)}
-              className="w-4 h-4 accent-cyan-500 rounded"
-            />
-            覆盖同名歌单
-          </label>
-          <button
-            onClick={() => hotboardMutation.mutate()}
-            disabled={hotboardMutation.isPending}
-            className="btn-primary w-full"
-          >
-            {hotboardMutation.isPending ? '同步中...' : hotboardMutation.isSuccess ? <><CheckCircle className="w-4 h-4 mr-1" />已提交</> : hotboardMutation.isError ? <><XCircle className="w-4 h-4 mr-1" />失败</> : '同步网易云热榜'}
-          </button>
-          <ResultTip isSuccess={hotboardMutation.isSuccess} isError={hotboardMutation.isError} error={hotboardMutation.error} />
-        </div>
-      </ActionCard>
+        </ActionCard>
+      )}
 
       {/* 第三方歌单同步 */}
-      <ActionCard icon={Music} title="第三方歌单同步" description="导入网易云、QQ 音乐等平台歌单，同步到 Navidrome">
-        <div className="space-y-3">
-          {/* Preflight */}
-          <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5">
-            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">执行前检查</div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-              <div className={`flex items-center gap-1.5 text-xs ${!!settings?.playlist_api_url ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                {!!settings?.playlist_api_url ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-                Playlist API 地址
-              </div>
-              <div className={`flex items-center gap-1.5 text-xs ${!!settings?.navidrome_url && !!settings?.navidrome_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                {!!settings?.navidrome_url && !!settings?.navidrome_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-                Navidrome 配置
-              </div>
-              <div className={`flex items-center gap-1.5 text-xs ${!!settings?.match_threshold ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                {!!settings?.match_threshold ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
-                默认阈值：{Math.round(Number(settings?.match_threshold || 0.75) * 100)}%
+      {activePanel === 'playlist' && (
+        <ActionCard icon={Music} title="第三方歌单同步" description="导入网易云、QQ 音乐等平台歌单，同步到 Navidrome。">
+          <div className="space-y-3">
+            <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900 space-y-1.5">
+              <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">执行前检查</div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                <div className={`flex items-center gap-1.5 text-xs ${!!settings?.playlist_api_url ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  {!!settings?.playlist_api_url ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                  Playlist API 地址
+                </div>
+                <div className={`flex items-center gap-1.5 text-xs ${!!settings?.navidrome_url && !!settings?.navidrome_username ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  {!!settings?.navidrome_url && !!settings?.navidrome_username ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                  Navidrome 配置
+                </div>
+                <div className={`flex items-center gap-1.5 text-xs ${!!settings?.match_threshold ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  {!!settings?.match_threshold ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 shrink-0" />}
+                  默认阈值：{Math.round(Number(settings?.match_threshold || 0.75) * 100)}%
+                </div>
               </div>
             </div>
+            <div>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单链接</label>
+              <input
+                type="text"
+                value={playlistUrl}
+                onChange={e => setPlaylistUrl(e.target.value)}
+                placeholder="https://music.163.com/playlist?id=xxx"
+                className="input"
+              />
+            </div>
+            <RangeSlider label="匹配阈值" value={playlistThreshold} onChange={setPlaylistThreshold} />
+            <div>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空自动）</label>
+              <input
+                type="text"
+                value={playlistName}
+                onChange={e => setPlaylistName(e.target.value)}
+                placeholder="自动从歌单名"
+                className="input"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={playlistOverwrite}
+                onChange={e => setPlaylistOverwrite(e.target.checked)}
+                className="w-4 h-4 accent-cyan-500 rounded"
+              />
+              覆盖同名歌单
+            </label>
+            <button
+              onClick={() => playlistMutation.mutate()}
+              disabled={!isPlaylistUrlValid(playlistUrl) || playlistMutation.isPending}
+              className="btn-primary w-full"
+            >
+              {playlistMutation.isPending ? '解析中...' : playlistMutation.isSuccess ? (
+                <><CheckCircle className="w-4 h-4 mr-1" />已提交</>
+              ) : playlistMutation.isError ? (
+                <><XCircle className="w-4 h-4 mr-1" />{String(playlistMutation.error?.message)}</>
+              ) : (
+                <><Music className="w-4 h-4 mr-1" />解析并同步到 Navidrome</>
+              )}
+            </button>
+            <ResultTip isSuccess={playlistMutation.isSuccess} isError={playlistMutation.isError} error={playlistMutation.error} />
           </div>
-          <div>
-            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单链接</label>
-            <input
-              type="text"
-              value={playlistUrl}
-              onChange={e => setPlaylistUrl(e.target.value)}
-              placeholder="https://music.163.com/playlist?id=xxx"
-              className="input"
-            />
-          </div>
-          <RangeSlider label="匹配阈值" value={playlistThreshold} onChange={setPlaylistThreshold} />
-          <div>
-            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空自动）</label>
-            <input
-              type="text"
-              value={playlistName}
-              onChange={e => setPlaylistName(e.target.value)}
-              placeholder="自动从歌单名"
-              className="input"
-            />
-          </div>
-          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={playlistOverwrite}
-              onChange={e => setPlaylistOverwrite(e.target.checked)}
-              className="w-4 h-4 accent-cyan-500 rounded"
-            />
-            覆盖同名歌单
-          </label>
-          <button
-            onClick={() => playlistMutation.mutate()}
-            disabled={!isPlaylistUrlValid(playlistUrl) || playlistMutation.isPending}
-            className="btn-primary w-full"
-          >
-            {playlistMutation.isPending ? '解析中...' : playlistMutation.isSuccess ? (
-              <><CheckCircle className="w-4 h-4 mr-1" />已提交</>
-            ) : playlistMutation.isError ? (
-              <><XCircle className="w-4 h-4 mr-1" />{String(playlistMutation.error?.message)}</>
-            ) : (
-              <><Music className="w-4 h-4 mr-1" />解析并同步到 Navidrome</>
-            )}
-          </button>
-          <ResultTip isSuccess={playlistMutation.isSuccess} isError={playlistMutation.isError} error={playlistMutation.error} />
-        </div>
-      </ActionCard>
+        </ActionCard>
+      )}
 
       {/* 文本歌单上传 */}
-      <ActionCard icon={FileText} title="文本歌单上传" description="上传 .txt 文件，每行格式：歌名 - 艺术家">
-        <div className="space-y-3">
-          <div>
-            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">选择 .txt 文件</label>
-            <input
-              type="file"
-              accept=".txt"
-              onChange={e => {
-                setTextFile(e.target.files?.[0] || null)
-                textMutation.reset()
-              }}
-              className="input"
-            />
-            {textFile && (
-              <p className="text-[11px] text-slate-400 mt-1">
-                已选择：{textFile.name}（{(textFile.size / 1024).toFixed(1)} KB）
-              </p>
-            )}
+      {activePanel === 'text' && (
+        <ActionCard icon={FileText} title="文本歌单上传" description="上传 .txt 文件，每行格式：歌名 - 艺术家。">
+          <div className="space-y-3">
+            <div>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">选择 .txt 文件</label>
+              <input
+                type="file"
+                accept=".txt"
+                onChange={e => {
+                  setTextFile(e.target.files?.[0] || null)
+                  textMutation.reset()
+                }}
+                className="input"
+              />
+              {textFile && (
+                <p className="text-[11px] text-slate-400 mt-1">
+                  已选择：{textFile.name}（{(textFile.size / 1024).toFixed(1)} KB）
+                </p>
+              )}
+            </div>
+            <RangeSlider label="匹配阈值" value={textThreshold} onChange={setTextThreshold} />
+            <div>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空自动）</label>
+              <input
+                type="text"
+                value={textPlaylistName}
+                onChange={e => setTextPlaylistName(e.target.value)}
+                placeholder="文本歌单"
+                className="input"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={textOverwrite}
+                onChange={e => setTextOverwrite(e.target.checked)}
+                className="w-4 h-4 accent-cyan-500 rounded"
+              />
+              覆盖同名歌单
+            </label>
+            <button
+              onClick={() => textMutation.mutate()}
+              disabled={!textFile || textMutation.isPending}
+              className="btn-primary w-full"
+            >
+              {textMutation.isPending ? '上传中...' : textMutation.isSuccess ? (
+                <><CheckCircle className="w-4 h-4 mr-1" />已提交</>
+              ) : textMutation.isError ? (
+                <><XCircle className="w-4 h-4 mr-1" />{String(textMutation.error?.message)}</>
+              ) : (
+                <><FileText className="w-4 h-4 mr-1" />上传并同步到 Navidrome</>
+              )}
+            </button>
+            <ResultTip isSuccess={textMutation.isSuccess} isError={textMutation.isError} error={textMutation.error} />
           </div>
-          <RangeSlider label="匹配阈值" value={textThreshold} onChange={setTextThreshold} />
-          <div>
-            <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">歌单名称（留空自动）</label>
-            <input
-              type="text"
-              value={textPlaylistName}
-              onChange={e => setTextPlaylistName(e.target.value)}
-              placeholder="文本歌单"
-              className="input"
-            />
-          </div>
-          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={textOverwrite}
-              onChange={e => setTextOverwrite(e.target.checked)}
-              className="w-4 h-4 accent-cyan-500 rounded"
-            />
-            覆盖同名歌单
-          </label>
-          <button
-            onClick={() => textMutation.mutate()}
-            disabled={!textFile || textMutation.isPending}
-            className="btn-primary w-full"
-          >
-            {textMutation.isPending ? '上传中...' : textMutation.isSuccess ? (
-              <><CheckCircle className="w-4 h-4 mr-1" />已提交</>
-            ) : textMutation.isError ? (
-              <><XCircle className="w-4 h-4 mr-1" />{String(textMutation.error?.message)}</>
-            ) : (
-              <><FileText className="w-4 h-4 mr-1" />上传并同步到 Navidrome</>
-            )}
-          </button>
-          <ResultTip isSuccess={textMutation.isSuccess} isError={textMutation.isError} error={textMutation.error} />
-        </div>
-      </ActionCard>
+        </ActionCard>
+      )}
     </div>
   )
 }

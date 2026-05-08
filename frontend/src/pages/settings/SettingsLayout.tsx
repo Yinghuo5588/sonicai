@@ -15,42 +15,35 @@ const SETTINGS_SECTIONS = [
     title: '服务连接',
     desc: 'Last.fm、Navidrome、Webhook 与歌单解析服务',
     icon: Server,
+    to: '/settings/connections',
   },
   {
-    key: 'source',
-    title: '推荐源',
-    desc: 'Last.fm 抓取策略与种子来源',
+    key: 'recommendation',
+    title: '推荐策略',
+    desc: '种子来源、推荐规模、匹配阈值与去重策略',
     icon: Radio,
-  },
-  {
-    key: 'playlist',
-    title: '歌单匹配',
-    desc: 'Navidrome 生成、匹配与推荐控制',
-    icon: ListMusic,
-  },
-  {
-    key: 'schedule',
-    title: '任务中心',
-    desc: '定时任务、执行并发、歌单生命周期与历史清理',
-    icon: Clock,
+    to: '/settings/source',
   },
   {
     key: 'library',
-    title: '曲库索引',
-    desc: '数据库曲库、别名索引与匹配日志',
+    title: '曲库与匹配',
+    desc: '曲库索引、缓存、未命中歌曲、人工匹配与诊断',
     icon: Library,
+    to: '/settings/library',
   },
   {
-    key: 'account',
-    title: '账户与备份',
-    desc: '修改用户名、修改密码、退出登录、配置导入导出',
+    key: 'automation',
+    title: '自动化任务',
+    desc: '定时推荐、热榜同步、歌单同步、清理策略',
+    icon: Clock,
+    to: '/settings/schedule',
+  },
+  {
+    key: 'system',
+    title: '账户与系统',
+    desc: '账户安全、配置备份与外观设置',
     icon: UserCog,
-  },
-  {
-    key: 'appearance',
-    title: '外观设置',
-    desc: '主题模式与显示偏好',
-    icon: Palette,
+    to: '/settings/account',
   },
 ] as const
 
@@ -58,48 +51,58 @@ export default function SettingsLayout() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const activeKey = location.pathname.split('/').filter(Boolean)[1] || 'connections'
+  const rawPath = location.pathname
+  const isSettingsRoot = rawPath === '/settings' || rawPath === '/settings/'
+  const activeKey = isSettingsRoot
+    ? 'connections'
+    : rawPath.split('/').filter(Boolean)[1] || 'connections'
   const activeSection =
     SETTINGS_SECTIONS.find(item => item.key === activeKey) || SETTINGS_SECTIONS[0]
 
   return (
     <div className="page">
-      <div className="hidden md:block">
-        <h1 className="page-title">设置</h1>
-        <p className="page-subtitle mt-1">
-          管理服务连接、推荐策略、任务中心、曲库索引、外观和账户安全。
-        </p>
-      </div>
+      {/* 移动端设置首页卡片 */}
+      {isSettingsRoot && (
+        <div className="md:hidden space-y-3">
+          <h1 className="page-title">设置</h1>
+          <p className="page-subtitle">
+            选择一个设置分类进行配置。
+          </p>
+
+          <div className="grid grid-cols-1 gap-3">
+            {SETTINGS_SECTIONS.map(item => {
+              const Icon = item.icon
+
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => navigate(item.to)}
+                  className="card card-padding flex items-start gap-3 text-left active:scale-[0.99] transition"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/10">
+                    <Icon className="h-5 w-5 text-cyan-600 dark:text-cyan-300" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {item.title}
+                    </div>
+                    <div className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                      {item.desc}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 md:gap-6 items-start">
 
         {/* 侧边导航 */}
         <aside className="md:sticky md:top-6 space-y-3">
-          {/* 移动端横向 Tab 栏（替代 select） */}
-          <div className="md:hidden overflow-x-auto overscroll-x-contain -mx-4 px-4 pt-1 pb-1">
-            <div className="flex gap-2 min-w-max">
-              {SETTINGS_SECTIONS.map(item => {
-                const Icon = item.icon
-                const isActive = activeKey === item.key
-
-                return (
-                  <NavLink
-                    key={item.key}
-                    to={`/settings/${item.key}`}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300'
-                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {item.title}
-                  </NavLink>
-                )
-              })}
-            </div>
-          </div>
-
           {/* 桌面端导航卡片 */}
           <div className="hidden md:block card overflow-hidden">
             <nav className="p-2 space-y-1">
@@ -109,7 +112,7 @@ export default function SettingsLayout() {
                 return (
                   <NavLink
                     key={item.key}
-                    to={`/settings/${item.key}`}
+                    to={item.to}
                     className={({ isActive }) =>
                       `flex items-start gap-3 px-4 py-3 rounded-2xl transition-all relative ${
                         isActive
@@ -132,23 +135,27 @@ export default function SettingsLayout() {
 
         {/* 内容区 */}
         <main className="min-w-0 space-y-4">
-          <div className="hidden md:block card card-padding">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0">
-                <activeSection.icon className="w-5 h-5 text-cyan-600 dark:text-cyan-300 mt-1" />
+          {!isSettingsRoot && (
+            <>
+              <div className="hidden md:block card card-padding">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0">
+                    <activeSection.icon className="w-5 h-5 text-cyan-600 dark:text-cyan-300 mt-1" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+                      {activeSection.title}
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                      {activeSection.desc}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
-                  {activeSection.title}
-                </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                  {activeSection.desc}
-                </p>
-              </div>
-            </div>
-          </div>
 
-          <Outlet />
+              <Outlet />
+            </>
+          )}
         </main>
       </div>
     </div>

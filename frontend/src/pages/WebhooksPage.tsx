@@ -4,12 +4,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Link2 } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
+import DataTableShell from '@/components/ui/DataTableShell'
 import { useToast } from '@/components/ui/useToast'
 import {
   PLAYLIST_TYPE_LABELS,
   WEBHOOK_STATUS_LABELS,
   labelOf,
 } from '@/lib/labels'
+import { confirmDanger } from '@/lib/confirm'
 
 const PAGE_SIZE = 5
 
@@ -278,7 +280,7 @@ export default function WebhooksPage() {
               <span className="text-xs text-cyan-600 font-medium">已选 {selected.size} 条</span>
               <button
                 onClick={() => {
-                  if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。`)) return
+                  if (!confirmDanger(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。`)) return
                   batchDeleteMutation.mutate(Array.from(selected))
                 }}
                 disabled={batchDeleteMutation.isPending}
@@ -303,7 +305,7 @@ export default function WebhooksPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
-                  if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。`)) return
+                  if (!confirmDanger(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。`)) return
                   batchDeleteMutation.mutate(Array.from(selected))
                 }}
                 disabled={batchDeleteMutation.isPending}
@@ -323,7 +325,7 @@ export default function WebhooksPage() {
             onToggle={() => setExpanded(expanded === b.id ? null : b.id)}
             onRetry={() => retryMutation.mutate(b.id)}
             onDelete={() => {
-              if (!confirm('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return
+              if (!confirmDanger('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return
               deleteMutation.mutate(b.id)
             }}
             onToggleSelect={() => {
@@ -360,7 +362,7 @@ export default function WebhooksPage() {
             </div>
             <button
               onClick={() => {
-                if (!confirm(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。`)) return
+                if (!confirmDanger(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。`)) return
                 batchDeleteMutation.mutate(Array.from(selected))
               }}
               disabled={batchDeleteMutation.isPending}
@@ -403,9 +405,9 @@ export default function WebhooksPage() {
                     {expanded === b.id ? '收起' : '预览'}
                   </button>
                   <button onClick={() => retryMutation.mutate(b.id)} disabled={retryMutation.isPending} className="btn-primary text-xs">重试</button>
-                  <button 
-                    onClick={() => { if(!confirm('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return; deleteMutation.mutate(b.id) }} 
-                    disabled={deleteMutation.isPending} 
+                  <button
+                    onClick={() => { if(!confirmDanger('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。')) return; deleteMutation.mutate(b.id) }}
+                    disabled={deleteMutation.isPending}
                     className="btn btn-danger text-xs"
                   >
                     删除

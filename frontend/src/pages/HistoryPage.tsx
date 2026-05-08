@@ -5,12 +5,15 @@ import apiFetch from '@/lib/api'
 import { formatRelativeTime } from '@/lib/date'
 import { Clock, CheckCircle, XCircle, RotateCw, List } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
+import PageHeader from '@/components/ui/PageHeader'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/useToast'
 import {
   RUN_TYPE_LABELS,
   TRIGGER_TYPE_LABELS,
   labelOf,
 } from '@/lib/labels'
+import { confirmDanger } from '@/lib/confirm'
 
 const PAGE_SIZE = 15
 
@@ -130,7 +133,17 @@ export default function HistoryPage() {
     },
   })
 
-  if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
+  if (isLoading) {
+    return (
+      <div className="page space-y-4">
+        <PageHeader
+          title="推荐历史"
+          subtitle="查看每次推荐、同步任务的执行状态和详情。"
+        />
+        <TableSkeleton rows={8} />
+      </div>
+    )
+  }
   if (error) return <div className="p-4 text-red-500">加载失败</div>
 
   const { runs = [], total = 0 } = data || {}
@@ -146,18 +159,18 @@ export default function HistoryPage() {
   })
 
   return (
-    <div className="page">
+    <div className="page space-y-4">
+      <PageHeader
+        title="推荐历史"
+        subtitle="查看每次推荐、同步任务的执行状态和详情。"
+      />
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="page-title">推荐历史</h1>
-          <p className="page-subtitle mt-1">查看每次推荐、同步任务的执行状态和详情。</p>
-        </div>
         {selected.size > 0 && (
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-xs text-cyan-600 font-medium">已选 {selected.size} 条</span>
             <button
               onClick={() => {
-                if (!confirm(`确定删除选中的 ${selected.size} 条推荐历史吗？`)) return
+                if (!confirmDanger(`确定删除选中的 ${selected.size} 条推荐历史吗？`)) return
                 batchDeleteMutation.mutate(Array.from(selected))
               }}
               disabled={batchDeleteMutation.isPending}
@@ -206,7 +219,7 @@ export default function HistoryPage() {
             run={r}
             isDeleting={deleteMutation.isPending}
             onDelete={() => {
-              if (!confirm('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。')) return
+              if (!confirmDanger('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。')) return
               deleteMutation.mutate(r.id)
             }}
           />
@@ -282,7 +295,7 @@ export default function HistoryPage() {
                         type="button"
                         disabled={deleteMutation.isPending}
                         onClick={() => {
-                          if (!confirm('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。')) return
+                          if (!confirmDanger('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。')) return
                           deleteMutation.mutate(r.id)
                         }}
                         className="text-sm text-red-500 hover:underline disabled:opacity-50"

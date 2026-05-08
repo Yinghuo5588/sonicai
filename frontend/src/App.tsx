@@ -59,7 +59,7 @@ export default function App() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="settings" element={<SettingsLayout />}>
-          <Route index element={<Navigate to="connections" replace />} />
+          <Route index element={null} />
           <Route path="connections" element={<SettingsConnections />} />
           <Route path="source" element={<SettingsSource />} />
           <Route path="playlist" element={<SettingsPlaylist />} />

@@ -466,16 +466,36 @@ export function FieldInput({
 
 export function SectionCard({
   title,
+  description,
+  actions,
   children,
 }: {
   title: string
+  description?: string
+  actions?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
-    <div className="card card-padding space-y-4">
-      <h3 className="section-title">{title}</h3>
+    <section className="card card-padding space-y-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="section-title">{title}</h3>
+          {description && (
+            <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              {description}
+            </p>
+          )}
+        </div>
+
+        {actions && (
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {actions}
+          </div>
+        )}
+      </div>
+
       {children}
-    </div>
+    </section>
   )
 }
 
@@ -554,10 +574,10 @@ export function SaveBar({
       <div className="card card-padding flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg">
         <div>
           <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
-            {hasChanges ? '有未保存的更改' : '当前页面暂无更改'}
+            {hasChanges ? '有未保存的更改' : '设置已是最新'}
           </div>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            此保存按钮只会提交当前页面产生的修改。
+          <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            修改会暂存在当前页面，点击保存后生效。
           </div>
         </div>
 
@@ -566,7 +586,7 @@ export function SaveBar({
           disabled={!hasChanges || isPending}
           className="btn-primary w-full sm:w-auto"
         >
-          {isPending ? '保存中...' : '保存配置'}
+          {isPending ? '保存中...' : hasChanges ? '保存更改' : '无需保存'}
         </button>
       </div>
 

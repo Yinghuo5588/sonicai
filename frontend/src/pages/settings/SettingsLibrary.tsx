@@ -845,13 +845,13 @@ export default function SettingsLibrary() {
   type ToolTab = 'status' | 'songs' | 'missed' | 'match' | 'manual' | 'logs'
   const [activeTool, setActiveTool] = useState<ToolTab>('status')
 
-  const TOOL_TABS: { key: ToolTab; label: string; icon: React.ElementType }[] = [
-    { key: 'status', label: '状态', icon: Database },
-    { key: 'songs', label: '搜索', icon: Search },
-    { key: 'missed', label: '未命中', icon: AlertTriangle },
-    { key: 'match', label: '诊断', icon: FileSearch },
-    { key: 'manual', label: '人工', icon: UserCheck },
-    { key: 'logs', label: '日志', icon: ScrollText },
+  const TOOL_TABS: { key: ToolTab; label: string; desc: string; icon: React.ElementType }[] = [
+    { key: 'status', label: '状态概览', desc: '查看曲库、缓存和命中率', icon: Database },
+    { key: 'songs', label: '搜索曲库', desc: '按歌名、艺术家、专辑搜索', icon: Search },
+    { key: 'missed', label: '未命中歌曲', desc: '查看待补库和可重试歌曲', icon: AlertTriangle },
+    { key: 'match', label: '匹配诊断', desc: '查看匹配链路和候选结果', icon: FileSearch },
+    { key: 'manual', label: '人工匹配', desc: '固定错误匹配的对应关系', icon: UserCheck },
+    { key: 'logs', label: '匹配日志', desc: '排查每次匹配的来源', icon: ScrollText },
   ]
 
   /* 工具箱 section 映射 */
@@ -864,11 +864,7 @@ export default function SettingsLibrary() {
     logs: '匹配日志',
   }
 
-  /* 判断当前 section 是否应显示（移动端按 activeTool，桌面端始终显示） */
-  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
-
   const isSectionVisible = (title: string) => {
-    if (isDesktop) return true
     if (title === '调试设置') return activeTool === 'match'
     return toolSectionMap[activeTool] === title
   }
@@ -876,25 +872,37 @@ export default function SettingsLibrary() {
   return (
     <div className="space-y-3">
 
-      {/* 移动端工具箱 Tabs */}
-      <div className="md:hidden overflow-x-auto overscroll-x-contain -mx-4 px-4 pt-1 pb-1">
-        <div className="flex gap-2 min-w-max">
-          {TOOL_TABS.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTool(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium transition-colors ${
-                activeTool === tab.key
-                  ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300'
-                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          ))}
+      {/* 工具箱入口卡片 */}
+      <SectionCard
+        title="曲库工具箱"
+        description="选择一个工具查看详细内容。"
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {TOOL_TABS.map(tool => {
+            const Icon = tool.icon
+            const active = activeTool === tool.key
+
+            return (
+              <button
+                key={tool.key}
+                type="button"
+                onClick={() => setActiveTool(tool.key)}
+                className={`rounded-2xl border p-4 text-left transition ${
+                  active
+                    ? 'border-cyan-500 bg-cyan-50 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-300'
+                    : 'border-border bg-background hover:bg-slate-50 dark:hover:bg-slate-900'
+                }`}
+              >
+                <Icon className="mb-3 h-5 w-5" />
+                <div className="text-sm font-semibold">{tool.label}</div>
+                <div className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  {tool.desc}
+                </div>
+              </button>
+            )
+          })}
         </div>
-      </div>
+      </SectionCard>
 
       {/* ── 曲库索引状态 ── */}
       {isSectionVisible('曲库索引状态') && (
