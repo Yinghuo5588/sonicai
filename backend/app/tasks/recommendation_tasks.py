@@ -180,7 +180,7 @@ async def run_playlist_sync_cron_job():
     from app.db.session import AsyncSessionLocal
     from app.db.models import SystemSettings
     from app.services.job_run_service import create_pending_run
-    from app.services.playlist_incremental import run_incremental_playlist_sync
+    from app.core.task_registry import create_background_task
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
@@ -209,12 +209,17 @@ async def run_playlist_sync_cron_job():
 
     logger.info(f"[scheduler] dispatch playlist sync run_id={run_id}")
 
-    await run_incremental_playlist_sync(
-        run_id=run_id,
-        url=settings_row.playlist_sync_url,
-        match_threshold=float(settings_row.playlist_sync_threshold or 0.75),
-        playlist_name=settings_row.playlist_sync_name,
-        overwrite=settings_row.playlist_sync_overwrite or False,
+    # Use create_background_task (same as manual sync) so the async pipeline
+    # is properly awaited in an async context instead of APScheduler's thread pool.
+    create_background_task(
+        run_incremental_playlist_sync(
+            run_id=run_id,
+            url=settings_row.playlist_sync_url,
+            match_threshold=float(settings_row.playlist_sync_threshold or 0.75),
+            playlist_name=settings_row.playlist_sync_name,
+            overwrite=settings_row.playlist_sync_overwrite or False,
+        ),
+        name=f"playlist-sync-cron-{run_id}",
     )
 
 
