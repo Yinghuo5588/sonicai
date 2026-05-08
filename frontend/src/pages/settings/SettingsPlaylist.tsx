@@ -16,7 +16,9 @@ export default function SettingsPlaylist() {
     save,
   } = useSettingsForm()
 
-  if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
+  if (isLoading) {
+    return <div className="space-y-4"><FormSkeleton fields={4} /><FormSkeleton fields={3} /><FormSkeleton fields={4} /></div>
+  }
 
   return (
     <div className="space-y-4">

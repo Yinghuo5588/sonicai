@@ -2,6 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
 import apiFetch from '@/lib/api'
 import { ArrowLeft } from 'lucide-react'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import {
   PLAYLIST_TYPE_LABELS,
   SOURCE_TYPE_LABELS,
@@ -164,7 +165,12 @@ export default function PlaylistDetailPage() {
   })
 
   if (!Number.isFinite(pid) || pid <= 0) return <div className="p-6 text-red-500">歌单 ID 无效</div>
-  if (isLoading) return <div className="p-6 text-slate-500">加载中...</div>
+  if (isLoading) return (
+    <div className="page space-y-4">
+      <div className="h-6 w-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-700" />
+      <TableSkeleton rows={8} />
+    </div>
+  )
   if (isError) return <div className="p-6 text-red-500">加载失败：{error instanceof Error ? error.message : '未知错误'}</div>
 
   const firstPage = data?.pages?.[0]

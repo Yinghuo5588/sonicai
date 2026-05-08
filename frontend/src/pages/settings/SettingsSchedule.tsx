@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { useToast } from '@/components/ui/useToast'
+import { FormSkeleton } from '@/components/ui/Skeleton'
 import {
   FieldInput,
   SaveBar,
@@ -81,7 +82,9 @@ export default function SettingsSchedule() {
     save,
   } = useSettingsForm()
 
-  if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
+  if (isLoading) {
+    return <div className="space-y-4"><FormSkeleton fields={4} /><FormSkeleton fields={3} /><FormSkeleton fields={4} /></div>
+  }
 
   return (
     <div className="space-y-4">

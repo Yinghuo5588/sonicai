@@ -872,6 +872,59 @@ export default function SettingsLibrary() {
   return (
     <div className="space-y-3">
 
+      {/* ── 曲库状态常驻摘要 ── */}
+      <SectionCard
+        title="曲库状态"
+        description="当前曲库索引与缓存状态。"
+        actions={
+          <button
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending || cache.refreshing}
+            className="btn-primary"
+          >
+            <RefreshCcw className="w-4 h-4" />
+            {syncMutation.isPending ? '同步启动中...' : '同步曲库'}
+          </button>
+        }
+      >
+        {statusLoading ? (
+          <div className="text-sm text-slate-500">加载曲库状态...</div>
+        ) : statusError ? (
+          <div className="text-sm text-red-500">加载失败: {(statusError as Error).message}</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <StatusCard
+                label="数据库歌曲"
+                value={(status as any)?.total_songs ?? 0}
+                desc="song_library 表"
+              />
+              <StatusCard
+                label="内存缓存"
+                value={cache.total_songs ?? 0}
+                desc={cache.ready ? '已就绪' : '未就绪'}
+              />
+              <StatusCard
+                label="命中率"
+                value={formatPercent(cache.hit_rate)}
+                desc={`命中 ${cache.hits ?? 0} / 未命中 ${cache.misses ?? 0}`}
+              />
+              <StatusCard
+                label="刷新状态"
+                value={cache.refreshing ? '刷新中' : cache.ready ? '已就绪' : '未就绪'}
+                desc={cache.last_full_refresh || '暂无刷新记录'}
+              />
+            </div>
+
+            {cache.last_error && (
+              <div className="text-xs text-red-500 bg-red-50 dark:bg-red-950/40 rounded-xl p-3 mt-3">
+                最近错误: {cache.last_error}
+              </div>
+            )}
+          </>
+        )}
+      </SectionCard>
+
       {/* 工具箱入口卡片 */}
       <SectionCard
         title="曲库工具箱"

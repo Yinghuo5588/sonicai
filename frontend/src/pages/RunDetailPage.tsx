@@ -20,6 +20,8 @@ import {
   labelOf,
 } from '@/lib/labels'
 import { useToast } from '@/components/ui/useToast'
+import { CardSkeleton } from '@/components/ui/Skeleton'
+import { confirmDanger } from '@/lib/confirm'
 
 async function fetchRunDetail(runId: number) {
   return apiFetch(`/runs/${runId}`)
@@ -276,7 +278,7 @@ export default function RunDetailPage() {
   })
 
   const handleStop = () => {
-    if (!confirm('确定停止这个任务吗？')) return
+    if (!confirmDanger('确定停止这个任务吗？')) return
     setStopping(true)
     stopMutation.mutate()
   }
@@ -294,7 +296,7 @@ export default function RunDetailPage() {
   })
 
   const handleDelete = () => {
-    if (!confirm('确定删除这条推荐历史吗？')) {
+    if (!confirmDanger('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。')) {
       return
     }
     const deleteNavidrome = confirm(
@@ -303,7 +305,18 @@ export default function RunDetailPage() {
     deleteMutation.mutate(deleteNavidrome)
   }
 
-  if (runLoading) return <div className="page text-slate-500">加载中...</div>
+  if (runLoading) {
+    return (
+      <div className="page space-y-4">
+        <div className="flex items-center gap-3">
+          <Link to="/history" className="btn-secondary"><ArrowLeft className="w-4 h-4" /></Link>
+          <div className="h-6 w-32 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-700" />
+        </div>
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
+    )
+  }
   if (runError) return <div className="page text-red-500">加载失败：{(runError as Error).message}</div>
   if (!run) return <div className="page text-slate-500">任务不存在</div>
 

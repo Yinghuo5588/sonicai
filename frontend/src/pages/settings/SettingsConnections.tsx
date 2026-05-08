@@ -10,6 +10,7 @@ import {
   useSettingsForm,
 } from './SettingsShared'
 import { useToast } from '@/components/ui/useToast'
+import { FormSkeleton } from '@/components/ui/Skeleton'
 
 export default function SettingsConnections() {
   const {
@@ -28,7 +29,15 @@ export default function SettingsConnections() {
   const [webhookResult, setWebhookResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [webhookLoading, setWebhookLoading] = useState(false)
 
-  if (isLoading) return <div className="p-4 text-slate-500">加载中...</div>
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <FormSkeleton fields={4} />
+        <FormSkeleton fields={3} />
+        <FormSkeleton fields={4} />
+      </div>
+    )
+  }
 
   const handleTestNavidrome = async () => {
     setNavidromeLoading(true)
