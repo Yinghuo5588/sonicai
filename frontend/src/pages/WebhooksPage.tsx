@@ -12,19 +12,19 @@ const PAGE_SIZE = 5
 
 async function fetchBatches(page: number) {
   const offset = (page - 1) * PAGE_SIZE
-  return apiFetch(`/webhooks/batches?limit=${PAGE_SIZE}&offset=${offset}`)
+  return apiFetch('/webhooks/batches?limit=' + PAGE_SIZE + '&offset=' + offset)
 }
 
 async function fetchBatchDetail(id: number) {
-  return apiFetch(`/webhooks/batches/${id}`)
+  return apiFetch('/webhooks/batches/' + id)
 }
 
 async function retryBatch(id: number) {
-  return apiFetch(`/webhooks/batches/${id}/retry`, { method: 'POST' })
+  return apiFetch('/webhooks/batches/' + id + '/retry', { method: 'POST' })
 }
 
 async function deleteBatch(id: number) {
-  return apiFetch(`/webhooks/batches/${id}`, { method: 'DELETE' })
+  return apiFetch('/webhooks/batches/' + id, { method: 'DELETE' })
 }
 
 async function batchDeleteBatches(ids: number[]) {
@@ -40,12 +40,18 @@ function WebhookStatusBadge({ status }: { status: string }) {
 }
 
 function BatchPreview({ batchId }: { batchId: number }) {
-  const { data, isLoading, error } = useQuery({ queryKey: ['webhook-batch', batchId], queryFn: () => fetchBatchDetail(batchId) })
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['webhook-batch', batchId],
+    queryFn: () => fetchBatchDetail(batchId),
+  })
+
   if (isLoading) return <div className="py-2 text-sm text-slate-400">加载中...</div>
   if (error) return <div className="py-2 text-sm text-red-500">加载失败</div>
   if (!data) return null
-  const batch = data as any
-  const items = batch.items || []
+
+  const batch: any = data
+  const items: any[] = batch.items || []
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -58,7 +64,9 @@ function BatchPreview({ batchId }: { batchId: number }) {
           {items.slice(0, 20).map((item: any) => (
             <li key={item.id} className="flex items-center gap-1.5 truncate">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-500" />
-              <span className="font-medium">{item.track}</span> — {item.artist}
+              <span className="font-medium">{item.track}</span>
+              {' - '}
+              {item.artist}
             </li>
           ))}
           {items.length > 20 && <li className="pl-4 text-slate-400">...还有 {items.length - 20} 首</li>}
@@ -68,7 +76,12 @@ function BatchPreview({ batchId }: { batchId: number }) {
   )
 }
 
-function BatchMobileCard({ batch, expanded, selected, onToggleExpand, onToggleSelect, onRetry, onDelete, retrying, deleting }: any) {
+function BatchMobileCard({ batch, expanded, selected, onToggleExpand, onToggleSelect, onRetry, onDelete, retrying, deleting }: {
+  batch: any; expanded: boolean; selected: boolean
+  onToggleExpand: () => void; onToggleSelect: () => void
+  onRetry: () => void; onDelete: () => void
+  retrying: boolean; deleting: boolean
+}) {
   return (
     <div className="card overflow-hidden">
       <div className="space-y-3 p-4">
@@ -87,12 +100,22 @@ function BatchMobileCard({ batch, expanded, selected, onToggleExpand, onToggleSe
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <button type="button" onClick={onToggleExpand} className="btn-secondary text-xs">{expanded ? <><ChevronUp className="h-4 w-4" />收起</> : <><ChevronDown className="h-4 w-4" />预览</>}</button>
-          <button type="button" onClick={onRetry} disabled={retrying} className="btn-primary text-xs"><RefreshCw className={retrying ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />{retrying ? '重试中' : '重试'}</button>
-          <button type="button" onClick={onDelete} disabled={deleting} className="btn-danger text-xs">{deleting ? '删除中' : '删除'}</button>
+          <button type="button" onClick={onToggleExpand} className="btn-secondary text-xs">
+            {expanded ? '收起' : '预览'}
+          </button>
+          <button type="button" onClick={onRetry} disabled={retrying} className="btn-primary text-xs">
+            {retrying ? '重试中' : '重试'}
+          </button>
+          <button type="button" onClick={onDelete} disabled={deleting} className="btn-danger text-xs">
+            {deleting ? '删除中' : '删除'}
+          </button>
         </div>
       </div>
-      {expanded && <div className="border-t border-border/50 bg-slate-50/70 p-4 dark:bg-slate-950/40"><BatchPreview batchId={batch.id} /></div>}
+      {expanded && (
+        <div className="border-t border-border/50 bg-slate-50/70 p-4 dark:bg-slate-950/40">
+          <BatchPreview batchId={batch.id} />
+        </div>
+      )}
     </div>
   )
 }
@@ -105,69 +128,157 @@ export default function WebhooksPage() {
   const [expanded, setExpanded] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
 
-  const { data, isLoading, isFetching } = useQuery({ queryKey: ['webhooks', page], queryFn: () => fetchBatches(page), placeholderData: previous => previous })
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['webhooks', page],
+    queryFn: () => fetchBatches(page),
+    placeholderData: (previous: any) => previous,
+  })
 
-  const retryMutation = useMutation({ mutationFn: retryBatch, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['webhooks'] }); queryClient.invalidateQueries({ queryKey: ['webhook-batch'] }); toast.success('重试请求已提交', 'Webhook 将在后台重新发送') }, onError: (err: Error) => toast.error('重试失败', err.message) })
-  const deleteMutation = useMutation({ mutationFn: deleteBatch, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['webhooks'] }); toast.success('Webhook 记录已删除'); setExpanded(null) }, onError: (err: Error) => toast.error('删除失败', err.message) })
-  const batchDeleteMutation = useMutation({ mutationFn: batchDeleteBatches, onSuccess: (res: any) => { queryClient.invalidateQueries({ queryKey: ['webhooks'] }); toast.success(`已删除 ${res.deleted} 条 Webhook 记录`); setSelected(new Set()); setExpanded(null) }, onError: (err: Error) => toast.error('批量删除失败', err.message) })
+  const retryMutation = useMutation({
+    mutationFn: retryBatch,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] })
+      queryClient.invalidateQueries({ queryKey: ['webhook-batch'] })
+      toast.success('重试请求已提交', 'Webhook 将在后台重新发送')
+    },
+    onError: (err: Error) => toast.error('重试失败', err.message),
+  })
 
-  const batches = (data as any)?.items || []
+  const deleteMutation = useMutation({
+    mutationFn: deleteBatch,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] })
+      toast.success('Webhook 记录已删除')
+      setExpanded(null)
+    },
+    onError: (err: Error) => toast.error('删除失败', err.message),
+  })
+
+  const batchDeleteMutation = useMutation({
+    mutationFn: batchDeleteBatches,
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] })
+      toast.success('已删除 ' + (res?.deleted ?? selected.size) + ' 条 Webhook 记录')
+      setSelected(new Set())
+      setExpanded(null)
+    },
+    onError: (err: Error) => toast.error('批量删除失败', err.message),
+  })
+
+  const batches: any[] = (data as any)?.items || []
   const total = Number((data as any)?.total || 0)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  useEffect(() => { if (page > totalPages) { setPage(totalPages); setExpanded(null) } }, [page, totalPages])
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages)
+      setExpanded(null)
+    }
+  }, [page, totalPages])
 
-  const allSelected = useMemo(() => batches.length > 0 && selected.size === batches.length, [batches, selected])
-  const toggleSelected = (id: number) => { setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next }) }
+  const allSelected = useMemo(
+    () => batches.length > 0 && selected.size === batches.length,
+    [batches, selected],
+  )
+
+  const toggleSelected = (id: number) => {
+    setSelected((prev: Set<number>) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   const clearSelected = () => setSelected(new Set())
 
-  if (isLoading) return <div className="p-6 text-slate-500">加载中...</div>
+  if (isLoading) {
+    return <div className="p-6 text-slate-500">加载中...</div>
+  }
 
   return (
     <div className="page">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="page-title">Webhook 记录</h1>
           <p className="page-subtitle mt-1">查看缺失歌曲通知的发送状态、响应码和重试记录。</p>
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400">共 {total} 条 · 每页 {PAGE_SIZE} 条{isFetching && <span className="ml-2 text-cyan-600">刷新中...</span>}</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">
+          共 {total} 条，每页 {PAGE_SIZE} 条
+          {isFetching && <span className="ml-2 text-cyan-600">刷新中...</span>}
+        </div>
       </div>
 
       <SectionToolbar
         left={
-          batches.length > 0 && (
+          batches.length > 0 ? (
             <>
-              <input type="checkbox" checked={allSelected} onChange={e => { if (e.target.checked) setSelected(new Set(batches.map((b: any) => b.id))) else clearSelected() }} className="h-4 w-4 rounded border-slate-300 text-cyan-600" />
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={(e: any) => {
+                  if (e.target.checked) setSelected(new Set(batches.map((b: any) => b.id)))
+                  else clearSelected()
+                }}
+                className="h-4 w-4 rounded border-slate-300 text-cyan-600"
+              />
               <span className="text-xs text-slate-500 dark:text-slate-400">全选本页</span>
             </>
-          )
+          ) : undefined
         }
         right={
-          selected.size > 0 && (
+          selected.size > 0 ? (
             <>
               <span className="text-xs font-medium text-cyan-600">已选 {selected.size} 条</span>
-              <button type="button" disabled={batchDeleteMutation.isPending} className="btn-danger text-xs"
-                onClick={async () => { const ok = await confirmDanger(`确定删除选中的 ${selected.size} 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。`, '批量删除 Webhook 记录'); if (!ok) return; batchDeleteMutation.mutate(Array.from(selected)) }}>
-                {batchDeleteMutation.isPending ? '删除中...' : `删除 ${selected.size} 条`}
+              <button
+                type="button"
+                disabled={batchDeleteMutation.isPending}
+                className="btn-danger text-xs"
+                onClick={async () => {
+                  const ok = await confirmDanger(
+                    '确定删除选中的 ' + selected.size + ' 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。',
+                    '批量删除 Webhook 记录',
+                  )
+                  if (!ok) return
+                  batchDeleteMutation.mutate(Array.from(selected))
+                }}
+              >
+                {batchDeleteMutation.isPending ? '删除中...' : '删除 ' + selected.size + ' 条'}
               </button>
               <button type="button" onClick={clearSelected} className="btn-secondary text-xs">取消</button>
             </>
-          )
+          ) : undefined
         }
       />
 
       <ResponsiveList
         items={batches}
-        getKey={batch => batch.id}
-        empty={<EmptyState icon={Link2} title="暂无 Webhook 记录" description="当同步出现缺失歌曲并开启 Webhook 后，这里会出现记录。" actionTo="/settings/connections" />}
-        renderMobileItem={batch => (
+        getKey={(batch: any) => batch.id}
+        empty={
+          <EmptyState
+            icon={Link2}
+            title="暂无 Webhook 记录"
+            description="当同步出现缺失歌曲并开启 Webhook 后，这里会出现记录。"
+            actionTo="/settings/connections"
+          />
+        }
+        renderMobileItem={(batch: any) => (
           <BatchMobileCard
-            batch={batch} expanded={expanded === batch.id} selected={selected.has(batch.id)}
+            batch={batch}
+            expanded={expanded === batch.id}
+            selected={selected.has(batch.id)}
             onToggleExpand={() => setExpanded(expanded === batch.id ? null : batch.id)}
             onToggleSelect={() => toggleSelected(batch.id)}
-            retrying={retryMutation.isPending} deleting={deleteMutation.isPending}
+            retrying={retryMutation.isPending}
+            deleting={deleteMutation.isPending}
             onRetry={() => retryMutation.mutate(batch.id)}
-            onDelete={async () => { const ok = await confirmDanger('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。', '删除 Webhook 记录'); if (!ok) return; deleteMutation.mutate(batch.id) }}
+            onDelete={async () => {
+              const ok = await confirmDanger(
+                '确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。',
+                '删除 Webhook 记录',
+              )
+              if (!ok) return
+              deleteMutation.mutate(batch.id)
+            }}
           />
         )}
         renderTableHeader={() => (
@@ -181,9 +292,16 @@ export default function WebhooksPage() {
             <th className="p-3 text-right font-medium text-slate-600 dark:text-slate-300">操作</th>
           </tr>
         )}
-        renderTableRow={batch => (
+        renderTableRow={(batch: any) => (
           <>
-            <td className="p-3"><input type="checkbox" checked={selected.has(batch.id)} onChange={() => toggleSelected(batch.id)} className="h-4 w-4 rounded border-slate-300 text-cyan-600" /></td>
+            <td className="p-3">
+              <input
+                type="checkbox"
+                checked={selected.has(batch.id)}
+                onChange={() => toggleSelected(batch.id)}
+                className="h-4 w-4 rounded border-slate-300 text-cyan-600"
+              />
+            </td>
             <td className="p-3 font-semibold">#{batch.id}</td>
             <td className="p-3 text-xs text-slate-500">{labelOf(PLAYLIST_TYPE_LABELS, batch.playlist_type)}</td>
             <td className="p-3"><WebhookStatusBadge status={batch.status} /></td>
@@ -191,10 +309,34 @@ export default function WebhooksPage() {
             <td className="p-3 text-xs text-slate-500">{batch.response_code ?? '-'}</td>
             <td className="p-3 text-right">
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setExpanded(expanded === batch.id ? null : batch.id)} className="btn-secondary text-xs">{expanded === batch.id ? '收起' : '预览'}</button>
-                <button type="button" onClick={() => retryMutation.mutate(batch.id)} disabled={retryMutation.isPending} className="btn-primary text-xs">重试</button>
-                <button type="button" disabled={deleteMutation.isPending} className="btn-danger text-xs"
-                  onClick={async () => { const ok = await confirmDanger('确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。', '删除 Webhook 记录'); if (!ok) return; deleteMutation.mutate(batch.id) }}>
+                <button
+                  type="button"
+                  onClick={() => setExpanded(expanded === batch.id ? null : batch.id)}
+                  className="btn-secondary text-xs"
+                >
+                  {expanded === batch.id ? '收起' : '预览'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => retryMutation.mutate(batch.id)}
+                  disabled={retryMutation.isPending}
+                  className="btn-primary text-xs"
+                >
+                  重试
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteMutation.isPending}
+                  className="btn-danger text-xs"
+                  onClick={async () => {
+                    const ok = await confirmDanger(
+                      '确定删除这条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。',
+                      '删除 Webhook 记录',
+                    )
+                    if (!ok) return
+                    deleteMutation.mutate(batch.id)
+                  }}
+                >
                   删除
                 </button>
               </div>
@@ -203,11 +345,23 @@ export default function WebhooksPage() {
         )}
       />
 
-      {expanded && (
-        <div className="card card-padding"><BatchPreview batchId={expanded} /></div>
+      {expanded !== null && (
+        <div className="card card-padding">
+          <BatchPreview batchId={expanded} />
+        </div>
       )}
 
-      <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={next => { setPage(next); setExpanded(null); clearSelected() }} />
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        pageSize={PAGE_SIZE}
+        onPageChange={(next: number) => {
+          setPage(next)
+          setExpanded(null)
+          clearSelected()
+        }}
+      />
     </div>
   )
 }
