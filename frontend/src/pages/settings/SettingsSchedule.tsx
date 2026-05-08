@@ -11,6 +11,14 @@ import {
 } from './SettingsShared'
 import { CheckCircle, XCircle, Zap } from 'lucide-react'
 
+async function previewPlaylistCleanup() {
+  return apiFetch('/tasks/playlist-cleanup/preview', { method: 'POST' })
+}
+
+async function runPlaylistCleanup() {
+  return apiFetch('/tasks/playlist-cleanup/run', { method: 'POST' })
+}
+
 export default function SettingsSchedule() {
   const {
     s,
@@ -292,25 +300,33 @@ export default function SettingsSchedule() {
         </div>
       </SectionCard>
 
-      <SectionCard title="任务管理">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FieldInput
-            fieldKey="playlist_keep_days"
-            value={s.playlist_keep_days}
-            onChange={v => handleChange('playlist_keep_days', v)}
-          />
-          <FieldInput
-            fieldKey="max_concurrent_tasks"
-            value={s.max_concurrent_tasks}
-            onChange={v => handleChange('max_concurrent_tasks', v)}
-          />
+      <SectionCard title="任务执行策略">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          控制 SonicAI 后台任务的最大并发数量。当前主要影响手动触发并通过后台任务注册器执行的任务。
+          Cron 定时任务仍由调度器直接触发，并通过业务锁避免同类任务并发。后续版本会统一接入任务调度器。
+        </p>
+
+        <FieldInput
+          fieldKey="max_concurrent_tasks"
+          value={s.max_concurrent_tasks}
+          onChange={v => handleChange('max_concurrent_tasks', v)}
+        />
+
+        <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 p-3 text-xs text-blue-700 dark:text-blue-300 mt-3">
+          说明：全局并发数并不等于业务互斥。推荐、热榜、歌单同步等任务仍会通过后端业务锁避免同类任务并发。
         </div>
       </SectionCard>
+
+      <PlaylistLifecycleCard
+        s={s}
+        handleChange={handleChange}
+      />
 
       <SectionCard title="历史记录清理">
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
           控制 SonicAI 数据库中的推荐历史和 Webhook 记录保留时间。
-          自动清理不会删除 Navidrome 中已经创建的歌单。
+          这里不会删除 Navidrome 中已经创建的歌单。
+          如需清理 Navidrome 歌单，请使用上方「歌单生命周期」。
         </p>
 
         <FieldInput
@@ -352,6 +368,162 @@ export default function SettingsSchedule() {
         onSave={save}
       />
     </div>
+  )
+}
+
+/* 歌单生命周期卡片 */
+function PlaylistLifecycleCard({
+  s,
+  handleChange,
+}: {
+  s: Record<string, any>
+  handleChange: (key: string, value: unknown) => void
+}) {
+  const toast = useToast()
+  const [preview, setPreview] = useState<any | null>(null)
+
+  const previewMutation = useMutation({
+    mutationFn: previewPlaylistCleanup,
+    onSuccess: (data: any) => {
+      setPreview(data)
+      toast.info('清理预览已生成', `预计清理 ${data?.total ?? 0} 个歌单`)
+    },
+    onError: (err: any) => {
+      toast.error('清理预览失败', err?.detail || err?.message || '未知错误')
+    },
+  })
+
+  const runMutation = useMutation({
+    mutationFn: runPlaylistCleanup,
+    onSuccess: (data: any) => {
+      toast.success(
+        '歌单清理完成',
+        `扫描 ${data?.scanned ?? 0} 个，更新 ${data?.updated_local_count ?? 0} 个`
+      )
+      setPreview(null)
+    },
+    onError: (err: any) => {
+      toast.error('歌单清理失败', err?.detail || err?.message || '未知错误')
+    },
+  })
+
+  return (
+    <SectionCard title="歌单生命周期">
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+        控制 SonicAI 创建的 Navidrome 歌单保留策略。建议先使用「预览清理」确认范围，
+        再执行立即清理或开启自动清理。
+      </p>
+
+      <FieldInput
+        fieldKey="playlist_cleanup_enabled"
+        value={s.playlist_cleanup_enabled}
+        onChange={v => handleChange('playlist_cleanup_enabled', v)}
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <FieldInput
+          fieldKey="playlist_cleanup_cron"
+          value={s.playlist_cleanup_cron ?? '30 3 * * *'}
+          onChange={v => handleChange('playlist_cleanup_cron', v)}
+        />
+
+        <FieldInput
+          fieldKey="playlist_keep_days"
+          value={s.playlist_keep_days}
+          onChange={v => handleChange('playlist_keep_days', v)}
+        />
+      </div>
+
+      <FieldInput
+        fieldKey="playlist_cleanup_delete_navidrome"
+        value={s.playlist_cleanup_delete_navidrome}
+        onChange={v => handleChange('playlist_cleanup_delete_navidrome', v)}
+      />
+
+      <FieldInput
+        fieldKey="playlist_cleanup_keep_failed"
+        value={s.playlist_cleanup_keep_failed}
+        onChange={v => handleChange('playlist_cleanup_keep_failed', v)}
+      />
+
+      <FieldInput
+        fieldKey="playlist_cleanup_keep_recent_success_count"
+        value={s.playlist_cleanup_keep_recent_success_count}
+        onChange={v => handleChange('playlist_cleanup_keep_recent_success_count', v)}
+      />
+
+      <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 p-3 text-xs text-amber-700 dark:text-amber-300">
+        注意：如果开启「同时删除 Navidrome 歌单」，清理时会调用 Navidrome 删除远端歌单。
+        建议首次使用前先点击「预览清理」确认列表。
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={previewMutation.isPending}
+          onClick={() => previewMutation.mutate()}
+        >
+          {previewMutation.isPending ? '预览中...' : '预览清理'}
+        </button>
+
+        <button
+          type="button"
+          className="btn-danger"
+          disabled={runMutation.isPending}
+          onClick={() => {
+            const confirmText = s.playlist_cleanup_delete_navidrome
+              ? '确定立即清理过期歌单吗？当前设置会同时删除 Navidrome 中的远端歌单。'
+              : '确定立即清理过期歌单吗？当前设置不会删除 Navidrome 远端歌单，只会清空 SonicAI 中的歌单 ID。'
+
+            if (!window.confirm(confirmText)) return
+            runMutation.mutate()
+          }}
+        >
+          {runMutation.isPending ? '清理中...' : '立即清理'}
+        </button>
+      </div>
+
+      {preview && (
+        <div className="rounded-2xl border border-border overflow-hidden">
+          <div className="bg-slate-50 dark:bg-slate-900 p-3 text-sm font-semibold">
+            预计清理 {preview.total ?? 0} 个歌单
+          </div>
+
+          {preview.by_type && (
+            <div className="p-3 flex flex-wrap gap-2 text-xs">
+              {Object.entries(preview.by_type).map(([type, count]) => (
+                <span key={type} className="badge-muted">
+                  {type}：{String(count)}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="max-h-72 overflow-y-auto divide-y divide-border">
+            {(preview.items || []).length === 0 && (
+              <div className="p-4 text-sm text-slate-500">
+                当前没有需要清理的过期歌单。
+              </div>
+            )}
+
+            {(preview.items || []).map((item: any) => (
+              <div key={item.playlist_id} className="p-3 text-sm">
+                <div className="font-medium text-slate-800 dark:text-slate-100">
+                  {item.playlist_name}
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  类型：{item.playlist_type} · 创建：{item.created_at || '-'} · 原因：{item.reason}
+                </div>
+                <div className="text-xs text-slate-400 mt-1">
+                  Navidrome ID：{item.navidrome_playlist_id || '-'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </SectionCard>
   )
 }
 

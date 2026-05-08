@@ -195,11 +195,12 @@ export const FIELD_LABELS: Record<string, { label: string; type?: string; toolti
       ' 默认：5  推荐：3 - 10',
   },
   playlist_keep_days: {
-    label: '歌单保留天数',
+    label: '默认歌单保留天数',
     type: 'number',
     tooltip:
-      '▸ 推荐歌单在 Navidrome 中保留多少天\n' +
-      ' 0 = 永不过期（慎用）',
+      '▸ SonicAI 创建的歌单默认保留多少天\n' +
+      ' 用于歌单生命周期自动清理\n' +
+      ' 0 = 永不过期',
   },
   history_cleanup_enabled: {
     label: '启用历史自动清理',
@@ -230,10 +231,12 @@ export const FIELD_LABELS: Record<string, { label: string; type?: string; toolti
       ' 失败、停止、部分成功记录会保留,方便排查问题。',
   },
   max_concurrent_tasks: {
-    label: '任务并发数',
+    label: '全局后台任务最大并发数',
     type: 'number',
     tooltip:
-      '▸ 同时允许的后台任务数量\n' +
+      '▸ 限制通过 SonicAI 后台任务注册器执行的任务数量\n' +
+      ' 当前主要影响手动任务和部分后台任务\n' +
+      ' Cron 任务后续会逐步统一接入任务调度器\n' +
       ' 默认：2  推荐：1 - 3',
   },
   webhook_timeout_seconds: {
@@ -261,6 +264,41 @@ export const FIELD_LABELS: Record<string, { label: string; type?: string; toolti
       ' · 完整推荐 — 同时生成相似曲目和相邻艺术家歌单\n' +
       ' · 仅相似曲目 — 只生成相似曲目歌单\n' +
       ' · 仅相邻艺术家 — 只生成相邻艺术家歌单',
+  },
+  playlist_cleanup_enabled: {
+    label: '启用歌单自动清理',
+    type: 'boolean',
+    tooltip:
+      '▸ 开启后，系统会按 Cron 定期清理过期歌单\n' +
+      ' 默认关闭，避免升级后误删 Navidrome 歌单。',
+  },
+  playlist_cleanup_cron: {
+    label: '歌单清理 Cron',
+    type: 'text',
+    tooltip:
+      '▸ 歌单自动清理的 Cron 表达式\n' +
+      ' 默认：30 3 * * *，表示每天凌晨 3:30 执行。',
+  },
+  playlist_cleanup_delete_navidrome: {
+    label: '同时删除 Navidrome 歌单',
+    type: 'boolean',
+    tooltip:
+      '▸ 开启后，清理时会调用 Navidrome 删除远端歌单\n' +
+      ' 关闭时仅清空 SonicAI 记录中的 Navidrome 歌单 ID。',
+  },
+  playlist_cleanup_keep_failed: {
+    label: '保留失败任务歌单',
+    type: 'boolean',
+    tooltip:
+      '▸ 开启后，失败、停止或部分成功任务关联的歌单不会被自动清理\n' +
+      ' 建议开启，方便排查问题。',
+  },
+  playlist_cleanup_keep_recent_success_count: {
+    label: '每类保留最近成功歌单数',
+    type: 'number',
+    tooltip:
+      '▸ 每种歌单类型至少保留最近 N 个成功歌单\n' +
+      ' 可避免某类歌单被按时间全部清空。',
   },
 }
 

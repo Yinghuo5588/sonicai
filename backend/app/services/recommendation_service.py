@@ -675,30 +675,18 @@ async def _create_webhook_batch(db: AsyncSession, run_id: int, playlist, missing
 
 
 async def _cleanup_old_playlists(settings: SystemSettings):
-    """Delete old SonicAI-generated playlists from Navidrome by DB created_at."""
-    from datetime import timedelta
-    from sqlalchemy import select
-    from app.db.session import AsyncSessionLocal
-    from app.db.models import GeneratedPlaylist
-    from app.services.navidrome_service import navidrome_delete_playlist
+    """Legacy cleanup entry.
 
-    keep_cutoff = datetime.now(timezone.utc) - timedelta(days=settings.playlist_keep_days)
+    Kept for backward compatibility. The new lifecycle cleanup is implemented
+    in playlist_cleanup_service and should be triggered by independent Cron
+    or manual API.
+    """
+    try:
+        from app.services.playlist_cleanup_service import run_playlist_cleanup
 
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(GeneratedPlaylist).where(
-                GeneratedPlaylist.created_at < keep_cutoff,
-                GeneratedPlaylist.navidrome_playlist_id.isnot(None),
-            )
-        )
-        old_playlists = result.scalars().all()
-
-        for pl in old_playlists:
-            try:
-                logger.info(f"Deleting old playlist: {pl.playlist_name} (id={pl.navidrome_playlist_id})")
-                await navidrome_delete_playlist(pl.navidrome_playlist_id)
-                pl.navidrome_playlist_id = None
-            except Exception as e:
-                logger.warning(f"Failed to delete playlist {pl.playlist_name}: {e}")
-
-        await db.commit()
+        # 兼容旧行为：完整推荐结束后仍尝试清理。
+        # force=True 表示不要求 playlist_cleanup_enabled 开启。
+        # 但是否删除 Navidrome 仍受 playlist_cleanup_delete_navidrome 控制。
+        await run_playlist_cleanup(force=True)
+    except Exception as e:
+        logger.warning("[playlist-cleanup-legacy] failed: %s", e)

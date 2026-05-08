@@ -67,6 +67,13 @@ class SystemSettings(Base):
     playlist_keep_days = Column(Integer, default=3)
     playlist_api_url = Column(String(500), nullable=True)  # e.g. https://sss.unmeta.cn/songlist
 
+    # Playlist lifecycle cleanup
+    playlist_cleanup_enabled = Column(Boolean, default=False)
+    playlist_cleanup_cron = Column(String(100), default="30 3 * * *")
+    playlist_cleanup_delete_navidrome = Column(Boolean, default=False)
+    playlist_cleanup_keep_failed = Column(Boolean, default=True)
+    playlist_cleanup_keep_recent_success_count = Column(Integer, default=2)
+
     # Recommendation
     library_mode_default = Column(String(20), default="allow_missing")  # library_only | allow_missing
     duplicate_avoid_days = Column(Integer, default=14)

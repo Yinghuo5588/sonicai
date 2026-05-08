@@ -46,6 +46,7 @@ async def load_cron_schedule(db: AsyncSession):
             "playlist_sync_cron",
             "song_cache_refresh",
             "missed_track_retry_cron",
+            "playlist_cleanup_cron",
             "history_cleanup",
         ):
             job.remove()
@@ -191,6 +192,37 @@ async def load_cron_schedule(db: AsyncSession):
                 logger.info("Missed track retry cron loaded: %s", config.missed_track_retry_cron)
         except Exception as e:
             logger.warning("Invalid missed track retry cron '%s': %s", config.missed_track_retry_cron, e)
+
+    # ===== Playlist lifecycle scheduled cleanup =====
+    if config and getattr(config, "playlist_cleanup_enabled", False) and getattr(config, "playlist_cleanup_cron", None):
+        try:
+            from app.tasks.playlist_cleanup_tasks import run_playlist_cleanup_cron_job
+
+            parts = config.playlist_cleanup_cron.split()
+            if len(parts) >= 5:
+                tz = config.timezone if config and config.timezone else settings.app_timezone
+
+                sched.add_job(
+                    run_playlist_cleanup_cron_job,
+                    CronTrigger(
+                        minute=parts[0],
+                        hour=parts[1],
+                        day=parts[2],
+                        month=parts[3],
+                        day_of_week=parts[4],
+                        timezone=tz,
+                    ),
+                    id="playlist_cleanup_cron",
+                    replace_existing=True,
+                    misfire_grace_time=300,
+                )
+                logger.info("Playlist cleanup cron loaded: %s", config.playlist_cleanup_cron)
+        except Exception as e:
+            logger.warning(
+                "Invalid playlist cleanup cron '%s': %s",
+                getattr(config, "playlist_cleanup_cron", None),
+                e,
+            )
 
     # Register webhook retry job (every 2 minutes)
     from apscheduler.triggers.interval import IntervalTrigger

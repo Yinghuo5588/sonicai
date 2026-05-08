@@ -30,8 +30,8 @@ const SETTINGS_SECTIONS = [
   },
   {
     key: 'schedule',
-    title: '调度设置',
-    desc: '定时任务、热榜同步、歌单同步与缓存刷新',
+    title: '任务中心',
+    desc: '定时任务、执行并发、歌单生命周期与历史清理',
     icon: Clock,
   },
   {
@@ -67,7 +67,7 @@ export default function SettingsLayout() {
       <div className="hidden md:block">
         <h1 className="page-title">设置</h1>
         <p className="page-subtitle mt-1">
-          管理服务连接、推荐策略、调度任务、外观和账户安全。
+          管理服务连接、推荐策略、任务中心、曲库索引、外观和账户安全。
         </p>
       </div>
 

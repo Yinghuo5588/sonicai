@@ -30,6 +30,11 @@ class SettingsResponse(BaseModel):
     webhook_retry_count: int
     playlist_keep_days: int
     playlist_api_url: str | None
+    playlist_cleanup_enabled: bool | None = False
+    playlist_cleanup_cron: str | None = "30 3 * * *"
+    playlist_cleanup_delete_navidrome: bool | None = False
+    playlist_cleanup_keep_failed: bool | None = True
+    playlist_cleanup_keep_recent_success_count: int | None = 2
     library_mode_default: str
     duplicate_avoid_days: int
     top_track_seed_limit: int
@@ -109,6 +114,11 @@ class SettingsUpdate(BaseModel):
     webhook_timeout_seconds: int | None = Field(default=None, ge=1, le=120)
     webhook_retry_count: int | None = Field(default=None, ge=0, le=10)
     playlist_keep_days: int | None = Field(default=None, ge=0, le=365)
+    playlist_cleanup_enabled: bool | None = None
+    playlist_cleanup_cron: str | None = None
+    playlist_cleanup_delete_navidrome: bool | None = None
+    playlist_cleanup_keep_failed: bool | None = None
+    playlist_cleanup_keep_recent_success_count: int | None = Field(default=None, ge=0, le=20)
     playlist_api_url: str | None = None
     library_mode_default: str | None = None
     duplicate_avoid_days: int | None = Field(default=None, ge=0, le=365)
@@ -226,6 +236,7 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
         "playlist_sync_cron_enabled", "playlist_sync_cron_expression",
         "missed_track_retry_enabled", "missed_track_retry_cron",
         "song_cache_auto_refresh_enabled", "song_cache_refresh_cron",
+        "playlist_cleanup_enabled", "playlist_cleanup_cron",
     }
     if set(body.model_dump(exclude_unset=True).keys()) & cron_keys:
         s.cron_created_by_user_id = current_user.id
@@ -317,6 +328,7 @@ async def import_settings(
     # Fields that must be numeric
     numeric_fields = {
         "webhook_timeout_seconds", "webhook_retry_count", "playlist_keep_days",
+        "playlist_cleanup_keep_recent_success_count",
         "top_track_seed_limit", "top_artist_seed_limit", "similar_track_limit",
         "similar_artist_limit", "artist_top_track_limit", "similar_playlist_size",
         "artist_playlist_size", "recommendation_balance", "recent_tracks_limit",

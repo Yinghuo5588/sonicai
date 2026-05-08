@@ -122,6 +122,11 @@ export interface Settings {
   webhook_timeout_seconds: number
   webhook_retry_count: number
   playlist_keep_days: number
+  playlist_cleanup_enabled: boolean | null
+  playlist_cleanup_cron: string | null
+  playlist_cleanup_delete_navidrome: boolean | null
+  playlist_cleanup_keep_failed: boolean | null
+  playlist_cleanup_keep_recent_success_count: number | null
   playlist_api_url: string | null
   library_mode_default: string
   duplicate_avoid_days: number
@@ -253,4 +258,33 @@ export interface CreateManualMatchPayload {
   input_artist?: string
   navidrome_id: string
   note?: string
+}
+
+export interface PlaylistCleanupPreviewItem {
+  playlist_id: number
+  run_id: number
+  playlist_name: string
+  playlist_type: string
+  created_at: string | null
+  navidrome_playlist_id: string | null
+  reason: string
+}
+
+export interface PlaylistCleanupPreviewResponse {
+  total: number
+  by_type: Record<string, number>
+  items: PlaylistCleanupPreviewItem[]
+}
+
+export interface PlaylistCleanupRunResponse {
+  scanned: number
+  deleted_navidrome_count: number
+  failed_navidrome_count: number
+  updated_local_count: number
+  failed_items: Array<{
+    playlist_id: number
+    playlist_name: string
+    navidrome_playlist_id: string
+    error: string
+  }>
 }
