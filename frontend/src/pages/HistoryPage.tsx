@@ -142,7 +142,17 @@ export default function HistoryPage() {
         )}
         renderTableHeader={() => (
           <tr>
-            <th className="w-10 p-3 text-left"><input type="checkbox" checked={selected.size === runs.length && runs.length > 0} onChange={e => { if (e.target.checked) setSelected(new Set(runs.map((r: any) => r.id))) else clearSelected() }} className="h-4 w-4 rounded border-slate-300 text-cyan-600" /></th>
+            <th className="w-10 p-3 text-left">
+              <input
+                type="checkbox"
+                checked={selected.size === runs.length && runs.length > 0}
+                onChange={e => {
+                  if (e.target.checked) setSelected(new Set(runs.map((r: any) => r.id)))
+                  else clearSelected()
+                }}
+                className="h-4 w-4 rounded border-slate-300 text-cyan-600"
+              />
+            </th>
             <th className="p-3 text-left font-medium text-slate-600 dark:text-slate-300">任务</th>
             <th className="p-3 text-left font-medium text-slate-600 dark:text-slate-300">状态</th>
             <th className="p-3 text-left font-medium text-slate-600 dark:text-slate-300">触发</th>
