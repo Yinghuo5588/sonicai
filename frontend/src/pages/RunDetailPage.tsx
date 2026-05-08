@@ -21,6 +21,7 @@ import {
 } from '@/lib/labels'
 import { useToast } from '@/components/ui/useToast'
 import { useConfirm } from '@/components/ui'
+import { CardSkeleton } from '@/components/ui/Skeleton'
 
 async function fetchRunDetail(runId: number) {
   return apiFetch(`/runs/${runId}`)
