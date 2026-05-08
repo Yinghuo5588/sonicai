@@ -255,7 +255,11 @@ async def _find_cleanup_candidates(
                 continue
 
             cutoff = now - timedelta(days=keep_days)
-            if pl.created_at >= cutoff:
+            # Ensure consistent timezone comparison
+            pl_created = pl.created_at
+            if pl_created.tzinfo is None:
+                pl_created = pl_created.replace(tzinfo=timezone.utc)
+            if pl_created >= cutoff:
                 continue
 
             grouped[pl.playlist_type].append(pl)
