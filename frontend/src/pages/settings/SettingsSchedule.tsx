@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { useToast } from '@/components/ui/useToast'
 import {
@@ -19,6 +19,58 @@ async function runPlaylistCleanup() {
   return apiFetch('/tasks/playlist-cleanup/run', { method: 'POST' })
 }
 
+async function fetchTaskStatus() {
+  return apiFetch('/tasks/status')
+}
+
+async function fetchRetentionPolicies() {
+  return apiFetch('/tasks/playlist-retention-policies')
+}
+
+async function updateRetentionPolicy(type: string, payload: Record<string, unknown>) {
+  return apiFetch(`/tasks/playlist-retention-policies/${type}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+function CurrentTasksCard() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['task-status'],
+    queryFn: fetchTaskStatus,
+    refetchInterval: 5000,
+  })
+
+  const activeTasks = (data as any)?.active_tasks || []
+
+  return (
+    <SectionCard title="当前后台任务">
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+        这里展示通过 create_background_task 注册的后台任务。Cron 任务目前仍由 APScheduler 直接执行，不一定全部出现在这里。
+      </p>
+
+      {isLoading ? (
+        <div className="text-sm text-slate-500">加载任务状态...</div>
+      ) : activeTasks.length === 0 ? (
+        <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-3 text-sm text-slate-500">
+          当前没有后台任务运行
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {activeTasks.map((name: string) => (
+            <div
+              key={name}
+              className="rounded-xl bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-100 dark:border-cyan-900 p-3 text-sm text-cyan-700 dark:text-cyan-300"
+            >
+              {name}
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
 export default function SettingsSchedule() {
   const {
     s,
@@ -33,6 +85,8 @@ export default function SettingsSchedule() {
 
   return (
     <div className="space-y-4">
+      <CurrentTasksCard />
+
       <SectionCard title="Last.fm 推荐歌单定时生成">
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
           定时基于 Last.fm 听歌数据生成推荐歌单，可选择完整推荐、仅相似曲目或仅相邻艺术家。
@@ -380,6 +434,7 @@ function PlaylistLifecycleCard({
   handleChange: (key: string, value: unknown) => void
 }) {
   const toast = useToast()
+  const queryClient = useQueryClient()
   const [preview, setPreview] = useState<any | null>(null)
 
   const previewMutation = useMutation({
@@ -406,6 +461,44 @@ function PlaylistLifecycleCard({
       toast.error('歌单清理失败', err?.detail || err?.message || '未知错误')
     },
   })
+
+  const { data: policiesData, isLoading: policiesLoading } = useQuery({
+    queryKey: ['playlist-retention-policies'],
+    queryFn: fetchRetentionPolicies,
+  })
+
+  const updatePolicyMutation = useMutation({
+    mutationFn: ({ type, payload }: { type: string; payload: Record<string, unknown> }) =>
+      updateRetentionPolicy(type, payload),
+    onSuccess: () => {
+      toast.success('保留策略已更新')
+      queryClient.invalidateQueries({ queryKey: ['playlist-retention-policies'] })
+    },
+    onError: (err: any) => {
+      toast.error('策略更新失败', err?.detail || err?.message || '未知错误')
+    },
+  })
+
+  const policies = (policiesData as any)?.items || []
+
+  const updatePolicyField = (
+    row: any,
+    key: string,
+    value: unknown,
+  ) => {
+    updatePolicyMutation.mutate({
+      type: row.playlist_type,
+      payload: {
+        enabled: key === 'enabled' ? value : row.enabled,
+        keep_days: key === 'keep_days' ? Number(value) : row.keep_days,
+        delete_navidrome: key === 'delete_navidrome' ? value : row.delete_navidrome,
+        keep_recent_success_count:
+          key === 'keep_recent_success_count'
+            ? Number(value)
+            : row.keep_recent_success_count,
+      },
+    })
+  }
 
   return (
     <SectionCard title="歌单生命周期">
@@ -457,7 +550,88 @@ function PlaylistLifecycleCard({
         建议首次使用前先点击「预览清理」确认列表。
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2">
+      {/* 按歌单类型保留策略表 */}
+      <div className="rounded-2xl border border-border overflow-hidden mt-4">
+        <div className="bg-slate-50 dark:bg-slate-900 p-3 text-sm font-semibold">
+          按歌单类型保留策略
+        </div>
+
+        {policiesLoading ? (
+          <div className="p-3 text-sm text-slate-500">加载策略...</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-900">
+                <tr>
+                  <th className="text-left p-3">歌单类型</th>
+                  <th className="text-left p-3">自动清理</th>
+                  <th className="text-left p-3">保留天数</th>
+                  <th className="text-left p-3">删除 Navidrome</th>
+                  <th className="text-left p-3">最近保留</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {policies.map((row: any) => (
+                  <tr key={row.playlist_type} className="border-t border-border">
+                    <td className="p-3 font-medium">
+                      {row.playlist_type}
+                    </td>
+
+                    <td className="p-3">
+                      <input
+                        type="checkbox"
+                        checked={!!row.enabled}
+                        onChange={e => updatePolicyField(row, 'enabled', e.target.checked)}
+                        className="w-4 h-4 accent-cyan-500"
+                      />
+                    </td>
+
+                    <td className="p-3">
+                      <input
+                        type="number"
+                        min={0}
+                        max={3650}
+                        value={Number(row.keep_days ?? 0)}
+                        onChange={e => updatePolicyField(row, 'keep_days', Number(e.target.value))}
+                        className="input w-24"
+                      />
+                    </td>
+
+                    <td className="p-3">
+                      <input
+                        type="checkbox"
+                        checked={!!row.delete_navidrome}
+                        onChange={e => updatePolicyField(row, 'delete_navidrome', e.target.checked)}
+                        className="w-4 h-4 accent-red-500"
+                      />
+                    </td>
+
+                    <td className="p-3">
+                      <input
+                        type="number"
+                        min={0}
+                        max={20}
+                        value={Number(row.keep_recent_success_count ?? 0)}
+                        onChange={e =>
+                          updatePolicyField(
+                            row,
+                            'keep_recent_success_count',
+                            Number(e.target.value),
+                          )
+                        }
+                        className="input w-24"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2 mt-4">
         <button
           type="button"
           className="btn-secondary"
@@ -485,18 +659,43 @@ function PlaylistLifecycleCard({
       </div>
 
       {preview && (
-        <div className="rounded-2xl border border-border overflow-hidden">
+        <div className="rounded-2xl border border-border overflow-hidden mt-4">
           <div className="bg-slate-50 dark:bg-slate-900 p-3 text-sm font-semibold">
             预计清理 {preview.total ?? 0} 个歌单
           </div>
 
           {preview.by_type && (
-            <div className="p-3 flex flex-wrap gap-2 text-xs">
-              {Object.entries(preview.by_type).map(([type, count]) => (
-                <span key={type} className="badge-muted">
-                  {type}：{String(count)}
-                </span>
-              ))}
+            <div className="p-3 space-y-3">
+              <div className="flex flex-wrap gap-2 text-xs">
+                {Object.entries(preview.by_type).map(([type, count]) => (
+                  <span key={type} className="badge-muted">
+                    {type}：{String(count)}
+                  </span>
+                ))}
+              </div>
+
+              {preview.operation_stats && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-2 text-red-700 dark:text-red-300">
+                    预计删除 Navidrome：{preview.operation_stats.delete_navidrome_count ?? 0}
+                  </div>
+                  <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-2 text-slate-600 dark:text-slate-300">
+                    仅清空本地关联：{preview.operation_stats.clear_local_only_count ?? 0}
+                  </div>
+                  <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 p-2 text-amber-700 dark:text-amber-300">
+                    跳过失败任务：{preview.operation_stats.skip_failed_count ?? 0}
+                  </div>
+                  <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 p-2 text-blue-700 dark:text-blue-300">
+                    最近保留跳过：{preview.operation_stats.skip_recent_keep_count ?? 0}
+                  </div>
+                </div>
+              )}
+
+              {(preview.operation_stats?.delete_navidrome_count ?? 0) > 0 && (
+                <div className="rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900 p-3 text-xs text-red-700 dark:text-red-300">
+                  本次操作会删除 Navidrome 中的远端歌单。删除后无法从 SonicAI 恢复，只能重新生成。
+                </div>
+              )}
             </div>
           )}
 
@@ -513,10 +712,14 @@ function PlaylistLifecycleCard({
                   {item.playlist_name}
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  类型：{item.playlist_type} · 创建：{item.created_at || '-'} · 原因：{item.reason}
+                  类型：{item.playlist_type} · 创建：{item.created_at || '-'} · 保留：{item.keep_days ?? '-'} 天
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  原因：{item.reason}
                 </div>
                 <div className="text-xs text-slate-400 mt-1">
-                  Navidrome ID：{item.navidrome_playlist_id || '-'}
+                  Navidrome ID：{item.navidrome_playlist_id || '-'} ·
+                  {item.delete_navidrome ? ' 会删除远端歌单' : ' 仅清空本地关联'}
                 </div>
               </div>
             ))}

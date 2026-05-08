@@ -172,6 +172,19 @@ class RecommendationRun(Base):
     webhook_batches = relationship("WebhookBatch", back_populates="run", cascade="all, delete-orphan")
 
 
+class PlaylistRetentionPolicy(Base):
+    __tablename__ = "playlist_retention_policies"
+
+    id = Column(Integer, primary_key=True)
+    playlist_type = Column(String(50), nullable=False, unique=True)
+    enabled = Column(Boolean, default=False, nullable=False)
+    keep_days = Column(Integer, default=0, nullable=False)
+    delete_navidrome = Column(Boolean, default=False, nullable=False)
+    keep_recent_success_count = Column(Integer, default=1, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 class GeneratedPlaylist(Base):
     __tablename__ = "generated_playlists"
 
