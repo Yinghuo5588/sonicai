@@ -1,11 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
-import {
-  SaveBar,
-  SectionCard,
-  Tooltip,
-  useSettingsForm,
-} from './SettingsShared'
+import { SaveBar, SectionCard, Tooltip, useSettingsForm } from './SettingsShared'
+import { InfoGrid } from '@/components/ui'
 
 async function fetchCacheStatus() {
   return apiFetch('/cache/status')
@@ -54,39 +50,15 @@ export default function SettingsCache() {
         {statusLoading ? (
           <div className="text-sm text-slate-500">加载缓存状态...</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-            <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-3">
-              <div className="text-xs text-slate-500 dark:text-slate-400">状态</div>
-              <div className="text-sm font-semibold mt-1">
-                {status?.refreshing
-                  ? '刷新中'
-                  : status?.ready
-                  ? '已就绪'
-                  : '未就绪'}
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-3">
-              <div className="text-xs text-slate-500 dark:text-slate-400">缓存歌曲</div>
-              <div className="text-sm font-semibold mt-1">
-                {status?.total_songs ?? 0}
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-3">
-              <div className="text-xs text-slate-500 dark:text-slate-400">命中率</div>
-              <div className="text-sm font-semibold mt-1">
-                {formatPercent(status?.hit_rate ?? 0)}
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-3">
-              <div className="text-xs text-slate-500 dark:text-slate-400">刷新次数</div>
-              <div className="text-sm font-semibold mt-1">
-                {status?.refresh_count ?? 0}
-              </div>
-            </div>
-          </div>
+          <InfoGrid
+            columns={4}
+            items={[
+              { label: '状态', value: status?.refreshing ? '刷新中' : status?.ready ? '已就绪' : '未就绪', tone: status?.refreshing ? 'info' : status?.ready ? 'success' : 'warning' },
+              { label: '缓存歌曲', value: status?.total_songs ?? 0 },
+              { label: '命中率', value: formatPercent(status?.hit_rate ?? 0), tone: 'success' },
+              { label: '刷新次数', value: status?.refresh_count ?? 0 },
+            ]}
+          />
         )}
 
         <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1 mt-3">

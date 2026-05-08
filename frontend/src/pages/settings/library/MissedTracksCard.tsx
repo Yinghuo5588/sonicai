@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
+import { InfoGrid } from '@/components/ui'
 import { useToast } from '@/components/ui/useToast'
 import { useConfirm } from '@/components/ui/useConfirm'
 import { labelOf, MISSED_STATUS_LABELS } from '@/lib/labels'
@@ -19,15 +20,6 @@ import {
 } from './libraryApi'
 import { LIBRARY_PAGE_SIZE, MissedTrackStats, MissedTracksResponse } from './libraryTypes'
 import PaginationControls from './components/PaginationControls'
-
-function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
-      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-50">{value}</div>
-    </div>
-  )
-}
 
 export default function MissedTracksCard() {
   const queryClient = useQueryClient()
@@ -91,13 +83,17 @@ export default function MissedTracksCard() {
     <SectionCard title="未命中歌曲">
       <p className="text-xs text-slate-500 dark:text-slate-400">这里记录自动匹配未命中的歌曲。它是任务池，不是普通日志。同一首歌会自动去重并累计出现次数。补库后可手动或定时重试。</p>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <StatCard label="全部" value={stats?.total ?? 0} />
-        <StatCard label="待处理" value={stats?.pending ?? 0} />
-        <StatCard label="已匹配" value={stats?.matched ?? 0} />
-        <StatCard label="失败" value={stats?.failed ?? 0} />
-        <StatCard label="已忽略" value={stats?.ignored ?? 0} />
-      </div>
+      <InfoGrid
+        columns={5}
+        className="mt-3"
+        items={[
+          { label: '全部', value: stats?.total ?? 0 },
+          { label: '待处理', value: stats?.pending ?? 0, tone: (stats?.pending ?? 0) > 0 ? 'warning' : 'default' },
+          { label: '已匹配', value: stats?.matched ?? 0, tone: 'success' },
+          { label: '失败', value: stats?.failed ?? 0, tone: (stats?.failed ?? 0) > 0 ? 'danger' : 'default' },
+          { label: '已忽略', value: stats?.ignored ?? 0 },
+        ]}
+      />
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <select value={status} onChange={e => { setStatus(e.target.value); setPage(1) }} className="select sm:w-40">

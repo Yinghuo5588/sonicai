@@ -20,8 +20,7 @@ import {
   labelOf,
 } from '@/lib/labels'
 import { useToast } from '@/components/ui/useToast'
-import { CardSkeleton } from '@/components/ui/Skeleton'
-import { confirmDanger } from '@/lib/confirm'
+import { useConfirm } from '@/components/ui'
 
 async function fetchRunDetail(runId: number) {
   return apiFetch(`/runs/${runId}`)
@@ -244,6 +243,7 @@ export default function RunDetailPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const toast = useToast()
+  const { confirmDanger, confirmInfo } = useConfirm()
   const [stopping, setStopping] = useState(false)
 
   const { data: run, isLoading: runLoading, error: runError } = useQuery({
@@ -277,8 +277,9 @@ export default function RunDetailPage() {
     },
   })
 
-  const handleStop = () => {
-    if (!confirmDanger('确定停止这个任务吗？')) return
+  const handleStop = async () => {
+    const ok = await confirmDanger('确定停止这个任务吗？停止后，已经写入的数据不会自动回滚。', '停止任务')
+    if (!ok) return
     setStopping(true)
     stopMutation.mutate()
   }
@@ -295,12 +296,15 @@ export default function RunDetailPage() {
     },
   })
 
-  const handleDelete = () => {
-    if (!confirmDanger('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。')) {
-      return
-    }
-    const deleteNavidrome = confirm(
-      '是否同时删除 Navidrome 中已创建的歌单？\n\n建议选择"取消"，只删除 SonicAI 历史记录。'
+  const handleDelete = async () => {
+    const ok = await confirmDanger(
+      '确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。',
+      '删除推荐历史',
+    )
+    if (!ok) return
+    const deleteNavidrome = await confirmInfo(
+      '是否同时删除 Navidrome 中已创建的歌单？\n\n建议选择「取消」，只删除 SonicAI 历史记录。',
+      '是否删除 Navidrome 歌单',
     )
     deleteMutation.mutate(deleteNavidrome)
   }
