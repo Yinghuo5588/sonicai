@@ -355,8 +355,8 @@ export default function SettingsSchedule() {
         />
 
         <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 p-3 text-xs text-amber-700 dark:text-amber-300 mt-3">
-          注意:这里清理的是 SonicAI 的数据库历史记录,不会自动删除 Navidrome 中已生成的歌单。
-          如果需要删除 Navidrome 歌单,请在推荐历史详情页手动选择删除。
+          注意：这里清理的是 SonicAI 的数据库历史记录，不会自动删除 Navidrome 中已生成的歌单。
+          如果需要删除 Navidrome 歌单，请在推荐历史详情页手动选择删除。
         </div>
       </SectionCard>
 
@@ -371,7 +371,7 @@ export default function SettingsSchedule() {
   )
 }
 
-/* 歌单生命周期卡片 */
+/* 歌单生命周期卡片 - 预览/清理功能完整实现 */
 function PlaylistLifecycleCard({
   s,
   handleChange,
