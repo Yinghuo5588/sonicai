@@ -45,7 +45,7 @@ function PanelContent({ key, s, handleChange }: { key: string; s: ScheduleCardPr
     case 'concurrency':       return <TaskConcurrencyCard     s={s} handleChange={handleChange} />
     case 'playlist-lifecycle': return <PlaylistLifecycleCard  s={s} handleChange={handleChange} />
     case 'history-cleanup':   return <HistoryCleanupCard     s={s} handleChange={handleChange} />
-    default: return null
+    default: return <div className="card card-padding text-sm text-slate-500">未找到面板：{key}（共 {SCHEDULE_PANELS.length} 个）</div>
   }
 }
 
@@ -75,6 +75,9 @@ export default function SchedulePage() {
 
   return (
     <div className="page pb-16">
+      {/* DEBUG: remove after fix */}
+      <div className="card card-padding mb-3 text-xs text-slate-400">DEBUG: activePanel=<b>{activePanel}</b></div>
+
       {/* 当前面板内容优先显示 */}
       <PanelContent key={activePanel} s={s} handleChange={handleChange} />
 
