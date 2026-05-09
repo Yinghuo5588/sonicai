@@ -1,6 +1,6 @@
 // frontend/src/pages/WebhooksPage.tsx
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, ChevronDown, ChevronUp, Link2, RefreshCw, XCircle } from 'lucide-react'
 import apiFetch from '@/lib/api'
@@ -76,17 +76,41 @@ function BatchPreview({ batchId }: { batchId: number }) {
   )
 }
 
-function BatchMobileCard({ batch, expanded, selected, onToggleExpand, onToggleSelect, onRetry, onDelete, retrying, deleting }: {
-  batch: any; expanded: boolean; selected: boolean
+function BatchMobileCard({ batch, expanded, selected, selectMode, onToggleExpand, onToggleSelect, onRetry, onDelete, retrying, deleting }: {
+  batch: any; expanded: boolean; selected: boolean; selectMode: boolean
   onToggleExpand: () => void; onToggleSelect: () => void
   onRetry: () => void; onDelete: () => void
   retrying: boolean; deleting: boolean
 }) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleTouchStart() {
+    timerRef.current = setTimeout(() => {
+      if (!selected) onToggleSelect()
+    }, 500)
+  }
+
+  function handleTouchEnd() {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }
+
   return (
-    <div className="card overflow-hidden">
+    <div
+      className="card overflow-hidden active:bg-cyan-50/50"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleTouchStart}
+      onMouseUp={handleTouchEnd}
+      onMouseLeave={handleTouchEnd}
+    >
       <div className="space-y-3 p-4">
         <div className="flex items-start gap-3">
-          <input type="checkbox" checked={selected} onChange={onToggleSelect} className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600" />
+          {selectMode && (
+            <input type="checkbox" checked={selected} onChange={onToggleSelect} className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600" />
+          )}
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">#{batch.id}</span>
@@ -127,6 +151,7 @@ export default function WebhooksPage() {
   const [page, setPage] = useState(1)
   const [expanded, setExpanded] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [selectMode, setSelectMode] = useState(false)
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['webhooks', page],
@@ -160,6 +185,7 @@ export default function WebhooksPage() {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
       toast.success('已删除 ' + (res?.deleted ?? selected.size) + ' 条 Webhook 记录')
       setSelected(new Set())
+      setSelectMode(false)
       setExpanded(null)
     },
     onError: (err: Error) => toast.error('批量删除失败', err.message),
@@ -185,11 +211,13 @@ export default function WebhooksPage() {
     setSelected((prev: Set<number>) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
+      if (next.size === 0) setSelectMode(false)
       return next
     })
   }
 
-  const clearSelected = () => setSelected(new Set())
+  const clearSelected = () => { setSelected(new Set()); setSelectMode(false) }
+  const enterSelectMode = (id: number) => { setSelectMode(true); setSelected(new Set([id])) }
 
   if (isLoading) {
     return <div className="p-6 text-slate-500">加载中...</div>
@@ -210,7 +238,7 @@ export default function WebhooksPage() {
 
       <SectionToolbar
         left={
-          batches.length > 0 ? (
+          selectMode ? (
             <>
               <input
                 type="checkbox"
@@ -226,7 +254,7 @@ export default function WebhooksPage() {
           ) : undefined
         }
         right={
-          selected.size > 0 ? (
+          selectMode && selected.size > 0 ? (
             <>
               <span className="text-xs font-medium text-cyan-600">已选 {selected.size} 条</span>
               <button
@@ -266,8 +294,12 @@ export default function WebhooksPage() {
             batch={batch}
             expanded={expanded === batch.id}
             selected={selected.has(batch.id)}
+            selectMode={selectMode}
             onToggleExpand={() => setExpanded(expanded === batch.id ? null : batch.id)}
-            onToggleSelect={() => toggleSelected(batch.id)}
+            onToggleSelect={() => {
+              if (!selectMode) { enterSelectMode(batch.id); return }
+              toggleSelected(batch.id)
+            }}
             retrying={retryMutation.isPending}
             deleting={deleteMutation.isPending}
             onRetry={() => retryMutation.mutate(batch.id)}
@@ -283,7 +315,17 @@ export default function WebhooksPage() {
         )}
         renderTableHeader={() => (
           <tr>
-            <th className="w-10 p-3 text-left" />
+            <th className="w-10 p-3 text-left">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={(e: any) => {
+                  if (e.target.checked) setSelected(new Set(batches.map((b: any) => b.id)))
+                  else clearSelected()
+                }}
+                className="h-4 w-4 rounded border-slate-300 text-cyan-600"
+              />
+            </th>
             <th className="p-3 text-left font-medium text-slate-600 dark:text-slate-300">ID</th>
             <th className="p-3 text-left font-medium text-slate-600 dark:text-slate-300">歌单类型</th>
             <th className="p-3 text-left font-medium text-slate-600 dark:text-slate-300">状态</th>

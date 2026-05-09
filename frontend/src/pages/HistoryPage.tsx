@@ -1,6 +1,6 @@
 // frontend/src/pages/HistoryPage.tsx
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, Clock, List, RotateCw, XCircle } from 'lucide-react'
@@ -43,12 +43,36 @@ function RunStatusBadge({ status }: { status: string }) {
   return <span className="badge badge-muted">{status}</span>
 }
 
-function RunMobileCard({ run, selected, onToggleSelect, onDelete, isDeleting }: any) {
+function RunMobileCard({ run, selected, selectMode, onToggleSelect, onDelete, isDeleting }: any) {
   const canDelete = run.status !== 'running' && run.status !== 'pending'
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleTouchStart() {
+    timerRef.current = setTimeout(() => {
+      if (!selected) onToggleSelect()
+    }, 500)
+  }
+
+  function handleTouchEnd() {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }
+
   return (
-    <div className="card card-padding flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-900/60">
+    <div
+      className="card card-padding flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-900/60 active:bg-cyan-50/50"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleTouchStart}
+      onMouseUp={handleTouchEnd}
+      onMouseLeave={handleTouchEnd}
+    >
       <div className="flex min-w-0 flex-1 items-start gap-3">
-        <input type="checkbox" checked={selected} onChange={onToggleSelect} className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600" />
+        {selectMode && (
+          <input type="checkbox" checked={selected} onChange={onToggleSelect} className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600" />
+        )}
         <Link to={`/history/run/${run.id}`} className="flex min-w-0 flex-1 items-start gap-3">
           <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10">
             <Clock className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
@@ -81,11 +105,12 @@ export default function HistoryPage() {
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState<FilterTab>('all')
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [selectMode, setSelectMode] = useState(false)
 
   const { data, isLoading, error } = useQuery({ queryKey: ['runs', page], queryFn: () => fetchRuns(PAGE_SIZE, (page - 1) * PAGE_SIZE) })
 
   const deleteMutation = useMutation({ mutationFn: deleteRun, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['runs'] }); toast.success('推荐历史已删除') }, onError: (err: Error) => toast.error('删除失败', err.message) })
-  const batchDeleteMutation = useMutation({ mutationFn: batchDeleteRuns, onSuccess: (res: any) => { queryClient.invalidateQueries({ queryKey: ['runs'] }); toast.success(`已删除 ${res.deleted} 条推荐历史`); setSelected(new Set()) }, onError: (err: Error) => toast.error('批量删除失败', err.message) })
+  const batchDeleteMutation = useMutation({ mutationFn: batchDeleteRuns, onSuccess: (res: any) => { queryClient.invalidateQueries({ queryKey: ['runs'] }); toast.success(`已删除 ${res.deleted} 条推荐历史`); setSelected(new Set()); setSelectMode(false) }, onError: (err: Error) => toast.error('批量删除失败', err.message) })
 
   const runs = (data as any)?.runs || []
   const total = Number((data as any)?.total || 0)
@@ -99,8 +124,16 @@ export default function HistoryPage() {
     return true
   }), [runs, filter])
 
-  const toggleSelected = (id: number) => { setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next }) }
-  const clearSelected = () => setSelected(new Set())
+  const toggleSelected = (id: number) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.size === 0) setSelectMode(false)
+      return next
+    })
+  }
+  const clearSelected = () => { setSelected(new Set()); setSelectMode(false) }
+  const enterSelectMode = (id: number) => { setSelectMode(true); setSelected(new Set([id])) }
 
   if (isLoading) return <div className="page space-y-4"><PageHeader title="推荐历史" subtitle="查看每次推荐、同步任务的执行状态和详情。" /><TableSkeleton rows={8} /></div>
   if (error) return <div className="page text-red-500">加载失败: {(error as Error).message}</div>
@@ -120,7 +153,7 @@ export default function HistoryPage() {
           </div>
         }
         right={
-          selected.size > 0 && (
+          selectMode && selected.size > 0 ? (
             <>
               <span className="text-xs font-medium text-cyan-600">已选 {selected.size} 条</span>
               <button type="button" disabled={batchDeleteMutation.isPending} className="btn-danger text-xs"
@@ -129,7 +162,7 @@ export default function HistoryPage() {
               </button>
               <button type="button" onClick={clearSelected} className="btn-secondary text-xs">取消</button>
             </>
-          )
+          ) : null
         }
       />
       <ResponsiveList
@@ -137,8 +170,17 @@ export default function HistoryPage() {
         getKey={run => run.id}
         empty={<EmptyState icon={List} title="暂无推荐历史" description="还没有执行过推荐任务。你可以先去任务执行页生成第一组歌单。" actionLabel="去执行推荐" actionTo="/jobs" />}
         renderMobileItem={run => (
-          <RunMobileCard run={run} selected={selected.has(run.id)} onToggleSelect={() => toggleSelected(run.id)} isDeleting={deleteMutation.isPending}
-            onDelete={async () => { const ok = await confirmDanger('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。', '删除推荐历史'); if (!ok) return; deleteMutation.mutate(run.id) }} />
+          <RunMobileCard
+            run={run}
+            selected={selected.has(run.id)}
+            selectMode={selectMode}
+            onToggleSelect={() => {
+              if (!selectMode) { enterSelectMode(run.id); return }
+              toggleSelected(run.id)
+            }}
+            isDeleting={deleteMutation.isPending}
+            onDelete={async () => { const ok = await confirmDanger('确定删除这条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。', '删除推荐历史'); if (!ok) return; deleteMutation.mutate(run.id) }}
+          />
         )}
         renderTableHeader={() => (
           <tr>
