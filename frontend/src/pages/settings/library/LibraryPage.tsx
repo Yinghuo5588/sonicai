@@ -82,7 +82,7 @@ export default function LibraryPage() {
           {/* 面板 */}
           <div
             ref={panelRef}
-            className="relative w-full max-w-sm rounded-t-3xl bg-white p-6 dark:bg-slate-900 md:rounded-2xl"
+            className="relative w-full max-w-sm rounded-t-3xl bg-white p-6 pb-24 dark:bg-slate-900 md:rounded-2xl md:pb-6"
           >
             {/* 标题栏 */}
             <div className="mb-5 flex items-center justify-between">
