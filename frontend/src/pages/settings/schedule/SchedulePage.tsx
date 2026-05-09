@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react'
 import { Clock, DatabaseZap, History, ListRestart, ListTodo, Music, Radio, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { FormSkeleton } from '@/components/ui/Skeleton'
 import { SaveBar, useSettingsForm } from '../SettingsShared'
-import CurrentTasksCard from './CurrentTasksCard'
 import RecommendationCronCard from './RecommendationCronCard'
 import HotboardCronCard from './HotboardCronCard'
 import PlaylistSyncCronCard from './PlaylistSyncCronCard'
@@ -75,11 +74,8 @@ export default function SchedulePage() {
 
   return (
     <div className="page pb-16">
-      {/* 任务配置面板 - 放最顶上 */}
+      {/* 任务配置面板 */}
       <PanelContent panelKey={activePanel} s={s} handleChange={handleChange} />
-
-      {/* 当前后台任务 */}
-      <CurrentTasksCard />
 
       <div className="rounded-2xl border border-border bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
         <div className="flex items-start gap-2">
