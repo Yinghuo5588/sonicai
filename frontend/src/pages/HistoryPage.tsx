@@ -165,7 +165,7 @@ export default function HistoryPage() {
           ) : null
         }
       />
-      <ResponsiveList
+      <ResponsiveList<any>
         items={filteredRuns}
         getKey={run => run.id}
         empty={<EmptyState icon={List} title="暂无推荐历史" description="还没有执行过推荐任务。你可以先去任务执行页生成第一组歌单。" actionLabel="去执行推荐" actionTo="/jobs" />}
