@@ -52,6 +52,15 @@ export default function SchedulePage() {
   const { s, isLoading, mutation, hasChanges, handleChange, save } = useSettingsForm()
   const [activePanel, setActivePanel] = useState('recommendation')
   const [panelOpen, setPanelOpen] = useState(false)
+  const [shownSuccess, setShownSuccess] = useState(false)
+
+  useEffect(() => {
+    if (mutation.isSuccess) {
+      const timer = setTimeout(() => setShownSuccess(false), 2000)
+      return () => clearTimeout(timer)
+    }
+    setShownSuccess(false)
+  }, [mutation.isSuccess])
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -96,14 +105,12 @@ export default function SchedulePage() {
               ? 'bg-amber-500 text-white animate-pulse'
               : mutation.isError
               ? 'bg-red-500 text-white'
-              : mutation.isSuccess
-              ? 'bg-green-500 text-white'
               : 'bg-cyan-500 text-white'
             : 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500'
         }`}
         aria-label="保存配置"
       >
-        {mutation.isSuccess ? (
+        {shownSuccess ? (
           <span className="text-lg">✓</span>
         ) : (
           <Save className="h-6 w-6" />
