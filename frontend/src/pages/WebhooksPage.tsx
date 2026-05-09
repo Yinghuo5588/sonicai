@@ -85,12 +85,21 @@ function BatchMobileCard({ batch, expanded, selected, selectMode, onToggleExpand
   return (
     <div
       className="card overflow-hidden active:bg-cyan-50/50 cursor-pointer"
-      onClick={() => { if (selectMode) onToggleSelect() }}
+      onClick={e => {
+        const target = e.target as HTMLElement
+        if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.closest('button') || target.closest('input')) return
+        if (selectMode) { onToggleSelect(); return }
+      }}
     >
       <div className="space-y-3 p-4">
         <div className="flex items-start gap-3">
           {selectMode && (
-            <input type="checkbox" checked={selected} onChange={onToggleSelect} className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600" />
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={e => { e.stopPropagation(); onToggleSelect() }}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600"
+            />
           )}
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -224,12 +233,7 @@ export default function WebhooksPage() {
               <button type="button" onClick={clearSelected} className="btn-secondary text-xs">取消选择</button>
               <span className="text-xs font-medium text-cyan-600">已选 {selected.size} 条</span>
             </>
-          ) : (
-            <>
-              <span className="text-xs text-slate-500 dark:text-slate-400">共 {total} 条</span>
-              <button type="button" onClick={() => setSelectMode(true)} className="btn-secondary text-xs">选择</button>
-            </>
-          )
+          ) : null
         }
         right={
           selectMode && selected.size > 0 ? (
@@ -248,7 +252,12 @@ export default function WebhooksPage() {
             >
               {batchDeleteMutation.isPending ? '删除中...' : '删除 ' + selected.size + ' 条'}
             </button>
-          ) : undefined
+          ) : !selectMode ? (
+            <>
+              <span className="text-xs text-slate-500 dark:text-slate-400">共 {total} 条</span>
+              <button type="button" onClick={() => setSelectMode(true)} className="btn-secondary text-xs">选择</button>
+            </>
+          ) : null
         }
       />
 

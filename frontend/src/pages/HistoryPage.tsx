@@ -14,13 +14,6 @@ import { useToast } from '@/components/ui/useToast'
 const PAGE_SIZE = 15
 type FilterTab = 'all' | 'success' | 'failed' | 'running'
 
-const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: 'all', label: '全部' },
-  { key: 'success', label: '成功' },
-  { key: 'failed', label: '失败' },
-  { key: 'running', label: '进行中' },
-]
-
 async function fetchRuns(limit: number, offset: number) {
   return apiFetch(`/runs?limit=${limit}&offset=${offset}`)
 }
@@ -49,11 +42,21 @@ function RunMobileCard({ run, selected, selectMode, onToggleSelect, onDelete, is
   return (
     <div
       className="card card-padding flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-900/60 active:bg-cyan-50/50 cursor-pointer"
-      onClick={() => { if (selectMode) onToggleSelect() }}
+      onClick={e => {
+        // Don't navigate if clicking the checkbox or delete button
+        const target = e.target as HTMLElement
+        if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.closest('button') || target.closest('input')) return
+        if (selectMode) { onToggleSelect(); return }
+      }}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">
         {selectMode && (
-          <input type="checkbox" checked={selected} onChange={onToggleSelect} className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600" />
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={e => { e.stopPropagation(); onToggleSelect() }}
+            className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600"
+          />
         )}
         <Link
             to={`/history/run/${run.id}`}
@@ -141,19 +144,7 @@ export default function HistoryPage() {
               <button type="button" onClick={clearSelected} className="btn-secondary text-xs">取消选择</button>
               <span className="text-xs font-medium text-cyan-600">已选 {selected.size} 条</span>
             </>
-          ) : (
-            <>
-              <div className="flex gap-2 overflow-x-auto">
-                {FILTER_TABS.map(tab => (
-                  <button key={tab.key} type="button" onClick={() => { setFilter(tab.key); setPage(1); clearSelected() }}
-                    className={filter === tab.key ? 'rounded-xl bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-300' : 'rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400'}>
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-              <button type="button" onClick={() => setSelectMode(true)} className="btn-secondary text-xs shrink-0">选择</button>
-            </>
-          )
+          ) : null
         }
         right={
           selectMode && selected.size > 0 ? (
@@ -161,9 +152,27 @@ export default function HistoryPage() {
               onClick={async () => { const ok = await confirmDanger(`确定删除选中的 ${selected.size} 条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。`, '批量删除推荐历史'); if (!ok) return; batchDeleteMutation.mutate(Array.from(selected)) }}>
               {batchDeleteMutation.isPending ? '删除中...' : `删除 ${selected.size} 条`}
             </button>
+          ) : !selectMode ? (
+            <>
+              <span className="text-xs text-slate-500 dark:text-slate-400">共 {total} 条</span>
+              <button type="button" onClick={() => setSelectMode(true)} className="btn-secondary text-xs">选择</button>
+            </>
           ) : null
         }
       />
+      {!selectMode && (
+        <div className="flex gap-2 overflow-x-auto">
+          {['全部', '成功', '失败', '进行中'].map(label => {
+            const key = label === '全部' ? 'all' : label === '成功' ? 'success' : label === '失败' ? 'failed' : 'running'
+            return (
+              <button key={key} type="button" onClick={() => { setFilter(key as FilterTab); setPage(1); clearSelected() }}
+                className={filter === key ? 'rounded-xl bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-300' : 'rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400'}>
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      )}
       <ResponsiveList<any>
         items={filteredRuns}
         getKey={run => run.id}
