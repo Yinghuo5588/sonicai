@@ -1,7 +1,7 @@
 // frontend/src/pages/settings/schedule/SchedulePage.tsx
 
 import { useState, useEffect, useRef } from 'react'
-import { Clock, DatabaseZap, History, ListRestart, ListTodo, Music, Radio, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { Clock, DatabaseZap, History, ListRestart, ListTodo, Music, Radio, ShieldCheck, Sparkles, X, Save } from 'lucide-react'
 import { FormSkeleton } from '@/components/ui/Skeleton'
 import { SaveBar, useSettingsForm } from '../SettingsShared'
 import RecommendationCronCard from './RecommendationCronCard'
@@ -84,7 +84,31 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      <SaveBar hasChanges={hasChanges} isPending={mutation.isPending} isSuccess={mutation.isSuccess} isError={mutation.isError} onSave={save} />
+      {/* 保存按钮 - 左下角 */}
+      <button
+        type="button"
+        onClick={save}
+        disabled={!hasChanges || mutation.isPending}
+        onMouseDown={e => e.stopPropagation()}
+        className={`fixed bottom-24 left-6 z-[51] flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 md:bottom-8 md:left-8 ${
+          hasChanges
+            ? mutation.isPending
+              ? 'bg-amber-500 text-white animate-pulse'
+              : mutation.isError
+              ? 'bg-red-500 text-white'
+              : mutation.isSuccess
+              ? 'bg-green-500 text-white'
+              : 'bg-cyan-500 text-white'
+            : 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500'
+        }`}
+        aria-label="保存配置"
+      >
+        {mutation.isSuccess ? (
+          <span className="text-lg">✓</span>
+        ) : (
+          <Save className="h-6 w-6" />
+        )}
+      </button>
 
       {/* FAB */}
       <button
