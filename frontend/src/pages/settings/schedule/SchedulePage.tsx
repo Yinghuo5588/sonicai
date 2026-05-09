@@ -36,17 +36,12 @@ const PANEL_ICONS: Record<string, React.ElementType> = Object.fromEntries(
 )
 
 function PanelContent({ key, s, handleChange }: { key: string; s: ScheduleCardProps['s']; handleChange: ScheduleCardProps['handleChange'] }) {
-  switch (key) {
-    case 'recommendation':    return <RecommendationCronCard    s={s} handleChange={handleChange} />
-    case 'hotboard':          return <HotboardCronCard         s={s} handleChange={handleChange} />
-    case 'playlist-sync':     return <PlaylistSyncCronCard    s={s} handleChange={handleChange} />
-    case 'missed-retry':      return <MissedRetryCronCard     s={s} handleChange={handleChange} />
-    case 'song-cache':        return <SongCacheCronCard       s={s} handleChange={handleChange} />
-    case 'concurrency':       return <TaskConcurrencyCard     s={s} handleChange={handleChange} />
-    case 'playlist-lifecycle': return <PlaylistLifecycleCard  s={s} handleChange={handleChange} />
-    case 'history-cleanup':   return <HistoryCleanupCard     s={s} handleChange={handleChange} />
-    default: return <div className="card card-padding text-sm text-slate-500">未找到面板：{key}（共 {SCHEDULE_PANELS.length} 个）</div>
-  }
+  console.log('PanelContent key:', key, '| activePanel state:', key)
+  return (
+    <div className="card card-padding mb-3 text-xs text-slate-400">
+      PanelContent received key={key} (type={typeof key})
+    </div>
+  )
 }
 
 export default function SchedulePage() {
