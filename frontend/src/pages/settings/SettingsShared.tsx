@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, Save } from 'lucide-react'
 import apiFetch, { type NavidromeTestResponse, type WebhookTestResponse } from '@/lib/api'
 import { useToast } from '@/components/ui/useToast'
 import {
@@ -571,34 +571,24 @@ export function SaveBar({
   onSave: () => void
 }) {
   return (
-    <div className="save-bar">
-      <div className="card card-padding flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg">
-        <div>
-          <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
-            {hasChanges ? '有未保存的更改' : '设置已是最新'}
-          </div>
-          <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            修改会暂存在当前页面，点击保存后生效。
-          </div>
-        </div>
-
-        <button
-          onClick={onSave}
-          disabled={!hasChanges || isPending}
-          className="btn-primary w-full sm:w-auto"
-        >
-          {isPending ? '保存中...' : hasChanges ? '保存更改' : '无需保存'}
-        </button>
-      </div>
-
-      {isSuccess && (
-        <p className="mt-2 text-emerald-600 dark:text-emerald-400 text-sm flex items-center gap-1">
-          <CheckCircle className="w-4 h-4" />
-          已保存
-        </p>
-      )}
-
-      {isError && <p className="mt-2 text-red-500 text-sm">保存失败</p>}
-    </div>
+    <button
+      type="button"
+      onClick={onSave}
+      disabled={!hasChanges || isPending}
+      className={`fixed bottom-24 left-6 z-[51] flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 md:bottom-8 md:left-8 ${
+        hasChanges
+          ? isPending
+            ? 'bg-amber-500 text-white animate-pulse'
+            : isError
+            ? 'bg-red-500 text-white'
+            : isSuccess
+            ? 'bg-green-500 text-white'
+            : 'bg-cyan-500 text-white'
+          : 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500'
+      }`}
+      aria-label="保存配置"
+    >
+      {isSuccess ? <span className="text-lg">&#10003;</span> : <Save className="h-6 w-6" />}
+    </button>
   )
 }
