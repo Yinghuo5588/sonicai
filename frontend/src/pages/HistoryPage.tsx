@@ -1,6 +1,6 @@
 // frontend/src/pages/HistoryPage.tsx
 
-import { useMemo, useState, useRef } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, Clock, List, RotateCw, XCircle } from 'lucide-react'
@@ -45,29 +45,11 @@ function RunStatusBadge({ status }: { status: string }) {
 
 function RunMobileCard({ run, selected, selectMode, onToggleSelect, onDelete, isDeleting }: any) {
   const canDelete = run.status !== 'running' && run.status !== 'pending'
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  function handleTouchStart() {
-    timerRef.current = setTimeout(() => {
-      if (!selected) onToggleSelect()
-    }, 500)
-  }
-
-  function handleTouchEnd() {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-  }
 
   return (
     <div
-      className="card card-padding flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-900/60 active:bg-cyan-50/50"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleTouchStart}
-      onMouseUp={handleTouchEnd}
-      onMouseLeave={handleTouchEnd}
+      className="card card-padding flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-900/60 active:bg-cyan-50/50 cursor-pointer"
+      onClick={() => { if (selectMode) onToggleSelect() }}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">
         {selectMode && (
@@ -154,25 +136,31 @@ export default function HistoryPage() {
       <PageHeader title="推荐历史" subtitle="查看每次推荐、同步任务的执行状态和详情。" />
       <SectionToolbar
         left={
-          <div className="flex gap-2 overflow-x-auto">
-            {FILTER_TABS.map(tab => (
-              <button key={tab.key} type="button" onClick={() => { setFilter(tab.key); setPage(1); clearSelected() }}
-                className={filter === tab.key ? 'rounded-xl bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-300' : 'rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400'}>
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          selectMode ? (
+            <>
+              <button type="button" onClick={clearSelected} className="btn-secondary text-xs">取消选择</button>
+              <span className="text-xs font-medium text-cyan-600">已选 {selected.size} 条</span>
+            </>
+          ) : (
+            <>
+              <div className="flex gap-2 overflow-x-auto">
+                {FILTER_TABS.map(tab => (
+                  <button key={tab.key} type="button" onClick={() => { setFilter(tab.key); setPage(1); clearSelected() }}
+                    className={filter === tab.key ? 'rounded-xl bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-300' : 'rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400'}>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={() => setSelectMode(true)} className="btn-secondary text-xs shrink-0">选择</button>
+            </>
+          )
         }
         right={
           selectMode && selected.size > 0 ? (
-            <>
-              <span className="text-xs font-medium text-cyan-600">已选 {selected.size} 条</span>
-              <button type="button" disabled={batchDeleteMutation.isPending} className="btn-danger text-xs"
-                onClick={async () => { const ok = await confirmDanger(`确定删除选中的 ${selected.size} 条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。`, '批量删除推荐历史'); if (!ok) return; batchDeleteMutation.mutate(Array.from(selected)) }}>
-                {batchDeleteMutation.isPending ? '删除中...' : `删除 ${selected.size} 条`}
-              </button>
-              <button type="button" onClick={clearSelected} className="btn-secondary text-xs">取消</button>
-            </>
+            <button type="button" disabled={batchDeleteMutation.isPending} className="btn-danger text-xs"
+              onClick={async () => { const ok = await confirmDanger(`确定删除选中的 ${selected.size} 条推荐历史吗？这只会删除 SonicAI 中的历史记录，不会删除 Navidrome 中已创建的歌单。`, '批量删除推荐历史'); if (!ok) return; batchDeleteMutation.mutate(Array.from(selected)) }}>
+              {batchDeleteMutation.isPending ? '删除中...' : `删除 ${selected.size} 条`}
+            </button>
           ) : null
         }
       />

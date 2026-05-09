@@ -1,6 +1,6 @@
 // frontend/src/pages/WebhooksPage.tsx
 
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, Link2, RefreshCw, XCircle } from 'lucide-react'
 import apiFetch from '@/lib/api'
@@ -82,29 +82,10 @@ function BatchMobileCard({ batch, expanded, selected, selectMode, onToggleExpand
   onRetry: () => void; onDelete: () => void
   retrying: boolean; deleting: boolean
 }) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  function handleTouchStart() {
-    timerRef.current = setTimeout(() => {
-      if (!selected) onToggleSelect()
-    }, 500)
-  }
-
-  function handleTouchEnd() {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-  }
-
   return (
     <div
-      className="card overflow-hidden active:bg-cyan-50/50"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleTouchStart}
-      onMouseUp={handleTouchEnd}
-      onMouseLeave={handleTouchEnd}
+      className="card overflow-hidden active:bg-cyan-50/50 cursor-pointer"
+      onClick={() => { if (selectMode) onToggleSelect() }}
     >
       <div className="space-y-3 p-4">
         <div className="flex items-start gap-3">
@@ -240,40 +221,33 @@ export default function WebhooksPage() {
         left={
           selectMode ? (
             <>
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={(e: any) => {
-                  if (e.target.checked) setSelected(new Set(batches.map((b: any) => b.id)))
-                  else clearSelected()
-                }}
-                className="h-4 w-4 rounded border-slate-300 text-cyan-600"
-              />
-              <span className="text-xs text-slate-500 dark:text-slate-400">全选本页</span>
+              <button type="button" onClick={clearSelected} className="btn-secondary text-xs">取消选择</button>
+              <span className="text-xs font-medium text-cyan-600">已选 {selected.size} 条</span>
             </>
-          ) : undefined
+          ) : (
+            <>
+              <span className="text-xs text-slate-500 dark:text-slate-400">共 {total} 条</span>
+              <button type="button" onClick={() => setSelectMode(true)} className="btn-secondary text-xs">选择</button>
+            </>
+          )
         }
         right={
           selectMode && selected.size > 0 ? (
-            <>
-              <span className="text-xs font-medium text-cyan-600">已选 {selected.size} 条</span>
-              <button
-                type="button"
-                disabled={batchDeleteMutation.isPending}
-                className="btn-danger text-xs"
-                onClick={async () => {
-                  const ok = await confirmDanger(
-                    '确定删除选中的 ' + selected.size + ' 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。',
-                    '批量删除 Webhook 记录',
-                  )
-                  if (!ok) return
-                  batchDeleteMutation.mutate(Array.from(selected))
-                }}
-              >
-                {batchDeleteMutation.isPending ? '删除中...' : '删除 ' + selected.size + ' 条'}
-              </button>
-              <button type="button" onClick={clearSelected} className="btn-secondary text-xs">取消</button>
-            </>
+            <button
+              type="button"
+              disabled={batchDeleteMutation.isPending}
+              className="btn-danger text-xs"
+              onClick={async () => {
+                const ok = await confirmDanger(
+                  '确定删除选中的 ' + selected.size + ' 条 Webhook 记录吗？这只会删除 SonicAI 中的通知历史，不会影响推荐任务和 Navidrome 歌单。',
+                  '批量删除 Webhook 记录',
+                )
+                if (!ok) return
+                batchDeleteMutation.mutate(Array.from(selected))
+              }}
+            >
+              {batchDeleteMutation.isPending ? '删除中...' : '删除 ' + selected.size + ' 条'}
+            </button>
           ) : undefined
         }
       />
