@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, Save } from 'lucide-react'
+import { Save } from 'lucide-react'
 import apiFetch, { type NavidromeTestResponse, type WebhookTestResponse } from '@/lib/api'
 import { useToast } from '@/components/ui/useToast'
 import {
