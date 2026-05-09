@@ -27,7 +27,7 @@ export default function LibraryStatusCard() {
     refetchInterval: 5000,
   })
 
-  const cache = data?.cache || {}
+  const cache = data?.cache || {} as any
 
   const syncMutation = useMutation({
     mutationFn: triggerLibrarySync,

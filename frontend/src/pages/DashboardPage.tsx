@@ -17,14 +17,15 @@ import {
 } from 'lucide-react'
 import MetricCard from '@/components/ui/MetricCard'
 import { RUN_TYPE_LABELS, labelOf } from '@/lib/labels'
-import type { DashboardSummary } from '@/types/api'
+import type { DashboardSummary, Run } from '@/types/api'
+import loginLogo from '@/assets/login-logo.webp'
 
 async function fetchDashboard(): Promise<DashboardSummary> {
   return apiFetch('/dashboard/summary') as Promise<DashboardSummary>
 }
 
 /* ---------- Hero 卡片 ---------- */
-function HeroCard({ lastRun }: { lastRun?: Record<string, any> }) {
+function HeroCard({ lastRun }: { lastRun?: Run | null }) {
   const statusColor = lastRun?.status === 'success'
     ? 'text-emerald-600'
     : lastRun?.status === 'failed'
@@ -225,7 +226,7 @@ function QuickActions() {
 }
 
 export default function DashboardPage() {
-  const { data, isLoading, error } = useQuery({ queryKey: ['dashboard'], queryFn: fetchDashboard })
+  const { data, isLoading, error } = useQuery<DashboardSummary>({ queryKey: ['dashboard'], queryFn: fetchDashboard })
 
   if (isLoading) {
     return (
@@ -250,7 +251,7 @@ export default function DashboardPage() {
   }
   if (error) return <div className="page text-red-500">加载失败</div>
 
-  const d = data || {}
+  const d = data as DashboardSummary
 
   return (
     <div className="page">
