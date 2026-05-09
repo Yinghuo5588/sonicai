@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import apiFetch from '@/lib/api'
+import apiFetch, { type RunDetail } from '@/lib/api'
+import type { Playlist } from '@/types/api'
 import { formatRelativeTime, formatDateTime } from '@/lib/date'
 import {
   ArrowLeft,
@@ -23,12 +24,12 @@ import { useToast } from '@/components/ui/useToast'
 import { useConfirm } from '@/components/ui'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 
-async function fetchRunDetail(runId: number) {
-  return apiFetch(`/runs/${runId}`)
+async function fetchRunDetail(runId: number): Promise<RunDetail> {
+  return apiFetch(`/runs/${runId}`) as Promise<RunDetail>
 }
 
-async function fetchRunPlaylists(runId: number) {
-  return apiFetch(`/runs/${runId}/playlists`)
+async function fetchRunPlaylists(runId: number): Promise<Playlist[]> {
+  return apiFetch(`/runs/${runId}/playlists`) as Promise<Playlist[]>
 }
 
 async function stopJob(runId: number) {
