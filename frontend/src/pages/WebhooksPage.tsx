@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, ChevronDown, ChevronUp, Link2, RefreshCw, XCircle } from 'lucide-react'
+import { CheckCircle, Link2, RefreshCw, XCircle } from 'lucide-react'
 import apiFetch from '@/lib/api'
 import { labelOf, PLAYLIST_TYPE_LABELS, WEBHOOK_STATUS_LABELS } from '@/lib/labels'
 import { EmptyState, Pagination, ResponsiveList, SectionToolbar, useConfirm } from '@/components/ui'
