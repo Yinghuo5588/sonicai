@@ -36,12 +36,17 @@ const PANEL_ICONS: Record<string, React.ElementType> = Object.fromEntries(
 )
 
 function PanelContent({ key, s, handleChange }: { key: string; s: ScheduleCardProps['s']; handleChange: ScheduleCardProps['handleChange'] }) {
-  console.log('PanelContent key:', key, '| activePanel state:', key)
-  return (
-    <div className="card card-padding mb-3 text-xs text-slate-400">
-      PanelContent received key={key} (type={typeof key})
-    </div>
-  )
+  switch (key) {
+    case 'recommendation':    return <RecommendationCronCard    s={s} handleChange={handleChange} />
+    case 'hotboard':          return <HotboardCronCard         s={s} handleChange={handleChange} />
+    case 'playlist-sync':     return <PlaylistSyncCronCard    s={s} handleChange={handleChange} />
+    case 'missed-retry':      return <MissedRetryCronCard     s={s} handleChange={handleChange} />
+    case 'song-cache':        return <SongCacheCronCard       s={s} handleChange={handleChange} />
+    case 'concurrency':       return <TaskConcurrencyCard     s={s} handleChange={handleChange} />
+    case 'playlist-lifecycle': return <PlaylistLifecycleCard  s={s} handleChange={handleChange} />
+    case 'history-cleanup':   return <HistoryCleanupCard     s={s} handleChange={handleChange} />
+    default: return null
+  }
 }
 
 export default function SchedulePage() {
@@ -70,11 +75,11 @@ export default function SchedulePage() {
 
   return (
     <div className="page pb-16">
-      {/* DEBUG: remove after fix */}
-      <div className="card card-padding mb-3 text-xs text-slate-400">DEBUG: activePanel=<b>{activePanel}</b></div>
-
-      {/* 当前面板内容优先显示 */}
+      {/* 任务配置面板 - 放最顶上 */}
       <PanelContent key={activePanel} s={s} handleChange={handleChange} />
+
+      {/* 当前后台任务 */}
+      <CurrentTasksCard />
 
       <div className="rounded-2xl border border-border bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
         <div className="flex items-start gap-2">
