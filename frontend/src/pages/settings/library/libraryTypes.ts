@@ -1,6 +1,6 @@
 // frontend/src/pages/settings/library/libraryTypes.ts
 
-export const LIBRARY_PAGE_SIZE = 20
+export const LIBRARY_PAGE_SIZE = 6
 
 export type LibraryToolTab =
   | 'status'
