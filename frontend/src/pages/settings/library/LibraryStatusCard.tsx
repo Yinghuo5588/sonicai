@@ -5,7 +5,7 @@ import { RefreshCcw } from 'lucide-react'
 import { useToast } from '@/components/ui/useToast'
 import { SectionCard } from '../SettingsShared'
 import { fetchLibraryStatus, triggerLibrarySync } from './libraryApi'
-import type { LibraryStatus } from './libraryTypes'
+import type { LibraryStatus } from '@/types/api'
 
 function StatusCard({ label, value, desc }: { label: string; value: React.ReactNode; desc?: string }) {
   return (

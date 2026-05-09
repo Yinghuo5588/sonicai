@@ -12,16 +12,17 @@ import {
   RECOMMENDATION_CRON_RUN_TYPE_LABELS,
   labelOf,
 } from '@/lib/labels'
+import type { Settings } from '@/types/api'
 
-export async function fetchSettings() {
-  return apiFetch('/settings')
+export async function fetchSettings(): Promise<Settings> {
+  return apiFetch('/settings') as Promise<Settings>
 }
 
-export async function updateSettings(data: Record<string, unknown>) {
+export async function updateSettings(data: Partial<Settings>): Promise<void> {
   return apiFetch('/settings', {
     method: 'PUT',
     body: JSON.stringify(data),
-  })
+  }) as Promise<void>
 }
 
 export async function testNavidrome() {
@@ -508,7 +509,7 @@ export function useSettingsForm() {
     queryFn: fetchSettings,
   })
 
-  const [form, setForm] = useState<Record<string, unknown>>({})
+  const [form, setForm] = useState<Partial<Settings>>({})
 
   useEffect(() => {
     setForm({})
@@ -526,10 +527,10 @@ export function useSettingsForm() {
     },
   })
 
-  const s = {
+  const s: Settings = {
     ...(data || {}),
     ...form,
-  }
+  } as Settings
 
   const handleChange = (key: string, value: unknown) => {
     setForm(prev => ({

@@ -15,7 +15,6 @@ export default function Pagination({
   page,
   totalPages,
   total,
-  pageSize,
   onPageChange,
   className,
 }: {

@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Play,
   ScrollText,
-  Link2,
   CheckCircle,
   XCircle,
   TrendingUp,
@@ -18,39 +17,10 @@ import {
 } from 'lucide-react'
 import MetricCard from '@/components/ui/MetricCard'
 import { RUN_TYPE_LABELS, labelOf } from '@/lib/labels'
-import loginLogo from '@/assets/login-logo.webp'
+import type { DashboardSummary } from '@/types/api'
 
-async function fetchDashboard() {
-  return apiFetch('/dashboard/summary')
-}
-
-/* ---------- 统计卡片（统一） ---------- */
-function StatCard({
-  label,
-  value,
-  color = 'text-slate-900 dark:text-slate-50',
-  icon: Icon,
-}: {
-  label: string
-  value: number
-  color?: string
-  icon?: React.ElementType
-}) {
-  return (
-    <div className="card card-padding">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
-          <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
-        </div>
-        {Icon && (
-          <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800">
-            <Icon className="w-4 h-4 text-slate-400" />
-          </div>
-        )}
-      </div>
-    </div>
-  )
+async function fetchDashboard(): Promise<DashboardSummary> {
+  return apiFetch('/dashboard/summary') as Promise<DashboardSummary>
 }
 
 /* ---------- Hero 卡片 ---------- */

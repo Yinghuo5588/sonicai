@@ -1,6 +1,8 @@
 // frontend/src/pages/settings/schedule/scheduleTypes.ts
 
-export type SettingsLike = Record<string, unknown>
+import type { Settings } from '@/types/api'
+
+export type SettingsLike = Settings
 export type SettingsHandleChange = (key: string, value: unknown) => void
 export interface ScheduleCardProps {
   s: SettingsLike

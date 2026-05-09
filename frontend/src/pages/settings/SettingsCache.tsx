@@ -2,9 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { SaveBar, SectionCard, Tooltip, useSettingsForm } from './SettingsShared'
 import { InfoGrid } from '@/components/ui'
+import type { SongCacheStatus } from '@/types/api'
 
-async function fetchCacheStatus() {
-  return apiFetch('/cache/status')
+async function fetchCacheStatus(): Promise<SongCacheStatus> {
+  return apiFetch('/cache/status') as Promise<SongCacheStatus>
 }
 
 async function triggerRefresh() {

@@ -1,5 +1,7 @@
 // frontend/src/pages/settings/library/libraryApi.ts
 
+import type { LibraryStatus } from '@/types/api'
+
 import apiFetch from '@/lib/api'
 import {
   CreateManualMatchPayload,
@@ -7,8 +9,8 @@ import {
   LIBRARY_PAGE_SIZE,
 } from './libraryTypes'
 
-export function fetchLibraryStatus() {
-  return apiFetch('/library/status')
+export function fetchLibraryStatus(): Promise<LibraryStatus> {
+  return apiFetch('/library/status') as Promise<LibraryStatus>
 }
 
 export function triggerLibrarySync() {

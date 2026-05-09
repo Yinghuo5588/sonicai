@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle, LogOut, XCircle, Palette } from 'lucide-react'
+import { CheckCircle, LogOut, XCircle } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { useAuthStore } from '@/hooks/useAuth'
