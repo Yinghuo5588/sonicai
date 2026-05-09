@@ -67,7 +67,7 @@ export default function LibraryPage() {
       <button
         type="button"
         onClick={() => setPanelOpen(v => !v)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8"
+        className="fixed bottom-24 right-6 z-[51] flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8"
         aria-label="打开曲库工具"
       >
         <CurrentIconComp className="h-6 w-6" />
