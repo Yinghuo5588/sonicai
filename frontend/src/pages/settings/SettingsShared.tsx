@@ -570,6 +570,16 @@ export function SaveBar({
   isError: boolean
   onSave: () => void
 }) {
+  const [shownSuccess, setShownSuccess] = useState(false)
+
+  useEffect(() => {
+    if (isSuccess) {
+      const timer = setTimeout(() => setShownSuccess(false), 2000)
+      return () => clearTimeout(timer)
+    }
+    setShownSuccess(false)
+  }, [isSuccess])
+
   return (
     <button
       type="button"
@@ -581,14 +591,14 @@ export function SaveBar({
             ? 'bg-amber-500 text-white animate-pulse'
             : isError
             ? 'bg-red-500 text-white'
-            : isSuccess
-            ? 'bg-green-500 text-white'
             : 'bg-cyan-500 text-white'
+          : shownSuccess
+          ? 'bg-green-500 text-white'
           : 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500'
       }`}
       aria-label="保存配置"
     >
-      {isSuccess ? <span className="text-lg">&#10003;</span> : <Save className="h-6 w-6" />}
+      {shownSuccess ? <span className="text-lg">&#10003;</span> : <Save className="h-6 w-6" />}
     </button>
   )
 }
