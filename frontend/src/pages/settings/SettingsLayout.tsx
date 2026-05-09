@@ -25,6 +25,13 @@ const SETTINGS_SECTIONS = [
     to: '/settings/source',
   },
   {
+    key: 'playlist',
+    title: '歌单匹配',
+    desc: 'Navidrome 生成、匹配与推荐控制',
+    icon: ListMusic,
+    to: '/settings/playlist',
+  },
+  {
     key: 'library',
     title: '曲库与匹配',
     desc: '曲库索引、缓存、未命中歌曲、人工匹配与诊断',
