@@ -75,9 +75,7 @@ export default function SchedulePage() {
 
   return (
     <div className="page pb-16">
-      <CurrentTasksCard />
-
-      {/* 当前面板内容 */}
+      {/* 当前面板内容优先显示 */}
       <PanelContent key={activePanel} s={s} handleChange={handleChange} />
 
       <div className="rounded-2xl border border-border bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
