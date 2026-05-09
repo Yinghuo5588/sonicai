@@ -6,6 +6,7 @@ import apiFetch from '@/lib/api'
 import {
   CreateManualMatchPayload,
   DebugMatchPayload,
+  DebugMatchResponse,
   LIBRARY_PAGE_SIZE,
 } from './libraryTypes'
 
@@ -62,11 +63,11 @@ export function clearLowConfidenceCache(maxScore: number) {
   return apiFetch(`/library/match-cache/low-confidence?max_score=${maxScore}`, { method: 'DELETE' })
 }
 
-export function debugMatch(payload: DebugMatchPayload) {
+export function debugMatch(payload: DebugMatchPayload): Promise<DebugMatchResponse> {
   return apiFetch('/library/debug-match', {
     method: 'POST',
     body: JSON.stringify(payload),
-  })
+  }) as Promise<DebugMatchResponse>
 }
 
 export function fetchMissedTracks(status: string, q: string, page: number) {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle } from 'lucide-react'
-import apiFetch from '@/lib/api'
+import apiFetch, { type NavidromeTestResponse, type WebhookTestResponse } from '@/lib/api'
 import { useToast } from '@/components/ui/useToast'
 import {
   LIBRARY_MODE_LABELS,
@@ -25,12 +25,12 @@ export async function updateSettings(data: Partial<Settings>): Promise<void> {
   }) as Promise<void>
 }
 
-export async function testNavidrome() {
-  return apiFetch('/settings/test-navidrome', { method: 'POST' })
+export async function testNavidrome(): Promise<NavidromeTestResponse> {
+  return apiFetch('/settings/test-navidrome', { method: 'POST' }) as Promise<NavidromeTestResponse>
 }
 
-export async function testWebhook() {
-  return apiFetch('/settings/test-webhook', { method: 'POST' })
+export async function testWebhook(): Promise<WebhookTestResponse> {
+  return apiFetch('/settings/test-webhook', { method: 'POST' }) as Promise<WebhookTestResponse>
 }
 
 export const FIELD_LABELS: Record<string, { label: string; type?: string; tooltip: string }> = {

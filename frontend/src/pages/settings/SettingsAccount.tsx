@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CheckCircle, LogOut, XCircle } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import apiFetch from '@/lib/api'
+import apiFetch, { type SettingsUpdateResponse } from '@/lib/api'
 import { useAuthStore } from '@/hooks/useAuth'
 import { changePasswordSchema, changeUsernameSchema } from '@/lib/validators'
 import { SectionCard } from './SettingsShared'
@@ -157,7 +157,7 @@ export default function SettingsAccount() {
         throw new Error('无效配置文件')
       }
 
-      const result = await apiFetch('/settings/import', {
+      const result = await apiFetch<SettingsUpdateResponse>('/settings/import', {
         method: 'POST',
         body: JSON.stringify({
           settings: json.settings,

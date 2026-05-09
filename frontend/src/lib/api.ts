@@ -1,10 +1,68 @@
+// ── Shared types ───────────────────────────────────────────────────────────────
+
+export interface CurrentUser {
+  id: number
+  username: string
+  email?: string
+}
+
+export interface ApiResponse<T> {
+  data?: T
+  detail?: string
+}
+
+export interface SettingsUpdateResponse {
+  updated_fields: string[]
+  message?: string
+}
+
+export interface NavidromeTestResponse {
+  ok: boolean
+  message?: string
+}
+
+export interface WebhookTestResponse {
+  ok: boolean
+  message?: string
+}
+
+export interface RunDetail {
+  id: number
+  run_type: string
+  status: string
+  started_at: string | null
+  finished_at: string | null
+  error_message: string | null
+  created_at: string | null
+  progress?: RunProgress
+  items?: PlaylistItem[]
+}
+
+export interface RunProgress {
+  total: number
+  current: number
+  playlists_created: number
+  tracks_added: number
+  tracks_matched: number
+  tracks_unmatched: number
+  error_message?: string
+}
+
+export interface PlaylistItem {
+  id: number
+  playlist_name: string
+  playlist_url?: string
+  tracks_added: number
+  status: string
+}
+
 const API_BASE = '/api'
 
 class ApiError extends Error {
   constructor(
     public status: number,
     public detail: string,
-    body?: unknown
+    _body?: unknown
   ) {
     super(detail || `HTTP ${status}`)
     this.name = 'ApiError'

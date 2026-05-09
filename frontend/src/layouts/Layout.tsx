@@ -9,6 +9,7 @@ import {
   Link2,
   Settings,
 } from 'lucide-react'
+import type { CurrentUser } from '@/lib/api'
 import loginLogo from '@/assets/login-logo.webp'
 
 const navItems = [
@@ -20,7 +21,7 @@ const navItems = [
 ]
 
 export default function Layout() {
-  const { data: user } = useQuery({
+  const { data: user } = useQuery<CurrentUser>({
     queryKey: ['me'],
     queryFn: () => apiFetch('/auth/me'),
     staleTime: 5 * 60 * 1000,
