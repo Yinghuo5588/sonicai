@@ -25,8 +25,6 @@ export default function LibraryPage() {
 
   return (
     <div className="space-y-3">
-      <LibraryStatusCard />
-
       <section className="card card-padding space-y-4">
         <div>
           <h3 className="section-title">曲库工具箱</h3>

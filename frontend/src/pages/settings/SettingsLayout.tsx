@@ -32,7 +32,7 @@ const SETTINGS_SECTIONS = [
   },
   {
     key: 'library',
-    title: '曲库与匹配',
+    title: '曲库调试',
     desc: '曲库索引、缓存、未命中歌曲、人工匹配与诊断',
     icon: Library,
     to: '/settings/library',
