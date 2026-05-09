@@ -5,7 +5,6 @@ import {
   ListMusic,
   Clock,
   UserCog,
-  Palette,
   Library,
 } from 'lucide-react'
 
@@ -52,14 +51,7 @@ const SETTINGS_SECTIONS = [
     icon: UserCog,
     to: '/settings/account',
   },
-  {
-    key: 'appearance',
-    title: '外观设置',
-    desc: '主题模式与显示偏好',
-    icon: Palette,
-    to: '/settings/appearance',
-  },
-] as const
+  ] as const
 
 export default function SettingsLayout() {
   const navigate = useNavigate()

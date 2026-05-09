@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle, LogOut, XCircle } from 'lucide-react'
+import { CheckCircle, LogOut, XCircle, Palette } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from '@/lib/api'
 import { useAuthStore } from '@/hooks/useAuth'
 import { changePasswordSchema, changeUsernameSchema } from '@/lib/validators'
 import { SectionCard } from './SettingsShared'
 import { useToast } from '@/components/ui/useToast'
+import { ThemeMode, useTheme } from '@/hooks/useTheme'
+import { Monitor, Moon, Sun } from 'lucide-react'
 
 export default function SettingsAccount() {
   const navigate = useNavigate()
@@ -30,6 +32,8 @@ export default function SettingsAccount() {
   const [usernameResult, setUsernameResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   const [importResult, setImportResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  const { theme, setTheme } = useTheme()
 
   const handleChangePassword = async () => {
     setPasswordLoading(true)
@@ -347,6 +351,53 @@ export default function SettingsAccount() {
             {importResult.msg}
           </p>
         )}
+      </SectionCard>
+
+      <SectionCard title="外观设置">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {([
+            {
+              value: 'light',
+              label: '日间模式',
+              icon: Sun,
+              desc: '始终使用浅色界面',
+            },
+            {
+              value: 'dark',
+              label: '黑夜模式',
+              icon: Moon,
+              desc: '始终使用深色界面',
+            },
+            {
+              value: 'system',
+              label: '跟随系统',
+              icon: Monitor,
+              desc: '根据设备系统自动切换',
+            },
+          ] as const).map(item => {
+            const Icon = item.icon
+            const active = theme === item.value
+
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setTheme(item.value as ThemeMode)}
+                className={`rounded-2xl border p-4 text-left transition ${
+                  active
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+                    : 'border-border bg-background hover:bg-slate-50 dark:hover:bg-slate-900'
+                }`}
+              >
+                <Icon className="w-5 h-5 mb-2" />
+                <div className="text-sm font-medium">{item.label}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  {item.desc}
+                </div>
+              </button>
+            )
+          })}
+        </div>
       </SectionCard>
     </div>
   )
