@@ -35,8 +35,8 @@ const PANEL_ICONS: Record<string, React.ElementType> = Object.fromEntries(
   SCHEDULE_PANELS.map(p => [p.key, p.icon])
 )
 
-function PanelContent({ key, s, handleChange }: { key: string; s: ScheduleCardProps['s']; handleChange: ScheduleCardProps['handleChange'] }) {
-  switch (key) {
+function PanelContent({ panelKey, s, handleChange }: { panelKey: string; s: ScheduleCardProps['s']; handleChange: ScheduleCardProps['handleChange'] }) {
+  switch (panelKey) {
     case 'recommendation':    return <RecommendationCronCard    s={s} handleChange={handleChange} />
     case 'hotboard':          return <HotboardCronCard         s={s} handleChange={handleChange} />
     case 'playlist-sync':     return <PlaylistSyncCronCard    s={s} handleChange={handleChange} />
@@ -76,7 +76,7 @@ export default function SchedulePage() {
   return (
     <div className="page pb-16">
       {/* 任务配置面板 - 放最顶上 */}
-      <PanelContent key={activePanel} s={s} handleChange={handleChange} />
+      <PanelContent panelKey={activePanel} s={s} handleChange={handleChange} />
 
       {/* 当前后台任务 */}
       <CurrentTasksCard />
@@ -93,6 +93,7 @@ export default function SchedulePage() {
       {/* FAB */}
       <button
         type="button"
+        onMouseDown={e => e.stopPropagation()}
         onClick={() => setPanelOpen(v => !v)}
         className="fixed bottom-24 right-6 z-[51] flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 md:bottom-8 md:right-8"
         aria-label="打开自动化任务"
@@ -103,7 +104,7 @@ export default function SchedulePage() {
       {/* 面板 */}
       {panelOpen && (
         <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center">
-          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setPanelOpen(false)} />
           <div
             ref={panelRef}
             className="relative w-full max-w-sm rounded-t-3xl bg-white p-6 pb-24 dark:bg-slate-900 md:rounded-2xl md:pb-6"
