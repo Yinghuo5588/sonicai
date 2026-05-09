@@ -73,7 +73,11 @@ function RunMobileCard({ run, selected, selectMode, onToggleSelect, onDelete, is
         {selectMode && (
           <input type="checkbox" checked={selected} onChange={onToggleSelect} className="mt-1 h-4 w-4 rounded border-slate-300 text-cyan-600" />
         )}
-        <Link to={`/history/run/${run.id}`} className="flex min-w-0 flex-1 items-start gap-3">
+        <Link
+            to={`/history/run/${run.id}`}
+            onClick={e => { if (selectMode) { e.preventDefault(); e.stopPropagation() } }}
+            className="flex min-w-0 flex-1 items-start gap-3"
+          >
           <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10">
             <Clock className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
           </div>
@@ -116,13 +120,20 @@ export default function HistoryPage() {
   const total = Number((data as any)?.total || 0)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  const filteredRuns = useMemo(() => runs.filter((r: any) => {
-    if (filter === 'all') return true
-    if (filter === 'success') return r.status === 'success' || r.status === 'completed'
-    if (filter === 'failed') return r.status === 'failed' || r.status === 'error'
-    if (filter === 'running') return r.status === 'running' || r.status === 'pending'
-    return true
-  }), [runs, filter])
+  const filteredRuns = useMemo(() => {
+    if (filter === 'all') return runs
+    return runs.filter((r: any) => {
+      if (filter === 'success') return r.status === 'success' || r.status === 'completed'
+      if (filter === 'failed') return r.status === 'failed' || r.status === 'error'
+      if (filter === 'running') return r.status === 'running' || r.status === 'pending'
+      return false
+    })
+  }, [runs, filter])
+
+  const isFiltered = filter !== 'all'
+  const paginationNote = isFiltered
+    ? `当前页筛选结果，共 ${filteredRuns.length} 条（后端支持状态筛选后可分页）`
+    : null
 
   const toggleSelected = (id: number) => {
     setSelected(prev => {
@@ -224,7 +235,13 @@ export default function HistoryPage() {
           )
         }}
       />
-      <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={next => { setPage(next); clearSelected() }} />
+      {isFiltered ? (
+        <div className="rounded-xl border border-border bg-slate-50 p-4 text-center text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+          {paginationNote}
+        </div>
+      ) : (
+        <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={next => { setPage(next); clearSelected() }} />
+      )}
     </div>
   )
 }
