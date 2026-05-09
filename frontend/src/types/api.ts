@@ -117,6 +117,7 @@ export interface Settings {
   lastfm_username: string | null
   navidrome_url: string | null
   navidrome_username: string | null
+  navidrome_password: string | null
   webhook_url: string | null
   webhook_headers_json: string | null
   webhook_timeout_seconds: number
