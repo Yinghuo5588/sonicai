@@ -79,6 +79,19 @@ export function fetchMissedTracks(status: string, q: string, page: number) {
   return apiFetch(`/missed-tracks?${params.toString()}`)
 }
 
+export async function fetchAllMissedTracks(status: string, q: string): Promise<MissedTrackItem[]> {
+  const allItems: MissedTrackItem[] = []
+  let page = 1
+  while (true) {
+    const res = await fetchMissedTracks(status, q, page) as MissedTracksResponse
+    if (!res?.items?.length) break
+    allItems.push(...res.items)
+    if (allItems.length >= (res.total ?? 0)) break
+    page++
+  }
+  return allItems
+}
+
 export function fetchMissedTrackStats() {
   return apiFetch('/missed-tracks/stats')
 }

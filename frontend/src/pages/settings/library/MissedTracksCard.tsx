@@ -11,6 +11,7 @@ import { labelOf, MISSED_STATUS_LABELS } from '@/lib/labels'
 import { SectionCard } from '../SettingsShared'
 import {
   deleteMissedTrack,
+  fetchAllMissedTracks,
   fetchMissedTrackStats,
   fetchMissedTracks,
   ignoreMissedTrack,
@@ -18,7 +19,7 @@ import {
   retryMissedTrack,
   retryMissedTracksBatch,
 } from './libraryApi'
-import { LIBRARY_PAGE_SIZE, MissedTrackStats, MissedTracksResponse } from './libraryTypes'
+import { LIBRARY_PAGE_SIZE, MissedTrackItem, MissedTrackStats, MissedTracksResponse } from './libraryTypes'
 import PaginationControls from './components/PaginationControls'
 
 export default function MissedTracksCard() {
@@ -29,6 +30,7 @@ export default function MissedTracksCard() {
   const [status, setStatus] = useState('pending')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [exporting, setExporting] = useState(false)
 
   const { data: stats } = useQuery<MissedTrackStats>({
     queryKey: ['missed-track-stats'],
@@ -106,6 +108,24 @@ export default function MissedTracksCard() {
         <input type="text" value={query} onChange={e => { setQuery(e.target.value); setPage(1) }} placeholder="搜索歌名或艺术家" className="input flex-1" />
         <button type="button" className="btn-secondary" disabled={retryBatchMutation.isPending} onClick={() => retryBatchMutation.mutate()}>
           {retryBatchMutation.isPending ? '启动中...' : '批量重试'}
+        </button>
+        <button type="button" className="btn-secondary" disabled={exporting || (stats?.total ?? 0) === 0} onClick={async () => {
+          setExporting(true)
+          try {
+            const allItems = await fetchAllMissedTracks(status, query)
+            const content = allItems.map(item => item.artist ? `${item.title} - ${item.artist}` : item.title).join('\n')
+            const blob = new Blob([content], { type: 'text/plain' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `未命中歌曲_${new Date().toISOString().slice(0, 10)}.txt`
+            a.click()
+            URL.revokeObjectURL(url)
+          } finally {
+            setExporting(false)
+          }
+        }}>
+          {exporting ? '导出中...' : '导出 TXT'}
         </button>
       </div>
 
