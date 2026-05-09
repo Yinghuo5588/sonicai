@@ -15,20 +15,21 @@ export default function MatchDebugCard() {
   const debugMutation = useMutation({ mutationFn: debugMatch })
 
   return (
-    <div className="space-y-4">
-      <SectionCard title="调试设置">
-        {isLoading ? (
-          <div className="text-sm text-slate-500 dark:text-slate-400">加载调试设置...</div>
-        ) : (
-          <>
-            <FieldInput fieldKey="match_debug_enabled" value={s.match_debug_enabled} onChange={v => handleChange('match_debug_enabled', v)} />
-            <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
-              开启后，新产生的匹配日志会写入完整链路 steps，包括 manual_match、match_cache、memory、db_alias、db_fuzzy、subsonic 等步骤。该功能会增加 match_log.raw_json 的写入体积，建议仅在排查问题时开启。
-            </div>
-            <SaveBar hasChanges={hasChanges} isPending={mutation.isPending} isSuccess={mutation.isSuccess} isError={mutation.isError} onSave={save} />
-          </>
-        )}
-      </SectionCard>
+    <>
+      <SaveBar hasChanges={hasChanges} isPending={mutation.isPending} isSuccess={mutation.isSuccess} isError={mutation.isError} onSave={save} />
+      <div className="space-y-4">
+        <SectionCard title="调试设置">
+          {isLoading ? (
+            <div className="text-sm text-slate-500 dark:text-slate-400">加载调试设置...</div>
+          ) : (
+            <>
+              <FieldInput fieldKey="match_debug_enabled" value={s.match_debug_enabled} onChange={v => handleChange('match_debug_enabled', v)} />
+              <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                开启后，新产生的匹配日志会写入完整链路 steps，包括 manual_match、match_cache、memory、db_alias、db_fuzzy、subsonic 等步骤。该功能会增加 match_log.raw_json 的写入体积，建议仅在排查问题时开启。
+              </div>
+            </>
+          )}
+        </SectionCard>
 
       <SectionCard title="匹配诊断">
         <p className="text-xs text-slate-500 dark:text-slate-400">输入歌名和艺术家，查看标准化结果、别名、最终匹配来源和得分。</p>
@@ -58,5 +59,6 @@ export default function MatchDebugCard() {
         {debugMutation.data && <DebugMatchResultView data={debugMutation.data} />}
       </SectionCard>
     </div>
+    </>
   )
 }
