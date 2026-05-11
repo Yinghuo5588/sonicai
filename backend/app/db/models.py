@@ -122,6 +122,7 @@ class SystemSettings(Base):
     playlist_sync_name = Column(String(255), nullable=True)
     playlist_sync_overwrite = Column(Boolean, default=False)
     playlist_sync_last_hash = Column(String(64), nullable=True)
+    playlist_parse_timeout = Column(Integer, default=30)  # seconds, 0 = no limit
 
     # Song cache
     song_cache_enabled = Column(Boolean, default=True)

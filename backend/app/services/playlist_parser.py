@@ -14,7 +14,7 @@ URL_RE = re.compile(r"https?://[^\s]+")
 NETEASE_CLEAN_PARAMS = {"id"}
 
 
-async def parse_playlist_url(url: str, api_base: str) -> tuple[str, str, list[dict]]:
+async def parse_playlist_url(url: str, api_base: str, timeout: float = 30.0) -> tuple[str, str, list[dict]]:
     """
     Parse any supported playlist URL using the given external API.
     api_base: full URL of the parser endpoint, e.g. https://sss.unmeta.cn/songlist
@@ -50,7 +50,7 @@ async def parse_playlist_url(url: str, api_base: str) -> tuple[str, str, list[di
     logger.info(f"[parser] sending URL: {clean_url}")
 
     try:
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             resp = await client.post(
                 api_url,
                 data={"url": clean_url},

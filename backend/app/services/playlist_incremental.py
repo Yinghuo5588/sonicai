@@ -74,7 +74,7 @@ async def run_incremental_playlist_sync(
 
     # Parse playlist
     try:
-        parsed_name, platform, songs = await parse_playlist_url(url, api_base=api_base)
+        parsed_name, platform, songs = await parse_playlist_url(url, api_base=api_base, timeout=float(settings.playlist_parse_timeout or 30))
     except Exception as e:
         async with AsyncSessionLocal() as db:
             run_row = await db.get(RecommendationRun, run_id)

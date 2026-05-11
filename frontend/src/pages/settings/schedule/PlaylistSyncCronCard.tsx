@@ -56,6 +56,10 @@ export default function PlaylistSyncCronCard({ s, handleChange }: ScheduleCardPr
             <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">歌单名称</label>
             <input type="text" placeholder="留空自动" value={String(s.playlist_sync_name ?? '')} onChange={e => handleChange('playlist_sync_name', e.target.value)} className="input" />
           </div>
+          <div>
+            <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">解析超时（秒）</label>
+            <input type="number" placeholder="默认30" value={String(s.playlist_parse_timeout ?? '')} onChange={e => handleChange('playlist_parse_timeout', Number(e.target.value) || null)} className="input" min={5} max={120} />
+          </div>
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           <input type="checkbox" checked={!!s.playlist_sync_overwrite} onChange={e => handleChange('playlist_sync_overwrite', e.target.checked)} className="h-4 w-4 accent-cyan-500" />

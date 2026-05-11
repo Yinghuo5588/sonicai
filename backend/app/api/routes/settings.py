@@ -72,6 +72,7 @@ class SettingsResponse(BaseModel):
     playlist_sync_threshold: float | None = None
     playlist_sync_name: str | None = None
     playlist_sync_overwrite: bool | None = False
+    playlist_parse_timeout: int | None = 30
 
     # Song cache
     song_cache_enabled: bool | None = True
@@ -157,6 +158,7 @@ class SettingsUpdate(BaseModel):
     playlist_sync_threshold: float | None = None
     playlist_sync_name: str | None = None
     playlist_sync_overwrite: bool | None = False
+    playlist_parse_timeout: int | None = Field(default=None, ge=5, le=120)
 
     # Song cache
     song_cache_enabled: bool | None = None

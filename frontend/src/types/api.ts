@@ -164,6 +164,7 @@ export interface Settings {
   playlist_sync_threshold: number | null
   playlist_sync_name: string | null
   playlist_sync_overwrite: boolean
+  playlist_parse_timeout: number | null
   // Song cache
   song_cache_enabled: boolean | null
   song_cache_auto_refresh_enabled: boolean | null
