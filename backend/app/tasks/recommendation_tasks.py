@@ -182,6 +182,7 @@ async def run_playlist_sync_cron_job():
     from app.db.models import SystemSettings
     from app.services.job_run_service import create_pending_run
     from app.core.task_registry import create_background_task
+    from app.services.playlist_incremental import run_incremental_playlist_sync
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
