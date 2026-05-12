@@ -17,6 +17,7 @@ async def run_recommendation_job(run_type: str = "full"):
         run_similar_tracks_only,
         run_similar_artists_only,
     )
+    from app.services.playlist_incremental import run_incremental_playlist_sync
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
