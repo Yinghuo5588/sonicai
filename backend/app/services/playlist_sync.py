@@ -72,6 +72,7 @@ async def run_playlist_sync(
       3. Convert songs to CandidateTrack.
       4. Delegate matching/persistence/Navidrome/webhook to unified pipeline.
     """
+    match_threshold = max(0.01, min(1.0, float(match_threshold or 0.75)))
     logger.info("[playlist] start run_id=%s url=%s", run_id, url)
 
     await _mark_run_running(run_id)
@@ -121,16 +122,21 @@ async def run_playlist_sync(
         source_type=playlist_type,
     )
 
-    return await run_candidate_playlist_pipeline(
-        run_id=run_id,
-        playlist_type=playlist_type,
-        playlist_name=final_name,
-        candidates=candidates,
-        match_threshold=match_threshold,
-        overwrite=overwrite,
-        source_type=playlist_type,
-        mark_run_running=False,
-    )
+    try:
+        return await run_candidate_playlist_pipeline(
+            run_id=run_id,
+            playlist_type=playlist_type,
+            playlist_name=final_name,
+            candidates=candidates,
+            match_threshold=match_threshold,
+            overwrite=overwrite,
+            source_type=playlist_type,
+            mark_run_running=False,
+        )
+    except Exception as e:
+        logger.exception('[playlist] pipeline failed run_id=%s', run_id)
+        await _mark_run_failed(run_id, str(e))
+        raise
 
 
 async def run_text_sync(
@@ -148,6 +154,7 @@ async def run_text_sync(
       2. Convert songs to CandidateTrack.
       3. Delegate matching/persistence/Navidrome/webhook to unified pipeline.
     """
+    match_threshold = max(0.01, min(1.0, float(match_threshold or 0.75)))
     logger.info("[text_sync] start run_id=%s chars=%s", run_id, len(text_content))
 
     await _mark_run_running(run_id)
@@ -175,13 +182,18 @@ async def run_text_sync(
         source_type=playlist_type,
     )
 
-    return await run_candidate_playlist_pipeline(
-        run_id=run_id,
-        playlist_type=playlist_type,
-        playlist_name=final_name,
-        candidates=candidates,
-        match_threshold=match_threshold,
-        overwrite=overwrite,
-        source_type=playlist_type,
-        mark_run_running=False,
-    )
+    try:
+        return await run_candidate_playlist_pipeline(
+            run_id=run_id,
+            playlist_type=playlist_type,
+            playlist_name=final_name,
+            candidates=candidates,
+            match_threshold=match_threshold,
+            overwrite=overwrite,
+            source_type=playlist_type,
+            mark_run_running=False,
+        )
+    except Exception as e:
+        logger.exception('[text_sync] pipeline failed run_id=%s', run_id)
+        await _mark_run_failed(run_id, str(e))
+        raise

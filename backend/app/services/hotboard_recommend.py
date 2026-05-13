@@ -38,6 +38,9 @@ async def run_hotboard_sync(
       2. Convert rows to CandidateTrack.
       3. Delegate matching/persistence/Navidrome/webhook to unified pipeline.
     """
+    limit = max(1, min(200, int(limit or 50)))
+    match_threshold = max(0.01, min(1.0, float(match_threshold or 0.75)))
+
     logger.info(
         "[hotboard] start run_id=%s limit=%s threshold=%s trigger_type=%s",
         run_id,
