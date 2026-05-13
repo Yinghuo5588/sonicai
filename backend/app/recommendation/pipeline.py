@@ -141,6 +141,7 @@ async def run_candidate_playlist_pipeline(
     overwrite: bool = False,
     source_type: str | None = None,
     mark_run_running: bool = True,
+    update_run_status: bool = True,
 ) -> dict:
     """
     Run the common candidate -> playlist pipeline.
@@ -162,6 +163,10 @@ async def run_candidate_playlist_pipeline(
             Fallback RecommendationItem.source_type when candidate.source_type is empty.
         mark_run_running:
             Whether this pipeline should set RecommendationRun to running at start.
+        update_run_status:
+            Whether this pipeline should set RecommendationRun status to success/failed.
+            Set False when this pipeline is used as a sub-step of a larger run,
+            e.g. full Last.fm recommendation containing similar_tracks + similar_artists.
     """
     fallback_source_type = source_type or playlist_type
 
@@ -184,9 +189,11 @@ async def run_candidate_playlist_pipeline(
     ]
 
     if not valid_candidates:
-        await _mark_run_failed(run_id, "No valid candidate tracks")
+        if update_run_status:
+            await _mark_run_failed(run_id, "No valid candidate tracks")
         return {
             "playlist_name": playlist_name,
+            "playlist_type": playlist_type,
             "matched": 0,
             "missing": 0,
             "total": 0,
@@ -314,11 +321,12 @@ async def run_candidate_playlist_pipeline(
                 playlist.error_message = "Failed to create Navidrome playlist"
                 playlist.status = "failed"
 
-                run_row = await db.get(RecommendationRun, run_id)
-                if run_row:
-                    run_row.status = "failed"
-                    run_row.error_message = "Failed to create Navidrome playlist"
-                    run_row.finished_at = datetime.now(timezone.utc)
+                if update_run_status:
+                    run_row = await db.get(RecommendationRun, run_id)
+                    if run_row:
+                        run_row.status = "failed"
+                        run_row.error_message = "Failed to create Navidrome playlist"
+                        run_row.finished_at = datetime.now(timezone.utc)
 
                 await db.commit()
 
@@ -342,11 +350,12 @@ async def run_candidate_playlist_pipeline(
                 playlist.error_message = "Failed to add songs to Navidrome playlist"
                 playlist.status = "failed"
 
-                run_row = await db.get(RecommendationRun, run_id)
-                if run_row:
-                    run_row.status = "failed"
-                    run_row.error_message = "Failed to add songs to Navidrome playlist"
-                    run_row.finished_at = datetime.now(timezone.utc)
+                if update_run_status:
+                    run_row = await db.get(RecommendationRun, run_id)
+                    if run_row:
+                        run_row.status = "failed"
+                        run_row.error_message = "Failed to add songs to Navidrome playlist"
+                        run_row.finished_at = datetime.now(timezone.utc)
 
                 await db.commit()
 
@@ -369,10 +378,11 @@ async def run_candidate_playlist_pipeline(
 
         playlist.status = "success"
 
-        run_row = await db.get(RecommendationRun, run_id)
-        if run_row:
-            run_row.status = "success"
-            run_row.finished_at = datetime.now(timezone.utc)
+        if update_run_status:
+            run_row = await db.get(RecommendationRun, run_id)
+            if run_row:
+                run_row.status = "success"
+                run_row.finished_at = datetime.now(timezone.utc)
 
         should_webhook_missing = (
             bool(missing_candidates)
