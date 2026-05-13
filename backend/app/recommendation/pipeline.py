@@ -100,13 +100,16 @@ def _candidate_to_item_kwargs(
 
 
 def _missing_text(payload: dict[str, Any]) -> str:
-    title = payload.get("title", "")
-    artist = payload.get("artist", "")
-    album = payload.get("album", "")
+    title = (payload.get("title") or "").strip()
+    artist = (payload.get("artist") or "").strip()
 
-    if album:
-        return f"{album} - {artist}"
-    return f"{title} - {artist}"
+    if title and artist:
+        return f"{title} - {artist}"
+
+    if title:
+        return title
+
+    return artist
 
 
 async def _mark_run_failed(run_id: int, error: str) -> None:
@@ -177,7 +180,7 @@ async def run_candidate_playlist_pipeline(
 
     valid_candidates = [
         c for c in candidates
-        if c.normalized_title() and c.normalized_artist()
+        if c.normalized_title()
     ]
 
     if not valid_candidates:
@@ -221,7 +224,7 @@ async def run_candidate_playlist_pipeline(
         search_tracks = [c.to_match_input() for c in valid_candidates]
 
         async def _log_progress(done: int, total: int):
-            if done % 20 == 0:
+            if done == 1 or done == total or done % 20 == 0:
                 logger.info(
                     "[pipeline] matching progress run_id=%s playlist_type=%s %s/%s",
                     run_id,
@@ -307,7 +310,27 @@ async def run_candidate_playlist_pipeline(
         if matched_ids:
             navidrome_playlist_id = await navidrome_create_playlist(playlist_name)
 
-        if navidrome_playlist_id:
+            if not navidrome_playlist_id:
+                playlist.error_message = "Failed to create Navidrome playlist"
+                playlist.status = "failed"
+
+                run_row = await db.get(RecommendationRun, run_id)
+                if run_row:
+                    run_row.status = "failed"
+                    run_row.error_message = "Failed to create Navidrome playlist"
+                    run_row.finished_at = datetime.now(timezone.utc)
+
+                await db.commit()
+
+                return {
+                    "playlist_name": playlist_name,
+                    "playlist_type": playlist_type,
+                    "matched": len(matched_ids),
+                    "missing": len(missing_candidates),
+                    "total": len(valid_candidates),
+                    "error": "Failed to create Navidrome playlist",
+                }
+
             ok = await navidrome_add_to_playlist(
                 str(navidrome_playlist_id),
                 matched_ids,
@@ -337,6 +360,7 @@ async def run_candidate_playlist_pipeline(
 
                 return {
                     "playlist_name": playlist_name,
+                    "playlist_type": playlist_type,
                     "matched": len(matched_ids),
                     "missing": len(missing_candidates),
                     "total": len(valid_candidates),
