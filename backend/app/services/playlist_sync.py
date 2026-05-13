@@ -1,29 +1,59 @@
-"""Third-party playlist sync pipeline — parse playlist URL and sync to Navidrome."""
+"""Third-party playlist sync pipeline — parse playlist URL/text and sync to Navidrome."""
 
 import logging
-import json as _json
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 
 from app.db.session import AsyncSessionLocal
-from app.db.models import (
-    SystemSettings, RecommendationRun, GeneratedPlaylist,
-    RecommendationItem, NavidromeMatch, WebhookBatch, WebhookBatchItem,
-)
-from app.services.concurrent_search import batch_search_and_match
-from app.services.library_match_service import MatchConfig
-from app.services.playlist_parser import parse_playlist_url
-from app.services.navidrome_service import (
-    navidrome_create_playlist,
-    navidrome_add_to_playlist,
-    navidrome_delete_playlist,
-    navidrome_list_playlists,
-)
-from app.utils.text_normalizer import dedup_key
-from app.services.webhook_service import send_webhook_batch
+from app.db.models import SystemSettings, RecommendationRun
+from app.services.playlist_parser import parse_playlist_url, parse_text_songs
+from app.recommendation.types import CandidateTrack
+from app.recommendation.pipeline import run_candidate_playlist_pipeline
 
 logger = logging.getLogger(__name__)
+
+
+async def _mark_run_running(run_id: int) -> None:
+    async with AsyncSessionLocal() as db:
+        run_row = await db.get(RecommendationRun, run_id)
+        if not run_row:
+            raise RuntimeError(f"RecommendationRun not found: run_id={run_id}")
+
+        run_row.status = "running"
+        run_row.started_at = datetime.now(timezone.utc)
+        await db.commit()
+
+
+async def _mark_run_failed(run_id: int, error: str) -> None:
+    async with AsyncSessionLocal() as db:
+        run_row = await db.get(RecommendationRun, run_id)
+        if run_row:
+            run_row.status = "failed"
+            run_row.error_message = error
+            run_row.finished_at = datetime.now(timezone.utc)
+            await db.commit()
+
+
+def _songs_to_candidates(
+    *,
+    songs: list[dict],
+    source_type: str,
+) -> list[CandidateTrack]:
+    return [
+        CandidateTrack(
+            title=str(song.get("title", "") or ""),
+            artist=str(song.get("artist", "") or ""),
+            album=song.get("album") or "",
+            score=idx + 1,
+            source_type=source_type,
+            source_seed_name=str(song.get("title", "") or ""),
+            source_seed_artist=str(song.get("artist", "") or ""),
+            rank_index=idx + 1,
+            raw_payload=song,
+        )
+        for idx, song in enumerate(songs)
+    ]
 
 
 async def run_playlist_sync(
@@ -33,50 +63,73 @@ async def run_playlist_sync(
     playlist_name: str | None = None,
     overwrite: bool = False,
 ) -> dict:
-    """URL-based playlist sync pipeline."""
-    logger.info(f"[playlist] start run_id={run_id} url={url}")
+    """
+    URL-based playlist sync.
 
-    # Load settings snapshot
+    Responsibilities:
+      1. Load parser settings.
+      2. Parse playlist URL.
+      3. Convert songs to CandidateTrack.
+      4. Delegate matching/persistence/Navidrome/webhook to unified pipeline.
+    """
+    logger.info("[playlist] start run_id=%s url=%s", run_id, url)
+
+    await _mark_run_running(run_id)
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
         settings = result.scalar_one_or_none()
+
         if not settings:
+            await _mark_run_failed(run_id, "SystemSettings not initialized")
             raise RuntimeError("SystemSettings not initialized")
-        run_row = await db.get(RecommendationRun, run_id)
-        if not run_row:
-            raise RuntimeError(f"RecommendationRun not found: run_id={run_id}")
-        run_row.status = "running"
-        run_row.started_at = datetime.now(timezone.utc)
-        await db.commit()
-        settings_snapshot = {
-            "playlist_api_url": settings.playlist_api_url,
-            "webhook_url": settings.webhook_url,
-            "webhook_retry_count": settings.webhook_retry_count,
-            "library_mode_default": settings.library_mode_default,
-            "search_concurrency": int(settings.search_concurrency or 5),
-        }
 
     try:
-        parsed_name, platform, songs = await parse_playlist_url(url, api_base=settings_snapshot["playlist_api_url"], timeout=float(settings.playlist_parse_timeout or 30))
+        parsed_name, platform, songs = await parse_playlist_url(
+            url,
+            api_base=settings.playlist_api_url,
+            timeout=float(settings.playlist_parse_timeout or 30),
+        )
     except Exception as e:
-        async with AsyncSessionLocal() as db:
-            run_row = await db.get(RecommendationRun, run_id)
-            if run_row:
-                run_row.status = "failed"
-                run_row.error_message = f"解析歌单失败: {e}"
-                run_row.finished_at = datetime.now(timezone.utc)
-                await db.commit()
-        return {"matched": 0, "missing": 0, "total": 0, "error": str(e)}
+        error = f"解析歌单失败: {e}"
+        await _mark_run_failed(run_id, error)
+        return {
+            "matched": 0,
+            "missing": 0,
+            "total": 0,
+            "error": str(e),
+        }
 
-    return await _run_sync_pipeline(
-        run_id=run_id,
-        parsed_name=parsed_name,
-        platform=platform,
+    if not songs:
+        await _mark_run_failed(run_id, "歌单为空")
+        return {
+            "matched": 0,
+            "missing": 0,
+            "total": 0,
+            "error": "empty playlist",
+        }
+
+    final_name = (
+        playlist_name.strip()
+        if playlist_name and playlist_name.strip()
+        else parsed_name
+    )
+
+    playlist_type = f"playlist_{platform}"
+    candidates = _songs_to_candidates(
         songs=songs,
+        source_type=playlist_type,
+    )
+
+    return await run_candidate_playlist_pipeline(
+        run_id=run_id,
+        playlist_type=playlist_type,
+        playlist_name=final_name,
+        candidates=candidates,
         match_threshold=match_threshold,
-        playlist_name=playlist_name,
         overwrite=overwrite,
-        settings=settings_snapshot,
+        source_type=playlist_type,
+        mark_run_running=False,
     )
 
 
@@ -87,225 +140,48 @@ async def run_text_sync(
     playlist_name: str | None = None,
     overwrite: bool = False,
 ) -> dict:
-    """Text-file based playlist sync — parse plain text and run the full sync pipeline."""
-    from app.services.playlist_parser import parse_text_songs
-    logger.info(f"[text_sync] start run_id={run_id}, chars={len(text_content)}")
+    """
+    Text-file based playlist sync.
 
-    async with AsyncSessionLocal() as db:
-        run_row = await db.get(RecommendationRun, run_id)
-        if not run_row:
-            raise RuntimeError(f"RecommendationRun not found: run_id={run_id}")
-        run_row.status = "running"
-        run_row.started_at = datetime.now(timezone.utc)
-        await db.commit()
+    Responsibilities:
+      1. Parse plain text.
+      2. Convert songs to CandidateTrack.
+      3. Delegate matching/persistence/Navidrome/webhook to unified pipeline.
+    """
+    logger.info("[text_sync] start run_id=%s chars=%s", run_id, len(text_content))
+
+    await _mark_run_running(run_id)
 
     parsed_name, platform, songs = parse_text_songs(text_content)
 
     if not songs:
-        async with AsyncSessionLocal() as db:
-            run_row = await db.get(RecommendationRun, run_id)
-            if run_row:
-                run_row.status = "failed"
-                run_row.error_message = "文本内容为空或解析失败"
-                run_row.finished_at = datetime.now(timezone.utc)
-                await db.commit()
-        return {"matched": 0, "missing": 0, "total": 0, "error": "empty text"}
+        await _mark_run_failed(run_id, "文本内容为空或解析失败")
+        return {
+            "matched": 0,
+            "missing": 0,
+            "total": 0,
+            "error": "empty text",
+        }
 
-    # Load settings snapshot
-    settings_snapshot: dict = {}
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(SystemSettings))
-        s = result.scalar_one_or_none()
-        if s:
-            settings_snapshot = {
-                "webhook_url": s.webhook_url,
-                "webhook_retry_count": s.webhook_retry_count,
-                "library_mode_default": s.library_mode_default,
-                "search_concurrency": int(s.search_concurrency or 5),
-            }
-
-    return await _run_sync_pipeline(
-        run_id=run_id,
-        parsed_name=parsed_name,
-        platform=platform,
-        songs=songs,
-        match_threshold=match_threshold,
-        playlist_name=playlist_name,
-        overwrite=overwrite,
-        settings=settings_snapshot,
+    final_name = (
+        playlist_name.strip()
+        if playlist_name and playlist_name.strip()
+        else parsed_name
     )
 
+    playlist_type = f"playlist_{platform}"
+    candidates = _songs_to_candidates(
+        songs=songs,
+        source_type=playlist_type,
+    )
 
-async def _run_sync_pipeline(
-    run_id: int,
-    parsed_name: str,
-    platform: str,
-    songs: list[dict],
-    match_threshold: float,
-    playlist_name: str | None,
-    overwrite: bool,
-    settings: dict | None = None,
-) -> dict:
-    """Shared pipeline — single DB session for all writes."""
-    if not songs:
-        async with AsyncSessionLocal() as db:
-            run_row = await db.get(RecommendationRun, run_id)
-            if run_row:
-                run_row.status = "failed"
-                run_row.error_message = f"歌单为空: {parsed_name}"
-                run_row.finished_at = datetime.now(timezone.utc)
-                await db.commit()
-        return {"matched": 0, "missing": 0, "total": 0, "error": "empty playlist"}
-
-    final_name = (playlist_name and playlist_name.strip()) or parsed_name
-
-    # Overwrite: delete existing playlist with same name from Navidrome
-    if overwrite:
-        all_pls = await navidrome_list_playlists()
-        for pl in all_pls:
-            if pl.get("name") == final_name and pl.get("id"):
-                logger.info(f"[playlist] overwriting playlist name={final_name} id={pl['id']}")
-                await navidrome_delete_playlist(str(pl["id"]))
-                break
-
-    # Single DB session for all writes
-    async with AsyncSessionLocal() as db:
-        playlist = GeneratedPlaylist(
-            run_id=run_id,
-            playlist_type=f"playlist_{platform}",
-            playlist_name=final_name,
-            playlist_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            status="running",
-        )
-        db.add(playlist)
-        await db.flush()
-
-        matched_ids: list[str] = []
-        missing_items: list[dict] = []
-
-        async def _log_progress(done: int, total: int):
-            if done % 20 == 0:
-                logger.info(f"[playlist] matching progress: {done}/{total}")
-
-        search_concurrency = max(1, min(20, int((settings or {}).get("search_concurrency") or 5)))
-        match_cfg = MatchConfig(threshold=match_threshold, concurrency=search_concurrency)
-        search_results = await batch_search_and_match(
-            tracks=songs,
-            config=match_cfg,
-            progress_callback=_log_progress,
-        )
-
-        for idx, sr in enumerate(search_results):
-            song = songs[idx]
-            title = sr["title"]
-            artist = sr["artist"]
-            if not title or not artist:
-                continue
-
-            item = RecommendationItem(
-                generated_playlist_id=playlist.id,
-                title=title,
-                artist=artist,
-                album=song.get("album", ""),
-                score=idx + 1,
-                source_type=f"playlist_{platform}",
-                source_seed_name=title,
-                source_seed_artist=artist,
-                dedup_key=dedup_key(title, artist),
-                rank_index=idx + 1,
-            )
-            db.add(item)
-            await db.flush()
-
-            best = sr.get("best_match")
-            if best:
-                matched_ids.append(best["id"])
-                db.add(NavidromeMatch(
-                    recommendation_item_id=item.id,
-                    matched=True,
-                    search_query=f"{title} {artist}",
-                    selected_song_id=best["id"],
-                    selected_title=best.get("title"),
-                    selected_artist=best.get("artist"),
-                    selected_album=best.get("album"),
-                    confidence_score=best["score"],
-                ))
-            else:
-                db.add(NavidromeMatch(
-                    recommendation_item_id=item.id,
-                    matched=False,
-                    search_query=f"{title} {artist}",
-                ))
-                missing_items.append(song)
-
-        logger.info(f"[playlist] done total={len(songs)} matched={len(matched_ids)} missing={len(missing_items)}")
-
-        playlist.total_candidates = len(songs)
-        playlist.matched_count = len(matched_ids)
-        playlist.missing_count = len(missing_items)
-
-        navidrome_playlist_id: str | None = None
-        if matched_ids:
-            navidrome_playlist_id = await navidrome_create_playlist(final_name)
-            if navidrome_playlist_id:
-                ok = await navidrome_add_to_playlist(str(navidrome_playlist_id), matched_ids)
-                if ok:
-                    playlist.navidrome_playlist_id = str(navidrome_playlist_id)
-                else:
-                    playlist.error_message = "Failed to add songs to Navidrome playlist"
-                    playlist.status = "failed"
-                    run_row = await db.get(RecommendationRun, run_id)
-                    if run_row:
-                        run_row.status = "failed"
-                        run_row.error_message = "Failed to add songs to Navidrome playlist"
-                        run_row.finished_at = datetime.now(timezone.utc)
-                    await db.commit()
-                    return {"matched": len(matched_ids), "missing": len(missing_items), "total": len(songs), "error": "Failed to add songs"}
-
-        playlist.status = "success"
-        run_row = await db.get(RecommendationRun, run_id)
-        if run_row:
-            run_row.status = "success"
-            run_row.finished_at = datetime.now(timezone.utc)
-
-        # Webhook for missing items
-        if missing_items and settings and settings.get("webhook_url") and settings.get("library_mode_default") == "allow_missing":
-            batch = WebhookBatch(
-                run_id=run_id,
-                playlist_type=f"playlist_{platform}",
-                status="pending",
-                max_retry_count=settings.get("webhook_retry_count") or 3,
-                payload_json=_json.dumps({"items": missing_items}, ensure_ascii=False),
-            )
-            db.add(batch)
-            await db.flush()
-            for item_data in missing_items:
-                text = f"{item_data.get('album', '')} - {item_data['artist']}" if item_data.get("album") else f"{item_data['title']} - {item_data['artist']}"
-                db.add(WebhookBatchItem(
-                    batch_id=batch.id,
-                    track=item_data["title"],
-                    artist=item_data["artist"],
-                    album=item_data.get("album"),
-                    text=text,
-                ))
-
-        await db.commit()
-
-    # Fire-and-forget webhook (outside main session)
-    if missing_items and settings and settings.get("webhook_url") and settings.get("library_mode_default") == "allow_missing":
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(
-                select(WebhookBatch).where(WebhookBatch.run_id == run_id).order_by(WebhookBatch.id.desc())
-            )
-            batch = result.scalar_one_or_none()
-            if batch:
-                await send_webhook_batch(batch.id)
-
-    return {
-        "playlist_name": final_name,
-        "platform": platform,
-        "matched": len(matched_ids),
-        "missing": len(missing_items),
-        "total": len(songs),
-        "navidrome_playlist_id": str(navidrome_playlist_id) if navidrome_playlist_id else None,
-    }
+    return await run_candidate_playlist_pipeline(
+        run_id=run_id,
+        playlist_type=playlist_type,
+        playlist_name=final_name,
+        candidates=candidates,
+        match_threshold=match_threshold,
+        overwrite=overwrite,
+        source_type=playlist_type,
+        mark_run_running=False,
+    )
