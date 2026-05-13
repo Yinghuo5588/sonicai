@@ -68,10 +68,24 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id)})
 
+    client_ip = request.headers.get("X-Forwarded-For")
+    if client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    else:
+        client_ip = request.headers.get("X-Real-IP")
+        if client_ip:
+            client_ip = client_ip.strip()
+        elif request.client:
+            client_ip = request.client.host
+        else:
+            client_ip = None
+
     session_obj = AuthSession(
         user_id=user.id,
         refresh_token_hash=hash_password(refresh_token),
         expires_at=datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days),
+        ip_address=client_ip,
+        user_agent=request.headers.get("User-Agent"),
     )
     db.add(session_obj)
     user.last_login_at = datetime.now(timezone.utc)
@@ -81,7 +95,7 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
 
 
 @router.post("/refresh", response_model=LoginResponse)
-async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     token_data = decode_refresh_token(body.refresh_token)
     if not token_data or token_data.get("type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
@@ -117,10 +131,25 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
 
     access_token = create_access_token({"sub": str(user.id)})
     new_refresh = create_refresh_token({"sub": str(user.id)})
+
+    refresh_client_ip = request.headers.get("X-Forwarded-For")
+    if refresh_client_ip:
+        refresh_client_ip = refresh_client_ip.split(",")[0].strip()
+    else:
+        refresh_client_ip = request.headers.get("X-Real-IP")
+        if refresh_client_ip:
+            refresh_client_ip = refresh_client_ip.strip()
+        elif request.client:
+            refresh_client_ip = request.client.host
+        else:
+            refresh_client_ip = None
+
     db.add(AuthSession(
         user_id=user.id,
         refresh_token_hash=hash_password(new_refresh),
         expires_at=datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days),
+        ip_address=refresh_client_ip,
+        user_agent=request.headers.get("User-Agent"),
     ))
     await db.commit()
 

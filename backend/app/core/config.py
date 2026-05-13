@@ -28,9 +28,6 @@ class Settings(BaseSettings):
     # Should be stable across deployments. Do not rotate unless re-encrypting stored secrets.
     encryption_key: str = Field(default="", alias="ENCRYPTION_KEY")
 
-    # Encryption
-    encryption_key: str = Field(default="", alias="ENCRYPTION_KEY")
-
     # CORS
     frontend_origin: str = Field(default="http://localhost:5173", alias="FRONTEND_ORIGIN")
 

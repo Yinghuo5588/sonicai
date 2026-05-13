@@ -29,7 +29,7 @@ class RetryConfig:
 
 async def _build_retry_config(force: bool = False) -> RetryConfig:
     from app.db.session import AsyncSessionLocal
-    from app.db.models import SystemSettings, MissedTrack
+    from app.db.models import SystemSettings
     from app.services.library_match_service import MatchConfig
 
     cfg = RetryConfig()
@@ -39,6 +39,9 @@ async def _build_retry_config(force: bool = False) -> RetryConfig:
         settings = result.scalar_one_or_none()
 
     if not settings:
+        return cfg
+
+    if not force and not bool(getattr(settings, "missed_track_retry_enabled", False)):
         return cfg
 
     cfg.max_retries = int(getattr(settings, "missed_track_retry_limit", 100) or 100)
@@ -79,15 +82,8 @@ async def retry_missed_tracks_job(*, force: bool = False):
     cfg = await _build_retry_config(force=force)
 
     if not force and cfg.match_config is None:
-        # means settings not initialized or retry disabled
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(SystemSettings))
-            settings = result.scalar_one_or_none()
-        if not settings or not getattr(settings, "missed_track_retry_enabled", False):
-            logger.info("[missed-track-retry] disabled or no settings")
-            return
-        # re-build with actual settings
-        cfg = await _build_retry_config(force=force)
+        logger.info("[missed-track-retry] disabled or no settings")
+        return
 
     limit = cfg.max_retries  # used as limit for batch size; actual per-row limit is in row.max_retries
 

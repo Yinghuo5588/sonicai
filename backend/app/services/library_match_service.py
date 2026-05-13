@@ -612,6 +612,8 @@ async def _match_track_internal(
     threshold: float = 0.75,
     force_debug: bool = False,
     force_mode: str | None = None,
+    write_cache: bool = True,
+    record_miss: bool = True,
 ) -> tuple[dict | None, list[dict] | None]:
     """
     Internal implementation of the full matching chain.
@@ -623,6 +625,12 @@ async def _match_track_internal(
             "api"   -> skip local steps and call Subsonic directly
             "full"  -> run the full local+Subsonic chain
             None    -> use the match_mode setting from the database
+        write_cache:
+            Whether to write successful matches to match_cache.
+            Set False for debug/test to avoid polluting the cache.
+        record_miss:
+            Whether to record unmatched tracks to missed_tracks.
+            Retry flows should set this to False to avoid re-triggering miss tracking.
     """
     debug_enabled = force_debug or await _is_debug_enabled()
     steps: list[dict] | None = [] if debug_enabled else None
@@ -724,7 +732,8 @@ async def _match_track_internal(
 
     if memory:
         memory["source"] = "memory"
-        await _write_match_cache(title, artist, memory, "memory")
+        if write_cache:
+            await _write_match_cache(title, artist, memory, "memory")
         await _write_match_log(title, artist, memory, "memory", steps)
         return memory, steps
 
@@ -740,7 +749,8 @@ async def _match_track_internal(
         steps.append(db_alias_step)
 
     if db_match:
-        await _write_match_cache(title, artist, db_match, "db_alias")
+        if write_cache:
+            await _write_match_cache(title, artist, db_match, "db_alias")
         await _write_match_log(title, artist, db_match, "db_alias", steps)
         return db_match, steps
 
@@ -756,7 +766,8 @@ async def _match_track_internal(
         steps.append(db_fuzzy_step)
 
     if db_fuzzy:
-        await _write_match_cache(title, artist, db_fuzzy, "db_fuzzy")
+        if write_cache:
+            await _write_match_cache(title, artist, db_fuzzy, "db_fuzzy")
         await _write_match_log(title, artist, db_fuzzy, "db_fuzzy", steps)
         return db_fuzzy, steps
 
@@ -768,7 +779,8 @@ async def _match_track_internal(
 
     if effective_mode == "local":
         await _write_match_log(title, artist, None, "miss", steps)
-        await _record_miss(title, artist, threshold, source="local")
+        if record_miss:
+            await _record_miss(title, artist, threshold, source="local")
         return None, steps
 
     if effective_mode == "api":
@@ -811,11 +823,13 @@ async def _match_track_internal(
                 "duration": best.get("duration"),
             }, source="passive")
             best["source"] = "subsonic"
-            await _write_match_cache(title, artist, best, "subsonic")
+            if write_cache:
+                await _write_match_cache(title, artist, best, "subsonic")
             await _write_match_log(title, artist, best, "subsonic", steps)
             return best, steps
         await _write_match_log(title, artist, None, "miss", steps)
-        await _record_miss(title, artist, threshold, source="api")
+        if record_miss:
+            await _record_miss(title, artist, threshold, source="api")
         return None, steps
 
     # effective_mode == "full" (default) – run full local chain first
@@ -896,12 +910,14 @@ async def _match_track_internal(
         )
 
         best["source"] = "subsonic"
-        await _write_match_cache(title, artist, best, "subsonic")
+        if write_cache:
+            await _write_match_cache(title, artist, best, "subsonic")
         await _write_match_log(title, artist, best, "subsonic", steps)
         return best, steps
 
     await _write_match_log(title, artist, None, "miss", steps)
-    await _record_miss(title, artist, threshold, source="full")
+    if record_miss:
+        await _record_miss(title, artist, threshold, source="full")
     return None, steps
 
 
@@ -1000,6 +1016,8 @@ async def match_track_debug(
         threshold=threshold,
         force_debug=True,
         force_mode=None,
+        write_cache=False,
+        record_miss=False,
     )
     return {
         "result": match,
@@ -1026,6 +1044,8 @@ async def match_track_with_config(
         threshold=config.threshold,
         force_debug=False,
         force_mode=config.force_mode,
+        write_cache=config.write_cache,
+        record_miss=config.record_miss,
     )
     return match
 

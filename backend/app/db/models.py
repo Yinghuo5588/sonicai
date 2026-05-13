@@ -159,7 +159,7 @@ class RecommendationRun(Base):
     __tablename__ = "recommendation_runs"
 
     id = Column(Integer, primary_key=True)
-    run_type = Column(String(30), nullable=False)  # full | similar_tracks | similar_artists
+    run_type = Column(String(30), nullable=False)  # full | similar_tracks | similar_artists | hotboard | playlist
     trigger_type = Column(String(20), nullable=True)  # manual | scheduled
     status = Column(String(30), default="pending")  # pending|running|success|partial_success|failed
     started_at = Column(DateTime, nullable=True)
@@ -191,7 +191,7 @@ class GeneratedPlaylist(Base):
 
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey("recommendation_runs.id", ondelete="CASCADE"), nullable=False)
-    playlist_type = Column(String(30), nullable=False)  # similar_tracks | similar_artists
+    playlist_type = Column(String(30), nullable=False)  # similar_tracks | similar_artists | hotboard | playlist_netease | playlist_text | playlist_incremental
     playlist_name = Column(String(255), nullable=False)
     playlist_date = Column(String(20), nullable=False)
     navidrome_playlist_id = Column(String(100), nullable=True)

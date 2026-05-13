@@ -304,6 +304,14 @@ async def export_settings(current_user: CurrentUser, db: AsyncSessionLocal = Dep
     data.pop("created_at", None)
     data.pop("updated_at", None)
 
+    # Redact sensitive fields
+    if data.get("lastfm_api_key"):
+        data["lastfm_api_key"] = "***"
+    if data.get("navidrome_password_encrypted"):
+        data["navidrome_password_encrypted"] = None
+    if data.get("webhook_headers_json"):
+        data["webhook_headers_json"] = "***"
+
     return JSONResponse(content={
         "version": "1.0",
         "exported_at": datetime.now(timezone.utc).isoformat(),
@@ -355,8 +363,8 @@ async def import_settings(
         if key not in allowed_fields:
             continue
 
-        # Empty string → None
-        if value == "":
+        # Empty string / redacted placeholder → None
+        if value == "" or value == "***":
             value = None
 
         # Skip None values (retain current value)

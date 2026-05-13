@@ -50,6 +50,15 @@ def _task_done(task: asyncio.Task):
         logger.debug(f"[task] {task.get_name()} completed successfully")
 
 
-def get_active_tasks() -> list[str]:
-    """Return names of currently running background tasks (for diagnostics)."""
-    return [t.get_name() for t in _background_tasks if not t.done()]
+def get_active_tasks() -> list[dict]:
+    """Return active background tasks for diagnostics."""
+    items = []
+    for t in _background_tasks:
+        if t.done():
+            continue
+        items.append({
+            "name": t.get_name(),
+            "done": t.done(),
+            "cancelled": t.cancelled(),
+        })
+    return items

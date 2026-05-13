@@ -111,15 +111,6 @@ async def sync_playlist_incremental(
         "url": settings.playlist_sync_url,
     }
 
-    return {
-        "message": "Playlist sync queued",
-        "run_id": run_id,
-        "url": url,
-        "threshold": match_threshold,
-        "playlist_name": playlist_name or "(auto)",
-        "overwrite": overwrite,
-    }
-
 
 @router.post("/sync-text")
 @limiter.limit("3/minute")
