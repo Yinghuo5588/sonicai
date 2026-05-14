@@ -11,7 +11,7 @@ import {
 } from './SettingsShared'
 import { useToast } from '@/components/ui/useToast'
 import { FormSkeleton } from '@/components/ui/Skeleton'
-import AiPreferenceProfileCard from './AiPreferenceProfileCard'
+
 
 export default function SettingsConnections() {
   const {
@@ -192,25 +192,7 @@ export default function SettingsConnections() {
             />
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={!!s.ai_preference_profile_enabled}
-              onChange={e => handleChange('ai_preference_profile_enabled', e.target.checked)}
-              className="h-4 w-4 accent-cyan-500"
-            />
-            <span className="text-sm text-slate-700 dark:text-slate-200">
-              启用 AI 长期偏好文件
-            </span>
-          </label>
-
-          <div className="rounded-xl border border-cyan-100 bg-cyan-50 p-3 text-xs leading-relaxed text-cyan-700 dark:border-cyan-900 dark:bg-cyan-950/30 dark:text-cyan-300">
-            第一阶段仅支持 OpenAI-compatible Chat Completions。AI 生成候选歌曲后,仍由 SonicAI 后端统一匹配并创建 Navidrome 歌单。
-          </div>
-        </div>
-      </SectionCard>
-
-      <AiPreferenceProfileCard />
+          
 
       <SectionCard title="Last.fm">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
