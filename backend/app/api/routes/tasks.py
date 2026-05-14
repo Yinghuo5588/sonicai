@@ -68,3 +68,13 @@ async def put_playlist_retention_policy(
         delete_navidrome=body.delete_navidrome,
         keep_recent_success_count=body.keep_recent_success_count,
     )
+
+
+@router.get("/recommendation-sources")
+async def get_recommendation_sources(current_user: CurrentUser):
+    """Return registered recommendation source plugins."""
+    from app.recommendation.registry import list_source_metadata
+
+    return {
+        "items": list_source_metadata(),
+    }

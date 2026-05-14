@@ -34,6 +34,12 @@ class RecommendationSource(ABC):
     source_type: str
     playlist_type: str
 
+    # Metadata for registry / frontend / diagnostics.
+    display_name: str = ""
+    description: str = ""
+    is_dynamic: bool = False
+    supported_playlist_types: tuple[str, ...] = ()
+
     def __init__(self, context: SourceContext):
         self.context = context
 

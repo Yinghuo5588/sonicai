@@ -32,6 +32,15 @@ class PlaylistUrlSource(RecommendationSource):
     source_type = "playlist"
     playlist_type = "playlist"
 
+    display_name = "第三方歌单 URL"
+    description = "通过配置的歌单解析 API 解析外部歌单 URL，并同步到 Navidrome。"
+    is_dynamic = True
+    supported_playlist_types = (
+        "playlist_netease",
+        "playlist_text",
+        "playlist_unknown",
+    )
+
     def __init__(
         self,
         context: SourceContext,
@@ -72,6 +81,11 @@ class TextPlaylistSource(RecommendationSource):
     source_type = "playlist_text"
     playlist_type = "playlist_text"
 
+    display_name = "文本歌单"
+    description = "解析上传的 txt 文本歌单，格式支持：歌名 - 艺术家。"
+    is_dynamic = False
+    supported_playlist_types = ("playlist_text",)
+
     def __init__(
         self,
         context: SourceContext,
@@ -103,6 +117,11 @@ class TextPlaylistSource(RecommendationSource):
 class IncrementalPlaylistSource(PlaylistUrlSource):
     source_type = "playlist_incremental"
     playlist_type = "playlist_incremental"
+
+    display_name = "增量歌单同步"
+    description = "解析配置的外部歌单 URL，根据歌曲 hash 变化只增量添加新歌曲。"
+    is_dynamic = False
+    supported_playlist_types = ("playlist_incremental",)
 
     async def fetch_candidates(self) -> list[CandidateTrack]:
         parsed_name, platform, songs = await parse_playlist_url(

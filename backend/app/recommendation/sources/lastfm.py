@@ -32,6 +32,11 @@ class LastfmSimilarTracksSource(RecommendationSource):
     source_type = "track_similarity"
     playlist_type = "similar_tracks"
 
+    display_name = "Last.fm 相似曲目"
+    description = "基于用户最近播放或 Top Tracks，从 Last.fm 获取相似曲目候选。"
+    is_dynamic = False
+    supported_playlist_types = ("similar_tracks",)
+
     def __init__(
         self,
         context: SourceContext,
@@ -265,6 +270,11 @@ class LastfmSimilarTracksSource(RecommendationSource):
 class LastfmSimilarArtistsSource(RecommendationSource):
     source_type = "artist_similarity"
     playlist_type = "similar_artists"
+
+    display_name = "Last.fm 相似艺术家"
+    description = "基于用户最近播放或 Top Artists，从 Last.fm 获取相似艺术家及其热门曲目。"
+    is_dynamic = False
+    supported_playlist_types = ("similar_artists",)
 
     def __init__(
         self,

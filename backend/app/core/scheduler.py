@@ -86,9 +86,7 @@ async def load_cron_schedule(db: AsyncSession):
                     run_type,
                 )
         except Exception as e:
-            logger.warning(f"Invalid cron expression '{config.cron_expression}': {e}")
-        except Exception as e:
-            logger.warning(f"Invalid cron expression '{config.cron_expression}': {e}")
+            logger.warning("Invalid cron expression '%s': %s", config.cron_expression, e)
 
     # ===== Hotboard scheduled sync =====
     if config and config.hotboard_cron_enabled and config.hotboard_cron_expression:

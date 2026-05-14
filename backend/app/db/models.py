@@ -191,7 +191,7 @@ class GeneratedPlaylist(Base):
 
     id = Column(Integer, primary_key=True)
     run_id = Column(Integer, ForeignKey("recommendation_runs.id", ondelete="CASCADE"), nullable=False)
-    playlist_type = Column(String(30), nullable=False)  # similar_tracks | similar_artists | hotboard | playlist_netease | playlist_text | playlist_incremental
+    playlist_type = Column(String(30), nullable=False)  # similar_tracks | similar_artists | hotboard | playlist_netease | playlist_text | playlist_incremental | future sources
     playlist_name = Column(String(255), nullable=False)
     playlist_date = Column(String(20), nullable=False)
     navidrome_playlist_id = Column(String(100), nullable=True)
@@ -215,7 +215,7 @@ class RecommendationItem(Base):
     artist = Column(String(500), nullable=False)
     album = Column(String(500), nullable=True)
     score = Column(Numeric(10, 4), nullable=True)
-    source_type = Column(String(30), nullable=False)  # track_similarity | artist_similarity
+    source_type = Column(String(30), nullable=False)  # track_similarity | artist_similarity | hotboard | playlist_* | future sources
     source_seed_name = Column(String(500), nullable=True)
     source_seed_artist = Column(String(500), nullable=True)
     dedup_key = Column(String(500), nullable=True, index=True)

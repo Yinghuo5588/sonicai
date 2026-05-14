@@ -12,14 +12,23 @@ from app.recommendation.sources.lastfm import (
     LastfmSimilarArtistsSource,
 )
 
-register_source(HotboardSource)
-register_source(PlaylistUrlSource)
-register_source(TextPlaylistSource)
-register_source(IncrementalPlaylistSource)
-register_source(LastfmSimilarTracksSource)
-register_source(LastfmSimilarArtistsSource)
+
+BUILTIN_SOURCES = (
+    HotboardSource,
+    PlaylistUrlSource,
+    TextPlaylistSource,
+    IncrementalPlaylistSource,
+    LastfmSimilarTracksSource,
+    LastfmSimilarArtistsSource,
+)
+
+
+for source_cls in BUILTIN_SOURCES:
+    register_source(source_cls)
+
 
 __all__ = [
+    "BUILTIN_SOURCES",
     "HotboardSource",
     "PlaylistUrlSource",
     "TextPlaylistSource",

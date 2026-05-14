@@ -13,6 +13,11 @@ class HotboardSource(RecommendationSource):
     source_type = "hotboard"
     playlist_type = "hotboard"
 
+    display_name = "网易云热榜"
+    description = "从网易云热榜抓取热门歌曲并同步到 Navidrome 歌单。"
+    is_dynamic = False
+    supported_playlist_types = ("hotboard",)
+
     def __init__(self, context: SourceContext, *, limit: int = 50):
         super().__init__(context)
         self.limit = max(1, min(200, int(limit or 50)))
