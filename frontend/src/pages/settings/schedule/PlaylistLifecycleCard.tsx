@@ -12,6 +12,7 @@ const TYPE_LABELS: Record<string, string> = {
   similar_tracks: 'Last.fm 相似曲目',
   similar_artists: 'Last.fm 相邻艺术家',
   hotboard: '网易云热榜',
+  ai_recommendation: 'AI 推荐歌单',
   playlist_netease: '第三方歌单',
   playlist_text: '文本歌单',
   playlist_incremental: '歌单链接增量同步',
