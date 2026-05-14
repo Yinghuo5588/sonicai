@@ -14,13 +14,10 @@ from app.db.models import (
     GeneratedPlaylist,
     RecommendationItem,
 )
-from app.services.lastfm_service import (
-    get_user_top_tracks,
-    get_user_top_artists,
-    get_user_recent_tracks,
-    get_similar_tracks,
-    get_similar_artists,
-    get_artist_top_tracks,
+from app.recommendation.base import SourceContext
+from app.recommendation.sources.lastfm import (
+    LastfmSimilarTracksSource,
+    LastfmSimilarArtistsSource,
 )
 from app.utils.text_normalizer import dedup_key
 from app.recommendation.types import CandidateTrack
@@ -266,11 +263,7 @@ async def run_similar_artists_only(run_id: int, trigger_type: str = "manual"):
 
 async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
     """
-    Generate Last.fm similar-tracks playlist.
-
-    New flow:
-    Last.fm seeds -> Last.fm similar tracks -> CandidateTrack[]
-    -> recent filter -> unified candidate playlist pipeline.
+    Generate Last.fm similar-tracks playlist through RecommendationSource plugin.
     """
     logger.info(
         f"[similar_tracks] seed_source_mode={getattr(settings, 'seed_source_mode', 'recent_plus_top')} "
@@ -278,124 +271,48 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
         f"duplicate_avoid_days={settings.duplicate_avoid_days} balance={settings.recommendation_balance}"
     )
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    playlist_name = f"LastFM - 相似曲目 - {today}"
+    context = SourceContext(
+        run_id=run_id,
+        playlist_name=None,
+        match_threshold=float(settings.match_threshold or 0.75),
+        overwrite=False,
+    )
 
-    seed_mode = getattr(settings, 'seed_source_mode', 'recent_plus_top') or 'recent_plus_top'
-    seed_limit = int(settings.top_track_seed_limit or 8)
+    async def stop_checker() -> bool:
+        return await _is_run_stopped(run_id, db)
 
-    # 1. Build seed tracks
-    if seed_mode == 'recent_only':
-        recent_limit = getattr(settings, 'recent_tracks_limit', 100) or 100
-        recent_tracks = await get_user_recent_tracks(settings.lastfm_username, limit=recent_limit)
-        recent_counter: dict = {}
-        for t in recent_tracks:
-            title = t.get("name", "")
-            artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else (t.get("artist", {}) or "")
-            if title and artist:
-                key = (title.lower(), artist.lower())
-                recent_counter[key] = recent_counter.get(key, 0) + 1
-        sorted_recent = sorted(recent_counter.items(), key=lambda x: x[1], reverse=True)
-        seeds = [{"name": k[0], "artist": {"name": k[1]}, "play_count": v} for k, v in sorted_recent[:seed_limit]]
-    elif seed_mode == 'top_only':
-        period = getattr(settings, 'top_period', '1month') or '1month'
-        top_tracks = await get_user_top_tracks(settings.lastfm_username, limit=seed_limit, period=period)
-        seeds = [t for t in top_tracks if t.get("name") and t.get("artist")]
-    else:
-        recent_limit = getattr(settings, 'recent_tracks_limit', 100) or 100
-        recent_tracks = await get_user_recent_tracks(settings.lastfm_username, limit=recent_limit)
-        recent_counter: dict = {}
-        for t in recent_tracks:
-            title = t.get("name", "")
-            artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else (t.get("artist", {}) or "")
-            if title and artist:
-                key = (title.lower(), artist.lower())
-                recent_counter[key] = recent_counter.get(key, 0) + 1
-        sorted_recent = sorted(recent_counter.items(), key=lambda x: x[1], reverse=True)
-        recent_ratio = (getattr(settings, 'recent_top_mix_ratio', 70) or 70) / 100.0
-        target_recent = int(seed_limit * recent_ratio)
-        recent_seeds = [{"name": k[0], "artist": {"name": k[1]}, "play_count": v} for k, v in sorted_recent[:target_recent]]
-        remaining = seed_limit - len(recent_seeds)
-        seeds = list(recent_seeds)
-        if remaining > 0:
-            period = getattr(settings, 'top_period', '1month') or '1month'
-            top_tracks = await get_user_top_tracks(settings.lastfm_username, limit=seed_limit, period=period)
-            existing_keys = {(s["name"].lower(), s["artist"]["name"].lower() if isinstance(s["artist"], dict) else "") for s in recent_seeds}
-            for t in top_tracks:
-                title = t.get("name", "")
-                artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else ""
-                if title and artist and (title.lower(), artist.lower()) not in existing_keys:
-                    seeds.append(t)
-                    existing_keys.add((title.lower(), artist.lower()))
-                if len(seeds) >= seed_limit:
-                    break
+    source = LastfmSimilarTracksSource(
+        context,
+        settings=settings,
+        stop_checker=stop_checker,
+    )
 
-    logger.info(f"[similar_tracks] seeds={len(seeds)}")
+    playlist_name = await source.resolve_playlist_name()
 
-    # 2. Candidate pool size
-    balance = float(settings.recommendation_balance or 55) / 100.0
-    min_mult = float(getattr(settings, 'candidate_pool_multiplier_min', 2.0) or 2.0)
-    max_mult = float(getattr(settings, 'candidate_pool_multiplier_max', 10.0) or 10.0)
-    target_size = int(settings.similar_playlist_size or 30)
-    candidate_pool_size = int(target_size * (min_mult + balance * (max_mult - min_mult)))
+    candidates = await source.fetch_candidates()
 
-    # 3. Fetch similar tracks from Last.fm
-    candidates: list[CandidateTrack] = []
-    seen_keys = set()
-
-    for seed in seeds[:seed_limit]:
-        seed_title = seed.get("name", "")
-        seed_artist = seed.get("artist", {}).get("name", "") if isinstance(seed.get("artist"), dict) else (seed.get("artist", {}) or "")
-        if not seed_title or not seed_artist:
-            continue
-        if await _is_run_stopped(run_id, db):
-            logger.info(f"[similar_tracks] run_id={run_id} stopped, aborting")
-            return
-        similar = await get_similar_tracks(seed_title, seed_artist, limit=int(settings.similar_track_limit or 30))
-        for track in similar:
-            title = track.get("name", "")
-            artist = track.get("artist", {}).get("name", "") if isinstance(track.get("artist"), dict) else ""
-            if not title or not artist:
-                continue
-            key = dedup_key(title, artist)
-            if key in seen_keys:
-                continue
-            seen_keys.add(key)
-            album = track.get("album", {}).get("#text", "") if isinstance(track.get("album"), dict) else ""
-            candidates.append(
-                CandidateTrack(
-                    title=title,
-                    artist=artist,
-                    album=album,
-                    score=float(track.get("match", 0) or 0),
-                    source_type="track_similarity",
-                    source_seed_name=seed_title,
-                    source_seed_artist=seed_artist,
-                    raw_payload=track,
-                )
-            )
-
-    candidates.sort(key=lambda c: float(c.score or 0), reverse=True)
-    candidates = candidates[:candidate_pool_size]
-
-    logger.info(f"[similar_tracks] candidates after pool={len(candidates)} pool_size={candidate_pool_size}")
+    logger.info(f"[similar_tracks] candidates before recent filter={len(candidates)}")
 
     if await _is_run_stopped(run_id, db):
         logger.info(f"[similar_tracks] run_id={run_id} stopped before filter")
         return
 
-    candidates = await _filter_recent_candidates(db, candidates, int(settings.duplicate_avoid_days or 0))
+    candidates = await _filter_recent_candidates(
+        db,
+        candidates,
+        int(settings.duplicate_avoid_days or 0),
+    )
+
     logger.info(f"[similar_tracks] candidates after recent filter={len(candidates)}")
 
-    # 4. Run unified pipeline
     result = await run_candidate_playlist_pipeline(
         run_id=run_id,
-        playlist_type="similar_tracks",
+        playlist_type=source.playlist_type,
         playlist_name=playlist_name,
         candidates=candidates,
         match_threshold=float(settings.match_threshold or 0.75),
         overwrite=False,
-        source_type="track_similarity",
+        source_type=source.source_type,
         mark_run_running=False,
         update_run_status=False,
     )
@@ -408,127 +325,68 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
 
 async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
     """
-    Generate Last.fm similar-artists playlist.
-
-    New flow:
-    Recent/top artists -> Last.fm similar artists -> artist top tracks
-    -> CandidateTrack[] -> recent filter -> unified candidate playlist pipeline.
+    Generate Last.fm similar-artists playlist through RecommendationSource plugin.
     """
     logger.info(
         f"[similar_artists] duplicate_avoid_days={settings.duplicate_avoid_days} "
         f"balance={settings.recommendation_balance}"
     )
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    playlist_name = f"LastFM - 相似艺术家 - {today}"
-
-    top_artist_seed_limit = int(settings.top_artist_seed_limit or 30)
-
-    # 1. Build seed artists from recent tracks + top artists
-    recent_tracks = await get_user_recent_tracks(settings.lastfm_username, limit=100)
-    artist_counter: dict = {}
-    for t in recent_tracks:
-        artist = t.get("artist", {}).get("name", "") if isinstance(t.get("artist"), dict) else (t.get("artist", {}) or "")
-        if artist:
-            artist_counter[artist.lower()] = artist_counter.get(artist.lower(), 0) + 1
-
-    sorted_recent_artists = sorted(artist_counter.items(), key=lambda x: x[1], reverse=True)
-    recent_seed_artists = [{"name": a[0].title(), "play_count": a[1]} for a in sorted_recent_artists[:top_artist_seed_limit]]
-
-    if len(recent_seed_artists) < top_artist_seed_limit:
-        period = getattr(settings, 'top_period', '1month') or '1month'
-        top_artists = await get_user_top_artists(settings.lastfm_username, limit=top_artist_seed_limit, period=period)
-        existing = {a["name"].lower() for a in recent_seed_artists}
-        for a in top_artists:
-            name = a.get("name", "")
-            if name and name.lower() not in existing:
-                recent_seed_artists.append(a)
-                existing.add(name.lower())
-            if len(recent_seed_artists) >= top_artist_seed_limit:
-                break
-
-    seed_artists = recent_seed_artists
-    logger.info(f"[similar_artists] seeds={len(seed_artists)}")
-
-    # 2. Avoid duplicates with similar_tracks in same run
-    seen_keys = set()
     existing_keys_result = await db.execute(
         select(RecommendationItem.dedup_key).join(GeneratedPlaylist)
         .where(GeneratedPlaylist.run_id == run_id)
         .where(GeneratedPlaylist.playlist_type == "similar_tracks")
     )
-    for row in existing_keys_result:
-        if row[0]:
-            seen_keys.add(row[0])
 
-    # 3. Fetch similar artists and their top tracks
-    candidates: list[CandidateTrack] = []
+    exclude_dedup_keys = {
+        row[0]
+        for row in existing_keys_result
+        if row[0]
+    }
 
-    similar_artist_limit = int(settings.similar_artist_limit or 30)
-    artist_top_track_limit = int(settings.artist_top_track_limit or 2)
+    context = SourceContext(
+        run_id=run_id,
+        playlist_name=None,
+        match_threshold=float(settings.match_threshold or 0.75),
+        overwrite=False,
+    )
 
-    for seed in seed_artists[:top_artist_seed_limit]:
-        seed_name = seed.get("name", "")
-        if not seed_name:
-            continue
-        if await _is_run_stopped(run_id, db):
-            logger.info(f"[similar_artists] run_id={run_id} stopped, aborting")
-            return
+    async def stop_checker() -> bool:
+        return await _is_run_stopped(run_id, db)
 
-        similar = await get_similar_artists(seed_name, limit=similar_artist_limit)
+    source = LastfmSimilarArtistsSource(
+        context,
+        settings=settings,
+        exclude_dedup_keys=exclude_dedup_keys,
+        stop_checker=stop_checker,
+    )
 
-        for artist in similar[:similar_artist_limit]:
-            artist_name = artist.get("name", "")
-            if not artist_name:
-                continue
-            artist_match = float(artist.get("match", 0.0) or 0.0)
-            tracks = await get_artist_top_tracks(artist_name, limit=artist_top_track_limit)
-            for track in tracks:
-                title = track.get("name", "")
-                if not title:
-                    continue
-                track_artist = track.get("artist", {}).get("name", "") if isinstance(track.get("artist"), dict) else ""
-                if not track_artist:
-                    track_artist = artist_name
-                album = track.get("album", {}).get("#text", "") if isinstance(track.get("album"), dict) else ""
-                key = dedup_key(title, track_artist)
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                candidates.append(
-                    CandidateTrack(
-                        title=title,
-                        artist=track_artist,
-                        album=album,
-                        score=artist_match,
-                        source_type="artist_similarity",
-                        source_seed_name=seed_name,
-                        source_seed_artist=artist_name,
-                        raw_payload=track,
-                    )
-                )
+    playlist_name = await source.resolve_playlist_name()
 
-    candidates.sort(key=lambda c: float(c.score or 0), reverse=True)
-    candidates = candidates[:int(settings.artist_playlist_size or 30)]
+    candidates = await source.fetch_candidates()
 
-    logger.info(f"[similar_artists] candidates after pool={len(candidates)}")
+    logger.info(f"[similar_artists] candidates before recent filter={len(candidates)}")
 
     if await _is_run_stopped(run_id, db):
         logger.info(f"[similar_artists] run_id={run_id} stopped before filter")
         return
 
-    candidates = await _filter_recent_candidates(db, candidates, int(settings.duplicate_avoid_days or 0))
+    candidates = await _filter_recent_candidates(
+        db,
+        candidates,
+        int(settings.duplicate_avoid_days or 0),
+    )
+
     logger.info(f"[similar_artists] candidates after recent filter={len(candidates)}")
 
-    # 4. Run unified pipeline
     result = await run_candidate_playlist_pipeline(
         run_id=run_id,
-        playlist_type="similar_artists",
+        playlist_type=source.playlist_type,
         playlist_name=playlist_name,
         candidates=candidates,
         match_threshold=float(settings.match_threshold or 0.75),
         overwrite=False,
-        source_type="artist_similarity",
+        source_type=source.source_type,
         mark_run_running=False,
         update_run_status=False,
     )
