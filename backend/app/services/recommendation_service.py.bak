@@ -1,26 +1,28 @@
 """Recommendation service — core recommendation logic."""
 
+import json
 import logging
 from datetime import datetime, timezone
+from collections import defaultdict
 import asyncio
 
-from sqlalchemy import select
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import AsyncSessionLocal
 from app.db.models import (
-    SystemSettings,
-    RecommendationRun,
-    GeneratedPlaylist,
-    RecommendationItem,
+    SystemSettings, RecommendationRun, GeneratedPlaylist,
+    RecommendationItem, NavidromeMatch, WebhookBatch, WebhookBatchItem,
 )
 from app.services.lastfm_service import (
-    get_user_top_tracks,
-    get_user_top_artists,
-    get_user_recent_tracks,
-    get_similar_tracks,
-    get_similar_artists,
-    get_artist_top_tracks,
+    get_user_top_tracks, get_user_top_artists, get_user_recent_tracks,
+    get_similar_tracks, get_similar_artists, get_artist_top_tracks,
+)
+from app.services.navidrome_service import (
+    navidrome_search,
+    navidrome_create_playlist,
+    navidrome_add_to_playlist,
+    navidrome_delete_playlist,
 )
 from app.utils.text_normalizer import dedup_key
 from app.recommendation.types import CandidateTrack
@@ -539,6 +541,21 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
     logger.info(f"[similar_artists] pipeline result={result}")
 
 
+async def _filter_recent(db: AsyncSession, candidates: list[dict], avoid_days: int) -> list[dict]:
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=avoid_days)
+    result = await db.execute(
+        select(RecommendationItem.dedup_key)
+        .join(GeneratedPlaylist)
+        .where(RecommendationItem.created_at >= cutoff)
+    )
+    recent_keys = {row[0] for row in result if row[0]}
+    original_count = len(candidates)
+    filtered = [c for c in candidates if c["dedup_key"] not in recent_keys]
+    logger.info(f"[filter-recent] avoid_days={avoid_days} input={original_count} output={len(filtered)} filtered={original_count - len(filtered)}")
+    return filtered
+
+
 async def _filter_recent_candidates(
     db: AsyncSession,
     candidates: list[CandidateTrack],
@@ -580,6 +597,60 @@ async def _filter_recent_candidates(
     )
 
     return filtered
+
+
+async def _match_to_navidrome(db: AsyncSession, item_data: dict, settings) -> dict | None:
+    """
+    Match recommendation item through the unified library matching pipeline
+    using MatchConfig from SystemSettings.
+    """
+    from app.services.library_match_service import MatchConfig, match_track
+
+    threshold = float(settings.match_threshold) if settings.match_threshold is not None else 0.75
+    cfg = MatchConfig(
+        threshold=threshold,
+        concurrency=max(1, min(20, int(settings.search_concurrency or 5))),
+    )
+
+    best = await match_track(
+        title=item_data["title"],
+        artist=item_data["artist"],
+        threshold=cfg.threshold,
+    )
+
+    if not best:
+        return None
+
+    return {
+        "selected_song_id": best.get("id"),
+        "selected_title": best.get("title"),
+        "selected_artist": best.get("artist"),
+        "selected_album": best.get("album"),
+        "confidence_score": best.get("score"),
+        "title_score": best.get("title_score"),
+        "artist_score": best.get("artist_score"),
+        "search_query": f"{item_data['title']} {item_data['artist']}",
+        "raw_response": best,
+    }
+
+
+async def _create_webhook_batch(db: AsyncSession, run_id: int, playlist, missing_items: list[dict], settings=None):
+    max_retry = settings.webhook_retry_count if settings else 3
+    batch = WebhookBatch(
+        run_id=run_id, playlist_type=playlist.playlist_type,
+        status="pending", max_retry_count=max_retry,
+    )
+    db.add(batch)
+    await db.flush()
+    for item_data in missing_items:
+        text = f"{item_data.get('album', '')} - {item_data['artist']}" if item_data.get("album") else f"{item_data['title']} - {item_data['artist']}"
+        db.add(WebhookBatchItem(
+            batch_id=batch.id, track=item_data["title"], artist=item_data["artist"],
+            album=item_data.get("album"), text=text,
+        ))
+    await db.commit()
+    from app.services.webhook_service import send_webhook_batch
+    await send_webhook_batch(batch.id)
 
 
 async def _cleanup_old_playlists(settings: SystemSettings):

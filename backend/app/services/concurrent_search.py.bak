@@ -91,7 +91,7 @@ async def batch_search_and_match(
         results[idx] = result
         done_count += 1
 
-        if progress_callback and (done_count == 1 or done_count % 10 == 0):
+        if progress_callback and done_count % 10 == 0:
             await progress_callback(done_count, total)
 
     if progress_callback:

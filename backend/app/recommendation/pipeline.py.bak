@@ -256,10 +256,10 @@ async def run_candidate_playlist_pipeline(
 
         for idx, sr in enumerate(search_results):
             candidate = valid_candidates[idx]
-            title = sr.get("title") or ""
-            artist = sr.get("artist") or ""
+            title = sr["title"]
+            artist = sr["artist"]
 
-            if not title:
+            if not title or not artist:
                 continue
 
             item = RecommendationItem(

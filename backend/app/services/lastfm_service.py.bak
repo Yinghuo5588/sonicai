@@ -126,23 +126,14 @@ async def get_similar_tracks(track_name: str, artist_name: str, limit: int = 50)
 
 async def get_similar_artists(artist_name: str, limit: int = 50) -> list[dict]:
     data = await lastfm_get("artist.getSimilar", {"artist": artist_name, "limit": limit})
-
-    if not data or not isinstance(data, dict):
+    if not data or not isinstance(data, dict) or "similarartists" not in data:
         return []
-
-    similarartists = data.get("similarartists")
-    if not isinstance(similarartists, dict):
+    raw = data.get("similarartists", {})
+    if isinstance(raw, dict):
+        raw = [raw]
+    elif not isinstance(raw, list):
         return []
-
-    artists = similarartists.get("artist", [])
-
-    if isinstance(artists, dict):
-        artists = [artists]
-
-    if not isinstance(artists, list):
-        return []
-
-    return [a for a in artists if isinstance(a, dict)]
+    return raw
 
 
 async def get_artist_top_tracks(artist_name: str, limit: int = 10) -> list[dict]:
