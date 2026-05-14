@@ -257,6 +257,33 @@ export const FIELD_LABELS: Record<string, { label: string; type?: string; toolti
       '▸ 第三方歌单解析服务的地址\n' +
       ' 配置后可导入网易云、QQ 音乐等平台歌单',
   },
+  ai_favorites_sample_limit: {
+    label: 'AI 收藏样本数量',
+    type: 'number',
+    tooltip:
+      '▸ 收藏个性化模式使用多少首 Navidrome 收藏歌曲作为 AI 上下文\n' +
+      ' 默认:40 推荐:20 - 80',
+  },
+  ai_preference_profile_enabled: {
+    label: '启用 AI 长期偏好文件',
+    type: 'boolean',
+    tooltip:
+      '▸ 开启后，AI 推荐会默认加入长期偏好文件内容\n' +
+      ' 执行任务时仍可单独选择是否使用。',
+  },
+  favorite_tracks_sync_enabled: {
+    label: '启用收藏歌曲定时同步',
+    type: 'boolean',
+    tooltip:
+      '▸ 定时从 Navidrome 拉取 Starred 收藏歌曲并缓存到本地。',
+  },
+  favorite_tracks_sync_cron: {
+    label: '收藏同步 Cron',
+    type: 'text',
+    tooltip:
+      '▸ Navidrome 收藏歌曲同步 Cron 表达式\n' +
+      ' 默认:15 4 * * *，表示每天凌晨 4:15 同步。',
+  },
   recommendation_cron_run_type: {
     label: '定时推荐类型',
     type: 'select',

@@ -20,7 +20,7 @@ type PlaylistInfo = {
 type PlaylistItem = {
   id: number; title: string; artist: string; album?: string | null; score?: number | string | null
   source_type: string; source_seed_name?: string | null; source_seed_artist?: string | null
-  rank_index?: number | null; navidrome_id?: string | null; navidrome_title?: string | null
+  rank_index?: number | null; raw_payload_json?: any | null; navidrome_id?: string | null; navidrome_title?: string | null
   navidrome_artist?: string | null; matched: boolean; confidence_score?: number | string | null; search_query?: string | null
 }
 
@@ -38,8 +38,20 @@ function sourceTypeClass(type: string) {
   return 'badge-muted'
 }
 
+function getAiMeta(item: PlaylistItem) {
+  const raw = item.raw_payload_json
+  const payload = raw?.raw || raw?.item || raw || {}
+  return {
+    reason: payload.reason || raw?.reason || null,
+    mood: Array.isArray(payload.mood) ? payload.mood : Array.isArray(raw?.mood) ? raw.mood : [],
+    genre: Array.isArray(payload.genre) ? payload.genre : Array.isArray(raw?.genre) ? raw.genre : [],
+    confidence: payload.confidence ?? raw?.confidence ?? null,
+  }
+}
+
 function TrackCard({ item }: { item: PlaylistItem }) {
   const confidence = item.confidence_score != null ? `${(Number(item.confidence_score) * 100).toFixed(0)}%` : null
+  const aiMeta = getAiMeta(item)
   return (
     <div className="card card-padding space-y-2">
       <div className="flex items-start justify-between gap-3">
@@ -48,6 +60,11 @@ function TrackCard({ item }: { item: PlaylistItem }) {
           <div className="truncate font-semibold text-slate-900 dark:text-slate-50">{item.title}</div>
           <div className="mt-0.5 truncate text-xs text-slate-500">{item.artist}{item.album ? ` · ${item.album}` : ''}</div>
           {item.navidrome_id && <div className="mt-1 truncate text-[10px] text-slate-400">Navidrome ID: {item.navidrome_id}</div>}
+          {item.source_type === 'ai' && aiMeta.reason && (
+            <div className="mt-2 rounded-xl bg-fuchsia-50 p-2 text-xs leading-relaxed text-fuchsia-700 dark:bg-fuchsia-950/30 dark:text-fuchsia-300">
+              {aiMeta.reason}
+            </div>
+          )}
         </div>
         <div className="shrink-0">
           {item.matched
@@ -59,6 +76,14 @@ function TrackCard({ item }: { item: PlaylistItem }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className={`badge ${sourceTypeClass(item.source_type)}`}>{labelOf(SOURCE_TYPE_LABELS, item.source_type)}</span>
         {confidence && <span className="text-[11px] text-slate-400">置信度 {confidence}</span>}
+        {item.source_type === 'ai' && aiMeta.confidence != null && (
+          <span className="text-[11px] text-slate-400">
+            AI 置信度 {(Number(aiMeta.confidence) * 100).toFixed(0)}%
+          </span>
+        )}
+        {item.source_type === 'ai' && [...aiMeta.mood, ...aiMeta.genre].slice(0, 4).map(tag => (
+          <span key={tag} className="badge-muted">{tag}</span>
+        ))}
       </div>
     </div>
   )
@@ -142,6 +167,7 @@ export default function PlaylistDetailPage() {
             <th className="hidden p-3 text-left font-medium text-slate-600 dark:text-slate-300 lg:table-cell">专辑</th>
             <th className="p-3 text-left font-medium text-slate-600 dark:text-slate-300">来源</th>
             <th className="p-3 text-left font-medium text-slate-600 dark:text-slate-300">置信度</th>
+            <th className="hidden p-3 text-left font-medium text-slate-600 dark:text-slate-300 xl:table-cell">AI 理由</th>
           </tr>
         )}
         renderTableRow={item => (
@@ -158,6 +184,9 @@ export default function PlaylistDetailPage() {
             <td className="hidden p-3 text-xs text-slate-400 lg:table-cell">{item.album || '-'}</td>
             <td className="p-3"><span className={`badge ${sourceTypeClass(item.source_type)}`}>{labelOf(SOURCE_TYPE_LABELS, item.source_type)}</span></td>
             <td className="p-3 text-xs text-slate-400">{item.confidence_score != null ? `${(Number(item.confidence_score) * 100).toFixed(0)}%` : '-'}</td>
+            <td className="hidden max-w-xs p-3 text-xs text-slate-500 xl:table-cell">
+              {item.source_type === 'ai' ? (getAiMeta(item).reason || '-') : '-'}
+            </td>
           </>
         )}
       />

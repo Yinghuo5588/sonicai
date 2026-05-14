@@ -2,32 +2,36 @@
 
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Bot, CheckCircle, XCircle } from 'lucide-react'
+import { Bot, CheckCircle, Heart, Sparkles, XCircle } from 'lucide-react'
 import { useToast } from '@/components/ui/useToast'
 import ActionCard from './components/ActionCard'
 import PreflightCheck from './components/PreflightCheck'
 import RangeSlider from './components/RangeSlider'
 import ResultTip from './components/ResultTip'
-import { triggerAiJob } from './jobsApi'
+import { triggerAiJob, type AiRecommendMode } from './jobsApi'
 import type { JobPanelProps } from './jobsTypes'
 
 export default function AiJobPanel({ settings, onSubmitted }: JobPanelProps) {
   const toast = useToast()
 
   const [prompt, setPrompt] = useState('')
+  const [mode, setMode] = useState<AiRecommendMode>('free')
   const [limit, setLimit] = useState(30)
   const [thresholdPercent, setThresholdPercent] = useState(75)
   const [playlistName, setPlaylistName] = useState('')
   const [overwrite, setOverwrite] = useState(false)
+  const [usePreferenceProfile, setUsePreferenceProfile] = useState(true)
 
   const mutation = useMutation({
     mutationFn: () =>
       triggerAiJob({
         prompt,
+        mode,
         limit,
         threshold: thresholdPercent / 100,
         playlistName,
         overwrite,
+        usePreferenceProfile,
       }),
     onSuccess: (data: any) => {
       const runId = Number(data?.run_id)
@@ -48,6 +52,7 @@ export default function AiJobPanel({ settings, onSubmitted }: JobPanelProps) {
   const aiKeyOk = !!settings?.ai_api_key
   const modelOk = !!settings?.ai_model
   const navidromeOk = !!settings?.navidrome_url && !!settings?.navidrome_username
+  const favoritesReady = Number((settings as any)?.favorite_tracks_last_sync_at ? 1 : 0) > 0
   const promptOk = prompt.trim().length > 0
   const limitOk = Number(limit) >= 1 && Number(limit) <= 200
   const thresholdOk = thresholdPercent >= 50 && thresholdPercent <= 95
@@ -97,6 +102,56 @@ export default function AiJobPanel({ settings, onSubmitted }: JobPanelProps) {
             },
           ]}
         />
+
+        <div>
+          <label className="mb-1 block text-[11px] text-slate-500 dark:text-slate-400">
+            推荐模式
+          </label>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setMode('free')}
+              className={
+                mode === 'free'
+                  ? 'rounded-2xl border border-cyan-500 bg-cyan-50 p-3 text-left text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-300'
+                  : 'rounded-2xl border border-border bg-background p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-900'
+              }
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Sparkles className="h-4 w-4" />
+                自由灵感模式
+              </div>
+              <div className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                只根据本次自然语言需求和长期偏好文件生成推荐。
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMode('favorites')}
+              className={
+                mode === 'favorites'
+                  ? 'rounded-2xl border border-cyan-500 bg-cyan-50 p-3 text-left text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-300'
+                  : 'rounded-2xl border border-border bg-background p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-900'
+              }
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Heart className="h-4 w-4" />
+                收藏个性化模式
+              </div>
+              <div className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                基于 Navidrome 收藏歌曲样本推断口味，并避免推荐已收藏歌曲。
+              </div>
+            </button>
+          </div>
+
+          {mode === 'favorites' && (
+            <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs leading-relaxed text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+              个性化模式会使用本地缓存的 Navidrome 收藏歌曲。请先在「设置 → 曲库调试 → 收藏缓存」中同步收藏。
+              {favoritesReady ? ' 当前检测到已有收藏同步记录。' : ' 当前未检测到收藏同步记录。'}
+            </div>
+          )}
+        </div>
 
         <div>
           <label className="mb-1 block text-[11px] text-slate-500 dark:text-slate-400">
@@ -158,8 +213,18 @@ export default function AiJobPanel({ settings, onSubmitted }: JobPanelProps) {
           覆盖同名歌单
         </label>
 
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={usePreferenceProfile}
+            onChange={e => setUsePreferenceProfile(e.target.checked)}
+            className="h-4 w-4 rounded accent-cyan-500"
+          />
+          使用长期偏好文件
+        </label>
+
         <div className="rounded-xl border border-cyan-100 bg-cyan-50 p-3 text-xs leading-relaxed text-cyan-700 dark:border-cyan-900 dark:bg-cyan-950/30 dark:text-cyan-300">
-          AI 只负责生成候选歌曲。实际匹配、创建 Navidrome 歌单、缺失歌曲 Webhook 通知仍由 SonicAI 后端统一处理。
+          AI 只负责生成候选歌曲。实际匹配、创建 Navidrome 歌单、缺失歌曲 Webhook 通知仍由 SonicAI 后端统一处理。收藏个性化模式会基于本地缓存的 Navidrome 收藏歌曲生成推荐，并在后端过滤已收藏歌曲。
         </div>
 
         <button

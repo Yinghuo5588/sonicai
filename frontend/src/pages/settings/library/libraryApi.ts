@@ -115,3 +115,19 @@ export function resetMissedTrack(id: number) {
 export function deleteMissedTrack(id: number) {
   return apiFetch(`/missed-tracks/${id}`, { method: 'DELETE' })
 }
+
+export function fetchLibraryFavoritesStatus() {
+  return apiFetch('/library/favorites/status')
+}
+
+export function triggerLibraryFavoritesSync() {
+  return apiFetch('/library/favorites/sync', { method: 'POST' })
+}
+
+export function fetchLibraryFavoriteSongs(q: string, page: number) {
+  const params = new URLSearchParams()
+  params.set('limit', String(LIBRARY_PAGE_SIZE))
+  params.set('offset', String((page - 1) * LIBRARY_PAGE_SIZE))
+  if (q.trim()) params.set('q', q.trim())
+  return apiFetch(`/library/favorites/songs?${params.toString()}`)
+}

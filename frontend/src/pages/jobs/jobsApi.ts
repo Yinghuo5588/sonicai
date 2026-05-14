@@ -54,27 +54,35 @@ export async function triggerTextPlaylistJob({ file, threshold, playlistName, ov
   return res.json()
 }
 
+export type AiRecommendMode = 'free' | 'favorites'
+
 export function triggerAiJob({
   prompt,
+  mode,
   limit,
   threshold,
   playlistName,
   overwrite,
+  usePreferenceProfile,
 }: {
   prompt: string
+  mode: AiRecommendMode
   limit?: number
   threshold: number
   playlistName?: string
   overwrite: boolean
+  usePreferenceProfile: boolean
 }) {
   return apiFetch('/ai/recommend', {
     method: 'POST',
     body: JSON.stringify({
       prompt,
+      mode,
       limit,
       playlist_name: playlistName?.trim() || null,
       match_threshold: threshold,
       overwrite,
+      use_preference_profile: usePreferenceProfile,
     }),
   })
 }

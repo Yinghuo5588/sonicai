@@ -1,10 +1,10 @@
 // frontend/src/pages/settings/library/LibraryStatusCard.tsx
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { RefreshCcw } from 'lucide-react'
+import { Heart, RefreshCcw } from 'lucide-react'
 import { useToast } from '@/components/ui/useToast'
 import { SectionCard } from '../SettingsShared'
-import { fetchLibraryStatus, triggerLibrarySync } from './libraryApi'
+import { fetchLibraryStatus, triggerLibrarySync, triggerLibraryFavoritesSync } from './libraryApi'
 import type { LibraryStatus } from '@/types/api'
 
 function StatusCard({ label, value, desc }: { label: string; value: React.ReactNode; desc?: string }) {
@@ -39,20 +39,43 @@ export default function LibraryStatusCard() {
     onError: (err: Error) => toast.error('曲库同步启动失败', err.message),
   })
 
+  const favoritesSyncMutation = useMutation({
+    mutationFn: triggerLibraryFavoritesSync,
+    onSuccess: () => {
+      toast.success('收藏同步任务已启动', '稍后会自动刷新收藏缓存状态')
+      queryClient.invalidateQueries({ queryKey: ['library-status'] })
+      queryClient.invalidateQueries({ queryKey: ['library-favorites-status'] })
+      queryClient.invalidateQueries({ queryKey: ['library-favorite-songs'] })
+    },
+    onError: (err: Error) => toast.error('收藏同步启动失败', err.message),
+  })
+
   return (
     <SectionCard
       title="曲库状态"
       description="当前曲库索引与缓存状态。"
       actions={
-        <button
-          type="button"
-          onClick={() => syncMutation.mutate()}
-          disabled={syncMutation.isPending || !!cache.refreshing}
-          className="btn-primary"
-        >
-          <RefreshCcw className="h-4 w-4" />
-          {syncMutation.isPending ? '同步启动中...' : '同步曲库'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending || !!cache.refreshing}
+            className="btn-primary"
+          >
+            <RefreshCcw className="h-4 w-4" />
+            {syncMutation.isPending ? '同步启动中...' : '同步曲库'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => favoritesSyncMutation.mutate()}
+            disabled={favoritesSyncMutation.isPending}
+            className="btn-secondary"
+          >
+            <Heart className="h-4 w-4" />
+            {favoritesSyncMutation.isPending ? '同步启动中...' : '同步收藏'}
+          </button>
+        </div>
       }
     >
       {isLoading ? (
@@ -61,7 +84,7 @@ export default function LibraryStatusCard() {
         <div className="text-sm text-red-500">加载失败: {(error as Error).message}</div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
             <StatusCard label="数据库歌曲" value={data?.total_songs ?? 0} desc="song_library 表" />
             <StatusCard label="内存缓存" value={cache.total_songs ?? 0} desc={cache.ready ? '已就绪' : '未就绪'} />
             <StatusCard
@@ -74,10 +97,24 @@ export default function LibraryStatusCard() {
               value={cache.refreshing ? '刷新中' : cache.ready ? '已就绪' : '未就绪'}
               desc={cache.last_full_refresh || '暂无刷新记录'}
             />
+            <StatusCard
+              label="收藏缓存"
+              value={data?.favorites?.total ?? 0}
+              desc={
+                data?.favorites?.last_sync_at
+                  ? `最后同步 ${data.favorites.last_sync_at}`
+                  : '暂无同步记录'
+              }
+            />
           </div>
           {cache.last_error && (
             <div className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-500 dark:bg-red-950/40">
               最近错误: {cache.last_error}
+            </div>
+          )}
+          {data?.favorites?.last_error && (
+            <div className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-500 dark:bg-red-950/40">
+              收藏同步最近错误: {data.favorites.last_error}
             </div>
           )}
         </>

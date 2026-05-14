@@ -5,6 +5,7 @@ export const LIBRARY_PAGE_SIZE = 6
 export type LibraryToolTab =
   | 'status'
   | 'songs'
+  | 'favorites'
   | 'missed'
   | 'match'
   | 'manual'
@@ -24,9 +25,19 @@ export interface SongCacheStatus {
   refresh_count: number
 }
 
+export interface LibraryFavoritesStatus {
+  total: number
+  sync_enabled: boolean
+  sync_cron: string | null
+  last_sync_at: string | null
+  last_error: string | null
+  ai_sample_limit: number
+}
+
 export interface LibraryStatus {
   total_songs: number
   cache: SongCacheStatus
+  favorites?: LibraryFavoritesStatus
 }
 
 export interface LibrarySong {
@@ -142,4 +153,22 @@ export interface DebugMatchResponse {
   steps?: MatchStep[]
   total_elapsed_ms?: number
   cache_status?: SongCacheStatus
+}
+
+// ── Favorite Tracks ────────────────────────────────────────────────────────────
+
+export interface FavoriteTrackItem {
+  id: number
+  navidrome_id: string
+  title: string
+  artist: string | null
+  album: string | null
+  duration: number | null
+  starred_at: string | null
+  last_seen_at: string | null
+}
+
+export interface FavoriteTracksResponse {
+  total: number
+  items: FavoriteTrackItem[]
 }

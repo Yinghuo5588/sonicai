@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, DatabaseZap, History, ListRestart, ListTodo, Music, Radio, ShieldCheck, Sparkles, Save } from 'lucide-react'
+import { Clock, DatabaseZap, Heart, History, ListRestart, ListTodo, Music, Radio, ShieldCheck, Sparkles, Save } from 'lucide-react'
 import { FormSkeleton } from '@/components/ui/Skeleton'
 import { useSettingsForm } from '../SettingsShared'
 import RecommendationCronCard from './RecommendationCronCard'
@@ -7,6 +7,7 @@ import HotboardCronCard from './HotboardCronCard'
 import PlaylistSyncCronCard from './PlaylistSyncCronCard'
 import MissedRetryCronCard from './MissedRetryCronCard'
 import SongCacheCronCard from './SongCacheCronCard'
+import FavoriteTracksCronCard from './FavoriteTracksCronCard'
 import TaskConcurrencyCard from './TaskConcurrencyCard'
 import PlaylistLifecycleCard from './PlaylistLifecycleCard'
 import HistoryCleanupCard from './HistoryCleanupCard'
@@ -19,6 +20,7 @@ const SCHEDULE_OPTIONS: ToolOption[] = [
   { key: 'playlist-sync',    label: '歌单链接增量同步', description: '监控歌单链接，变化后追加新歌',        icon: Music },
   { key: 'missed-retry',     label: '缺失歌曲重试',     description: '补库后定时重试未命中歌曲',            icon: ListRestart },
   { key: 'song-cache',       label: '歌曲缓存刷新',     description: '控制本地曲库缓存定时刷新',            icon: DatabaseZap },
+  { key: 'favorite-tracks',  label: '收藏歌曲同步',     description: '定时同步 Navidrome 收藏歌曲',            icon: Heart },
   { key: 'concurrency',      label: '任务执行策略',     description: '控制后台任务最大并发数',            icon: ShieldCheck },
   { key: 'playlist-lifecycle', label: '歌单生命周期',  description: '按类型配置歌单保留和删除策略',       icon: ListTodo },
   { key: 'history-cleanup',  label: '历史记录清理',     description: '清理推荐历史和 Webhook 记录',        icon: History },
@@ -31,6 +33,7 @@ function PanelContent({ panelKey, s, handleChange }: { panelKey: string; s: Sche
     case 'playlist-sync':     return <PlaylistSyncCronCard    s={s} handleChange={handleChange} />
     case 'missed-retry':      return <MissedRetryCronCard     s={s} handleChange={handleChange} />
     case 'song-cache':        return <SongCacheCronCard       s={s} handleChange={handleChange} />
+    case 'favorite-tracks':   return <FavoriteTracksCronCard s={s} handleChange={handleChange} />
     case 'concurrency':       return <TaskConcurrencyCard     s={s} handleChange={handleChange} />
     case 'playlist-lifecycle': return <PlaylistLifecycleCard  s={s} handleChange={handleChange} />
     case 'history-cleanup':   return <HistoryCleanupCard     s={s} handleChange={handleChange} />

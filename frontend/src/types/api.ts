@@ -43,6 +43,7 @@ export interface PlaylistItem {
   source_seed_name: string | null
   source_seed_artist: string | null
   rank_index: number | null
+  raw_payload_json?: any | null
   navidrome_id: string | null
   navidrome_title: string | null
   navidrome_artist: string | null
@@ -145,6 +146,17 @@ export interface Settings {
   ai_request_timeout: number | null
   ai_default_limit: number | null
   ai_temperature: number | null
+  // AI preference profile
+  ai_preference_profile_enabled: boolean | null
+  ai_preference_profile_filename: string | null
+  ai_preference_profile_updated_at: string | null
+  // AI favorites personalization
+  ai_favorites_sample_limit: number | null
+  // Navidrome favorite tracks sync
+  favorite_tracks_sync_enabled: boolean | null
+  favorite_tracks_sync_cron: string | null
+  favorite_tracks_last_sync_at: string | null
+  favorite_tracks_last_error: string | null
   artist_playlist_size: number
   recommendation_balance: number
   seed_source_mode: string | null
@@ -209,9 +221,19 @@ export interface SongCacheStatus {
   refresh_count: number
 }
 
+export interface LibraryFavoritesStatus {
+  total: number
+  sync_enabled: boolean
+  sync_cron: string | null
+  last_sync_at: string | null
+  last_error: string | null
+  ai_sample_limit: number
+}
+
 export interface LibraryStatus {
   total_songs: number
   cache: SongCacheStatus
+  favorites?: LibraryFavoritesStatus
 }
 
 export interface LibrarySong {

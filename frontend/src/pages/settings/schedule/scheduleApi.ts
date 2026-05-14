@@ -28,3 +28,7 @@ export function updateRetentionPolicy(type: string, payload: Record<string, unkn
 export function triggerIncrementalPlaylistSync() {
   return apiFetch('/playlist/sync-incremental', { method: 'POST' })
 }
+
+export function triggerFavoriteTracksSync() {
+  return apiFetch('/library/favorites/sync', { method: 'POST' })
+}
