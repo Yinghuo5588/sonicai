@@ -11,6 +11,7 @@ from app.recommendation.sources.lastfm import (
     LastfmSimilarTracksSource,
     LastfmSimilarArtistsSource,
 )
+from app.recommendation.sources.ai import AIRecommendationSource
 
 
 BUILTIN_SOURCES = (
@@ -20,6 +21,7 @@ BUILTIN_SOURCES = (
     IncrementalPlaylistSource,
     LastfmSimilarTracksSource,
     LastfmSimilarArtistsSource,
+    AIRecommendationSource,
 )
 
 
@@ -35,4 +37,5 @@ __all__ = [
     "IncrementalPlaylistSource",
     "LastfmSimilarTracksSource",
     "LastfmSimilarArtistsSource",
+    "AIRecommendationSource",
 ]

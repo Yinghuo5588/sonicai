@@ -22,6 +22,16 @@ class SettingsResponse(BaseModel):
     timezone: str
     lastfm_api_key: str | None
     lastfm_username: str | None
+
+    # AI recommendation
+    ai_enabled: bool | None = False
+    ai_api_key: str | None = None
+    ai_base_url: str | None = "https://api.openai.com/v1"
+    ai_model: str | None = "gpt-4o-mini"
+    ai_request_timeout: int | None = 60
+    ai_default_limit: int | None = 30
+    ai_temperature: float | None = 0.8
+
     navidrome_url: str | None
     navidrome_username: str | None
     webhook_url: str | None
@@ -107,6 +117,16 @@ class SettingsUpdate(BaseModel):
     timezone: str | None = None
     lastfm_api_key: str | None = None
     lastfm_username: str | None = None
+
+    # AI recommendation
+    ai_enabled: bool | None = None
+    ai_api_key: str | None = None
+    ai_base_url: str | None = None
+    ai_model: str | None = None
+    ai_request_timeout: int | None = Field(default=None, ge=10, le=300)
+    ai_default_limit: int | None = Field(default=None, ge=1, le=200)
+    ai_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+
     navidrome_url: str | None = None
     navidrome_username: str | None = None
     navidrome_password: str | None = None
@@ -219,6 +239,9 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
             raise HTTPException(status_code=400, detail="missed_track_retry_mode must be one of: local, api, full")
         if key == "recommendation_cron_run_type" and value not in {"full", "similar_tracks", "similar_artists"}:
             raise HTTPException(status_code=400, detail="recommendation_cron_run_type must be one of: full, similar_tracks, similar_artists")
+        if key == "ai_base_url" and value:
+            if not str(value).startswith(("http://", "https://")):
+                raise HTTPException(status_code=400, detail="ai_base_url must start with http:// or https://")
         if (key.endswith("_cron_expression") or key.endswith("_cron")) and value:
             parts = str(value).split()
             if len(parts) != 5:
@@ -307,6 +330,8 @@ async def export_settings(current_user: CurrentUser, db: AsyncSessionLocal = Dep
     # Redact sensitive fields
     if data.get("lastfm_api_key"):
         data["lastfm_api_key"] = "***"
+    if data.get("ai_api_key"):
+        data["ai_api_key"] = "***"
     if data.get("navidrome_password_encrypted"):
         data["navidrome_password_encrypted"] = None
     if data.get("webhook_headers_json"):
@@ -346,6 +371,7 @@ async def import_settings(
         "match_threshold", "candidate_pool_multiplier_min", "candidate_pool_multiplier_max",
         "hotboard_match_threshold", "playlist_sync_threshold", "duplicate_avoid_days",
         "missed_track_retry_limit", "run_history_keep_days", "webhook_history_keep_days",
+        "ai_request_timeout", "ai_default_limit", "ai_temperature",
     }
 
     # Fields that are enum-validated

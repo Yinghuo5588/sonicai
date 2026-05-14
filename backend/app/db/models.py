@@ -52,6 +52,15 @@ class SystemSettings(Base):
     lastfm_api_key = Column(String(255), nullable=True)
     lastfm_username = Column(String(255), nullable=True)
 
+    # AI recommendation
+    ai_enabled = Column(Boolean, default=False)
+    ai_api_key = Column(String(500), nullable=True)
+    ai_base_url = Column(String(500), default="https://api.openai.com/v1")
+    ai_model = Column(String(100), default="gpt-4o-mini")
+    ai_request_timeout = Column(Integer, default=60)
+    ai_default_limit = Column(Integer, default=30)
+    ai_temperature = Column(Numeric(3, 2), default=0.80)
+
     # Navidrome
     navidrome_url = Column(String(500), nullable=True)
     navidrome_username = Column(String(255), nullable=True)
