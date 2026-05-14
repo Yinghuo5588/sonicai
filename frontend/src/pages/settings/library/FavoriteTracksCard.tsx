@@ -16,7 +16,7 @@ import {
   LibraryFavoritesStatus,
   LIBRARY_PAGE_SIZE,
 } from './libraryTypes'
-import PaginationControls from '@/components/ui/PaginationControls'
+import PaginationControls from './components/PaginationControls'
 import { formatDateTime } from '@/lib/date'
 
 export default function FavoriteTracksCard() {
