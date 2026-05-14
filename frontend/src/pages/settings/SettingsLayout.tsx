@@ -12,7 +12,7 @@ const SETTINGS_SECTIONS = [
   {
     key: 'connections',
     title: '服务连接',
-    desc: 'Last.fm、Navidrome、Webhook 与歌单解析服务',
+    desc: 'AI、Last.fm、Navidrome、Webhook 与歌单解析服务',
     icon: Server,
     to: '/settings/connections',
   },

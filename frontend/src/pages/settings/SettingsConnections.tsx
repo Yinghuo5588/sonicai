@@ -73,6 +73,115 @@ export default function SettingsConnections() {
 
   return (
     <div className="space-y-4">
+      <SectionCard title="AI 推荐">
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!s.ai_enabled}
+              onChange={e => handleChange('ai_enabled', e.target.checked)}
+              className="h-4 w-4 accent-cyan-500"
+            />
+            <span className="text-sm text-slate-700 dark:text-slate-200">
+              启用 AI 推荐
+            </span>
+          </label>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                AI API Key
+                <Tooltip text="OpenAI-compatible API Key。导出配置时应脱敏。" />
+              </label>
+              <input
+                type="password"
+                value={String(s.ai_api_key ?? '')}
+                onChange={e => handleChange('ai_api_key', e.target.value)}
+                className="input"
+                placeholder="sk-..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                模型
+                <Tooltip text="例如 gpt-4o-mini、deepseek-chat、qwen-plus、llama3.1 等。" />
+              </label>
+              <input
+                type="text"
+                value={String(s.ai_model ?? '')}
+                onChange={e => handleChange('ai_model', e.target.value)}
+                className="input"
+                placeholder="gpt-4o-mini"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+              Base URL
+              <Tooltip text="OpenAI-compatible API 地址。例如 https://api.openai.com/v1 或 https://api.deepseek.com/v1。" />
+            </label>
+            <input
+              type="text"
+              value={String(s.ai_base_url ?? '')}
+              onChange={e => handleChange('ai_base_url', e.target.value)}
+              className="input"
+              placeholder="https://api.openai.com/v1"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                请求超时（秒）
+              </label>
+              <input
+                type="number"
+                min={10}
+                max={300}
+                value={Number(s.ai_request_timeout ?? 60)}
+                onChange={e => handleChange('ai_request_timeout', Number(e.target.value))}
+                className="input"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                默认数量
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={200}
+                value={Number(s.ai_default_limit ?? 30)}
+                onChange={e => handleChange('ai_default_limit', Number(e.target.value))}
+                className="input"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                Temperature
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={2}
+                step={0.1}
+                value={Number(s.ai_temperature ?? 0.8)}
+                onChange={e => handleChange('ai_temperature', Number(e.target.value))}
+                className="input"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-cyan-100 bg-cyan-50 p-3 text-xs leading-relaxed text-cyan-700 dark:border-cyan-900 dark:bg-cyan-950/30 dark:text-cyan-300">
+            第一阶段仅支持 OpenAI-compatible Chat Completions。AI 生成候选歌曲后,仍由 SonicAI 后端统一匹配并创建 Navidrome 歌单。
+          </div>
+        </div>
+      </SectionCard>
+
       <SectionCard title="Last.fm">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
