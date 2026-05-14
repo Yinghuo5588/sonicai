@@ -1,14 +1,15 @@
 // frontend/src/pages/jobs/JobPanelTabs.tsx
 
-import { FileText, Music, Sparkles, Star } from 'lucide-react'
+import { Bot, FileText, Music, Sparkles, Star } from 'lucide-react'
 import clsx from 'clsx'
 import type { JobPanel } from './jobsTypes'
 
 const JOB_PANELS = [
-  { key: 'lastfm' as JobPanel,   title: 'Last.fm 推荐',  desc: '基于听歌数据生成推荐歌单', icon: Sparkles },
-  { key: 'hotboard' as JobPanel,  title: '网易云热榜',   desc: '抓取热榜并同步到 Navidrome', icon: Star },
-  { key: 'playlist' as JobPanel, title: '歌单链接',     desc: '导入第三方平台歌单',         icon: Music },
-  { key: 'text' as JobPanel,     title: '文本歌单',     desc: '上传 txt 文本歌单',           icon: FileText },
+  { key: 'ai' as JobPanel,      title: 'AI 推荐',     desc: '自然语言生成推荐歌单',   icon: Bot },
+  { key: 'lastfm' as JobPanel,  title: 'Last.fm 推荐', desc: '基于听歌数据生成推荐歌单', icon: Sparkles },
+  { key: 'hotboard' as JobPanel, title: '网易云热榜',  desc: '抓取热榜并同步到 Navidrome', icon: Star },
+  { key: 'playlist' as JobPanel, title: '歌单链接',    desc: '导入第三方平台歌单',         icon: Music },
+  { key: 'text' as JobPanel,    title: '文本歌单',    desc: '上传 txt 文本歌单',           icon: FileText },
 ]
 
 export default function JobPanelTabs({ value, onChange }: { value: JobPanel; onChange: (v: JobPanel) => void }) {

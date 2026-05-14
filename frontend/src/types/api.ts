@@ -137,6 +137,14 @@ export interface Settings {
   similar_artist_limit: number
   artist_top_track_limit: number
   similar_playlist_size: number
+  // AI recommendation
+  ai_enabled: boolean | null
+  ai_api_key: string | null
+  ai_base_url: string | null
+  ai_model: string | null
+  ai_request_timeout: number | null
+  ai_default_limit: number | null
+  ai_temperature: number | null
   artist_playlist_size: number
   recommendation_balance: number
   seed_source_mode: string | null

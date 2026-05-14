@@ -34,6 +34,7 @@ function sourceTypeClass(type: string) {
   if (type === 'track_similarity') return 'badge-info'
   if (type === 'artist_similarity') return 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300'
   if (type === 'hotboard') return 'badge-danger'
+  if (type === 'ai') return 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/50 dark:text-fuchsia-300'
   return 'badge-muted'
 }
 

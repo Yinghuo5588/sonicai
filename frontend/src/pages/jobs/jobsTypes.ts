@@ -2,7 +2,7 @@
 
 import type { Settings } from '@/types/api'
 
-export type JobPanel = 'lastfm' | 'hotboard' | 'playlist' | 'text'
+export type JobPanel = 'lastfm' | 'hotboard' | 'playlist' | 'text' | 'ai'
 
 export type LastfmRunType = 'full' | 'similar_tracks' | 'similar_artists'
 

@@ -4,6 +4,7 @@ export const RUN_TYPE_LABELS: Record<string, string> = {
   similar_artists: 'Last.fm 相邻艺术家',
   hotboard: '网易云热榜同步',
   playlist: '第三方歌单同步',
+  ai: 'AI 推荐',
 }
 
 export const RECOMMENDATION_CRON_RUN_TYPE_LABELS: Record<string, string> = {
@@ -19,6 +20,7 @@ export const PLAYLIST_TYPE_LABELS: Record<string, string> = {
   playlist_netease: '网易云歌单',
   playlist_text: '文本歌单',
   playlist_incremental: '歌单链接增量同步',
+  ai_recommendation: 'AI 推荐歌单',
 }
 
 export const SOURCE_TYPE_LABELS: Record<string, string> = {
@@ -29,6 +31,7 @@ export const SOURCE_TYPE_LABELS: Record<string, string> = {
   playlist_netease: '网易云歌单',
   playlist_text: '文本歌单',
   playlist_incremental: '歌单链接增量',
+  ai: 'AI 推荐',
 }
 
 export const LIBRARY_MODE_LABELS: Record<string, string> = {

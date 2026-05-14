@@ -18,6 +18,8 @@ export default function GlobalServiceStatus({ settings }: { settings?: Partial<S
     <section className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900">
       <div className="mb-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">全局服务状态</div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatusItem ok={!!settings?.ai_enabled} label="AI 推荐启用" />
+        <StatusItem ok={!!settings?.ai_api_key} label="AI API Key" />
         <StatusItem ok={!!settings?.lastfm_api_key} label="Last.fm API Key" />
         <StatusItem ok={!!settings?.lastfm_username} label="Last.fm 用户名" />
         <StatusItem ok={!!settings?.navidrome_url && !!settings?.navidrome_username} label="Navidrome 配置" />
