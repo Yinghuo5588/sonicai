@@ -7,8 +7,8 @@ from sqlalchemy import select
 
 from app.db.session import AsyncSessionLocal
 from app.db.models import SystemSettings, RecommendationRun
-from app.services.playlist_parser import parse_playlist_url, parse_text_songs
-from app.recommendation.types import CandidateTrack
+from app.recommendation.base import SourceContext
+from app.recommendation.sources.playlist import PlaylistUrlSource, TextPlaylistSource
 from app.recommendation.pipeline import run_candidate_playlist_pipeline
 
 logger = logging.getLogger(__name__)
@@ -35,27 +35,6 @@ async def _mark_run_failed(run_id: int, error: str) -> None:
             await db.commit()
 
 
-def _songs_to_candidates(
-    *,
-    songs: list[dict],
-    source_type: str,
-) -> list[CandidateTrack]:
-    return [
-        CandidateTrack(
-            title=str(song.get("title", "") or ""),
-            artist=str(song.get("artist", "") or ""),
-            album=song.get("album") or "",
-            score=idx + 1,
-            source_type=source_type,
-            source_seed_name=str(song.get("title", "") or ""),
-            source_seed_artist=str(song.get("artist", "") or ""),
-            rank_index=idx + 1,
-            raw_payload=song,
-        )
-        for idx, song in enumerate(songs)
-    ]
-
-
 async def run_playlist_sync(
     run_id: int,
     url: str,
@@ -64,13 +43,7 @@ async def run_playlist_sync(
     overwrite: bool = False,
 ) -> dict:
     """
-    URL-based playlist sync.
-
-    Responsibilities:
-      1. Load parser settings.
-      2. Parse playlist URL.
-      3. Convert songs to CandidateTrack.
-      4. Delegate matching/persistence/Navidrome/webhook to unified pipeline.
+    URL-based playlist sync through RecommendationSource plugin.
     """
     match_threshold = max(0.01, min(1.0, float(match_threshold or 0.75)))
     logger.info("[playlist] start run_id=%s url=%s", run_id, url)
@@ -85,12 +58,22 @@ async def run_playlist_sync(
             await _mark_run_failed(run_id, "SystemSettings not initialized")
             raise RuntimeError("SystemSettings not initialized")
 
+    context = SourceContext(
+        run_id=run_id,
+        playlist_name=playlist_name,
+        match_threshold=match_threshold,
+        overwrite=overwrite,
+    )
+
+    source = PlaylistUrlSource(
+        context,
+        url=url,
+        api_base=settings.playlist_api_url,
+        timeout=float(settings.playlist_parse_timeout or 30),
+    )
+
     try:
-        parsed_name, platform, songs = await parse_playlist_url(
-            url,
-            api_base=settings.playlist_api_url,
-            timeout=float(settings.playlist_parse_timeout or 30),
-        )
+        candidates = await source.fetch_candidates()
     except Exception as e:
         error = f"解析歌单失败: {e}"
         await _mark_run_failed(run_id, error)
@@ -101,7 +84,7 @@ async def run_playlist_sync(
             "error": str(e),
         }
 
-    if not songs:
+    if not candidates:
         await _mark_run_failed(run_id, "歌单为空")
         return {
             "matched": 0,
@@ -110,27 +93,17 @@ async def run_playlist_sync(
             "error": "empty playlist",
         }
 
-    final_name = (
-        playlist_name.strip()
-        if playlist_name and playlist_name.strip()
-        else parsed_name
-    )
-
-    playlist_type = f"playlist_{platform}"
-    candidates = _songs_to_candidates(
-        songs=songs,
-        source_type=playlist_type,
-    )
+    final_name = await source.resolve_playlist_name()
 
     try:
         return await run_candidate_playlist_pipeline(
             run_id=run_id,
-            playlist_type=playlist_type,
+            playlist_type=source.playlist_type,
             playlist_name=final_name,
             candidates=candidates,
             match_threshold=match_threshold,
             overwrite=overwrite,
-            source_type=playlist_type,
+            source_type=source.source_type,
             mark_run_running=False,
         )
     except Exception as e:
@@ -147,21 +120,28 @@ async def run_text_sync(
     overwrite: bool = False,
 ) -> dict:
     """
-    Text-file based playlist sync.
-
-    Responsibilities:
-      1. Parse plain text.
-      2. Convert songs to CandidateTrack.
-      3. Delegate matching/persistence/Navidrome/webhook to unified pipeline.
+    Text-file based playlist sync through RecommendationSource plugin.
     """
     match_threshold = max(0.01, min(1.0, float(match_threshold or 0.75)))
     logger.info("[text_sync] start run_id=%s chars=%s", run_id, len(text_content))
 
     await _mark_run_running(run_id)
 
-    parsed_name, platform, songs = parse_text_songs(text_content)
+    context = SourceContext(
+        run_id=run_id,
+        playlist_name=playlist_name,
+        match_threshold=match_threshold,
+        overwrite=overwrite,
+    )
 
-    if not songs:
+    source = TextPlaylistSource(
+        context,
+        text_content=text_content,
+    )
+
+    candidates = await source.fetch_candidates()
+
+    if not candidates:
         await _mark_run_failed(run_id, "文本内容为空或解析失败")
         return {
             "matched": 0,
@@ -170,27 +150,17 @@ async def run_text_sync(
             "error": "empty text",
         }
 
-    final_name = (
-        playlist_name.strip()
-        if playlist_name and playlist_name.strip()
-        else parsed_name
-    )
-
-    playlist_type = f"playlist_{platform}"
-    candidates = _songs_to_candidates(
-        songs=songs,
-        source_type=playlist_type,
-    )
+    final_name = await source.resolve_playlist_name()
 
     try:
         return await run_candidate_playlist_pipeline(
             run_id=run_id,
-            playlist_type=playlist_type,
+            playlist_type=source.playlist_type,
             playlist_name=final_name,
             candidates=candidates,
             match_threshold=match_threshold,
             overwrite=overwrite,
-            source_type=playlist_type,
+            source_type=source.source_type,
             mark_run_running=False,
         )
     except Exception as e:

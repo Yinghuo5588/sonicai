@@ -11,13 +11,13 @@ from sqlalchemy import select
 
 from app.db.session import AsyncSessionLocal
 from app.db.models import SystemSettings, RecommendationRun
-from app.services.playlist_parser import parse_playlist_url
 from app.services.navidrome_service import (
     navidrome_delete_playlist,
     navidrome_list_playlists,
     navidrome_get_playlist_songs,
 )
-from app.recommendation.types import CandidateTrack
+from app.recommendation.base import SourceContext
+from app.recommendation.sources.playlist import IncrementalPlaylistSource
 from app.recommendation.pipeline import run_incremental_candidate_playlist_pipeline
 
 logger = logging.getLogger(__name__)
@@ -72,26 +72,6 @@ async def _mark_run_success_skipped(
             await db.commit()
 
 
-def _songs_to_candidates(
-    *,
-    songs: list[dict],
-) -> list[CandidateTrack]:
-    return [
-        CandidateTrack(
-            title=str(song.get("title", "") or ""),
-            artist=str(song.get("artist", "") or ""),
-            album=song.get("album") or "",
-            score=idx + 1,
-            source_type="playlist_incremental",
-            source_seed_name=str(song.get("title", "") or ""),
-            source_seed_artist=str(song.get("artist", "") or ""),
-            rank_index=idx + 1,
-            raw_payload=song,
-        )
-        for idx, song in enumerate(songs)
-    ]
-
-
 async def run_incremental_playlist_sync(
     run_id: int,
     url: str,
@@ -104,11 +84,10 @@ async def run_incremental_playlist_sync(
 
     Responsibilities:
     1. Load settings.
-    2. Parse playlist URL.
+    2. Parse playlist URL via IncrementalPlaylistSource.
     3. Compute current hash and skip if unchanged.
     4. Find existing Navidrome playlist and existing song ids.
-    5. Convert songs to CandidateTrack.
-    6. Delegate matching / DB persistence / Navidrome add / webhook to incremental pipeline.
+    5. Delegate matching / DB persistence / Navidrome add / webhook to incremental pipeline.
     """
     match_threshold = max(0.01, min(1.0, float(match_threshold or 0.75)))
 
@@ -134,12 +113,23 @@ async def run_incremental_playlist_sync(
         api_base = settings.playlist_api_url
         parse_timeout = float(settings.playlist_parse_timeout or 30)
 
+    context = SourceContext(
+        run_id=run_id,
+        playlist_name=playlist_name,
+        match_threshold=match_threshold,
+        overwrite=overwrite,
+    )
+
+    source = IncrementalPlaylistSource(
+        context,
+        url=url,
+        api_base=api_base,
+        timeout=parse_timeout,
+    )
+
     try:
-        parsed_name, platform, songs = await parse_playlist_url(
-            url,
-            api_base=api_base,
-            timeout=parse_timeout,
-        )
+        candidates = await source.fetch_candidates()
+        songs = getattr(source, "raw_songs", [])
     except Exception as e:
         error = f"解析歌单失败: {e}"
         await _mark_run_failed(run_id, error)
@@ -178,11 +168,7 @@ async def run_incremental_playlist_sync(
             "reason": "unchanged",
         }
 
-    final_name = (
-        playlist_name.strip()
-        if playlist_name and playlist_name.strip()
-        else parsed_name
-    )
+    final_name = await source.resolve_playlist_name()
 
     existing_song_ids: set[str] = set()
     existing_navidrome_playlist_id: str | None = None
@@ -219,8 +205,6 @@ async def run_incremental_playlist_sync(
             "[playlist_incr] failed to inspect existing Navidrome playlist: %s",
             e,
         )
-
-    candidates = _songs_to_candidates(songs=songs)
 
     try:
         return await run_incremental_candidate_playlist_pipeline(

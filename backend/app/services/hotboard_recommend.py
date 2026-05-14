@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 
 from app.db.session import AsyncSessionLocal
 from app.db.models import RecommendationRun
-from app.services.hotboard_service import fetch_netease_hotboard
-from app.recommendation.types import CandidateTrack
+from app.recommendation.base import SourceContext
+from app.recommendation.sources.hotboard import HotboardSource
 from app.recommendation.pipeline import run_candidate_playlist_pipeline
 
 logger = logging.getLogger(__name__)
@@ -31,12 +31,7 @@ async def run_hotboard_sync(
     trigger_type: str = "manual",
 ) -> dict:
     """
-    Hotboard sync.
-
-    Responsibilities:
-      1. Fetch hotboard data.
-      2. Convert rows to CandidateTrack.
-      3. Delegate matching/persistence/Navidrome/webhook to unified pipeline.
+    Hotboard sync through RecommendationSource plugin.
     """
     limit = max(1, min(200, int(limit or 50)))
     match_threshold = max(0.01, min(1.0, float(match_threshold or 0.75)))
@@ -57,10 +52,18 @@ async def run_hotboard_sync(
             await db.commit()
 
     try:
-        hot_tracks = await fetch_netease_hotboard(limit=limit)
-        logger.info("[hotboard] fetched %s tracks", len(hot_tracks))
+        context = SourceContext(
+            run_id=run_id,
+            playlist_name=playlist_name,
+            match_threshold=match_threshold,
+            overwrite=overwrite,
+            extra={"trigger_type": trigger_type},
+        )
 
-        if not hot_tracks:
+        source = HotboardSource(context, limit=limit)
+        candidates = await source.fetch_candidates()
+
+        if not candidates:
             await _mark_run_failed(run_id, "Failed to fetch hotboard data")
             return {
                 "matched": 0,
@@ -69,36 +72,16 @@ async def run_hotboard_sync(
                 "error": "fetch failed",
             }
 
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        final_name = (
-            playlist_name.strip()
-            if playlist_name and playlist_name.strip()
-            else f"网易云热榜 - {today}"
-        )
-
-        candidates = [
-            CandidateTrack(
-                title=str(t.get("title", "") or ""),
-                artist=str(t.get("artist", "") or ""),
-                album=t.get("album") or "",
-                score=t.get("index") or idx + 1,
-                source_type="hotboard",
-                source_seed_name=str(t.get("title", "") or ""),
-                source_seed_artist=str(t.get("artist", "") or ""),
-                rank_index=idx + 1,
-                raw_payload=t,
-            )
-            for idx, t in enumerate(hot_tracks)
-        ]
+        final_name = await source.resolve_playlist_name()
 
         return await run_candidate_playlist_pipeline(
             run_id=run_id,
-            playlist_type="hotboard",
+            playlist_type=source.playlist_type,
             playlist_name=final_name,
             candidates=candidates,
             match_threshold=match_threshold,
             overwrite=overwrite,
-            source_type="hotboard",
+            source_type=source.source_type,
             mark_run_running=False,
         )
 
