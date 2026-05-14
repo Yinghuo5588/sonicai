@@ -50,9 +50,12 @@ async def library_status(
     total_result = await db.execute(select(func.count(SongLibrary.id)))
     total = total_result.scalar() or 0
 
+    from app.services.favorite_tracks_service import favorite_tracks_status
+
     return {
         "total_songs": total,
         "cache": song_cache.status(),
+        "favorites": await favorite_tracks_status(),
     }
 
 
@@ -71,6 +74,51 @@ async def sync_library(
     return {
         "message": "曲库同步任务已启动",
     }
+
+
+# ── Favorites ─────────────────────────────────────────────────────────────────
+
+@router.get("/favorites/status")
+async def library_favorites_status(
+    current_user: CurrentUser,
+):
+    from app.services.favorite_tracks_service import favorite_tracks_status
+    return await favorite_tracks_status()
+
+
+@router.post("/favorites/sync")
+@limiter.limit("2/minute")
+async def sync_library_favorites(
+    request: Request,
+    current_user: CurrentUser,
+):
+    from app.core.task_registry import create_background_task
+    from app.services.favorite_tracks_service import sync_navidrome_favorites_to_db
+
+    create_background_task(
+        sync_navidrome_favorites_to_db(),
+        name="navidrome-favorites-sync",
+    )
+
+    return {
+        "message": "Navidrome 收藏歌曲同步任务已启动",
+    }
+
+
+@router.get("/favorites/songs")
+async def list_library_favorite_songs(
+    current_user: CurrentUser,
+    q: str | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    from app.services.favorite_tracks_service import list_favorite_tracks
+
+    return await list_favorite_tracks(
+        q=q,
+        limit=limit,
+        offset=offset,
+    )
 
 
 # ── Songs ──────────────────────────────────────────────────────────────────────

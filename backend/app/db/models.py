@@ -61,6 +61,15 @@ class SystemSettings(Base):
     ai_default_limit = Column(Integer, default=30)
     ai_temperature = Column(Numeric(3, 2), default=0.80)
 
+    # AI preference profile
+    ai_preference_profile_enabled = Column(Boolean, default=True)
+    ai_preference_profile_text = Column(Text, nullable=True)
+    ai_preference_profile_filename = Column(String(255), nullable=True)
+    ai_preference_profile_updated_at = Column(DateTime, nullable=True)
+
+    # AI favorites personalization
+    ai_favorites_sample_limit = Column(Integer, default=40)
+
     # Navidrome
     navidrome_url = Column(String(500), nullable=True)
     navidrome_username = Column(String(255), nullable=True)
@@ -137,6 +146,12 @@ class SystemSettings(Base):
     song_cache_enabled = Column(Boolean, default=True)
     song_cache_auto_refresh_enabled = Column(Boolean, default=True)
     song_cache_refresh_cron = Column(String(100), default="0 4 * * *")
+
+    # Navidrome favorite tracks sync
+    favorite_tracks_sync_enabled = Column(Boolean, default=True)
+    favorite_tracks_sync_cron = Column(String(100), default="15 4 * * *")
+    favorite_tracks_last_sync_at = Column(DateTime, nullable=True)
+    favorite_tracks_last_error = Column(Text, nullable=True)
 
     # Match debug
     match_debug_enabled = Column(Boolean, default=False)
@@ -328,6 +343,28 @@ class SongLibrary(Base):
         back_populates="song",
         cascade="all, delete-orphan",
     )
+
+
+class NavidromeFavoriteTrack(Base):
+    __tablename__ = "navidrome_favorite_tracks"
+
+    id = Column(Integer, primary_key=True)
+
+    navidrome_id = Column(String(100), unique=True, nullable=False, index=True)
+    title = Column(String(500), nullable=False)
+    artist = Column(String(500), nullable=True)
+    album = Column(String(500), nullable=True)
+    duration = Column(Integer, nullable=True)
+
+    title_norm = Column(String(500), nullable=True, index=True)
+    artist_norm = Column(String(500), nullable=True, index=True)
+    dedup_key = Column(String(500), nullable=True, index=True)
+
+    starred_at = Column(DateTime, nullable=True)
+    last_seen_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class SongTitleAlias(Base):

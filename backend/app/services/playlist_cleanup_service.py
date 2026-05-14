@@ -81,6 +81,12 @@ DEFAULT_RETENTION_POLICIES = {
         "delete_navidrome": False,
         "keep_recent_success_count": 1,
     },
+    "ai_recommendation": {
+        "enabled": False,
+        "keep_days": 30,
+        "delete_navidrome": False,
+        "keep_recent_success_count": 1,
+    },
 }
 
 

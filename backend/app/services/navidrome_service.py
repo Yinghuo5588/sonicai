@@ -267,3 +267,39 @@ async def navidrome_get_playlist_songs(playlist_id: str) -> list[dict]:
         for e in entries
         if e.get("id")
     ]
+
+
+async def navidrome_get_starred_songs() -> list[dict]:
+    """Get starred/favorite songs from Navidrome through Subsonic getStarred2."""
+    result = await _nd_get("getStarred2.view")
+    if not result:
+        return []
+
+    starred = result.get("starred2", {})
+    songs = starred.get("song", [])
+
+    if isinstance(songs, dict):
+        songs = [songs]
+
+    items: list[dict] = []
+
+    for s in songs:
+        if not isinstance(s, dict):
+            continue
+
+        song_id = s.get("id")
+        title = s.get("title")
+
+        if not song_id or not title:
+            continue
+
+        items.append({
+            "id": str(song_id),
+            "title": str(title),
+            "artist": str(s.get("artist") or ""),
+            "album": str(s.get("album") or ""),
+            "duration": s.get("duration"),
+            "starred": s.get("starred"),
+        })
+
+    return items

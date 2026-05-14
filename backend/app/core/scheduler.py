@@ -47,6 +47,7 @@ async def load_cron_schedule(db: AsyncSession):
             "song_cache_refresh",
             "missed_track_retry_cron",
             "playlist_cleanup_cron",
+            "favorite_tracks_sync_cron",
             "history_cleanup",
         ):
             job.remove()
@@ -219,6 +220,37 @@ async def load_cron_schedule(db: AsyncSession):
             logger.warning(
                 "Invalid playlist cleanup cron '%s': %s",
                 getattr(config, "playlist_cleanup_cron", None),
+                e,
+            )
+
+    # ===== Navidrome favorite tracks scheduled sync =====
+    if config and getattr(config, "favorite_tracks_sync_enabled", True) and getattr(config, "favorite_tracks_sync_cron", None):
+        try:
+            from app.tasks.favorite_tracks_tasks import sync_favorite_tracks_cron_job
+
+            parts = config.favorite_tracks_sync_cron.split()
+            if len(parts) >= 5:
+                tz = config.timezone if config and config.timezone else settings.app_timezone
+
+                sched.add_job(
+                    sync_favorite_tracks_cron_job,
+                    CronTrigger(
+                        minute=parts[0],
+                        hour=parts[1],
+                        day=parts[2],
+                        month=parts[3],
+                        day_of_week=parts[4],
+                        timezone=tz,
+                    ),
+                    id="favorite_tracks_sync_cron",
+                    replace_existing=True,
+                    misfire_grace_time=300,
+                )
+                logger.info("Favorite tracks sync cron loaded: %s", config.favorite_tracks_sync_cron)
+        except Exception as e:
+            logger.warning(
+                "Invalid favorite tracks sync cron '%s': %s",
+                getattr(config, "favorite_tracks_sync_cron", None),
                 e,
             )
 

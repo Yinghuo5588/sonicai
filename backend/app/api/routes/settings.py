@@ -32,6 +32,20 @@ class SettingsResponse(BaseModel):
     ai_default_limit: int | None = 30
     ai_temperature: float | None = 0.8
 
+    # AI preference profile
+    ai_preference_profile_enabled: bool | None = True
+    ai_preference_profile_filename: str | None = None
+    ai_preference_profile_updated_at: datetime | None = None
+
+    # AI favorites personalization
+    ai_favorites_sample_limit: int | None = 40
+
+    # Navidrome favorite tracks sync
+    favorite_tracks_sync_enabled: bool | None = True
+    favorite_tracks_sync_cron: str | None = "15 4 * * *"
+    favorite_tracks_last_sync_at: datetime | None = None
+    favorite_tracks_last_error: str | None = None
+
     navidrome_url: str | None
     navidrome_username: str | None
     webhook_url: str | None
@@ -126,6 +140,16 @@ class SettingsUpdate(BaseModel):
     ai_request_timeout: int | None = Field(default=None, ge=10, le=300)
     ai_default_limit: int | None = Field(default=None, ge=1, le=200)
     ai_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+
+    # AI preference profile
+    ai_preference_profile_enabled: bool | None = None
+
+    # AI favorites personalization
+    ai_favorites_sample_limit: int | None = Field(default=None, ge=1, le=200)
+
+    # Navidrome favorite tracks sync
+    favorite_tracks_sync_enabled: bool | None = None
+    favorite_tracks_sync_cron: str | None = None
 
     navidrome_url: str | None = None
     navidrome_username: str | None = None
@@ -262,6 +286,7 @@ async def update_settings(body: SettingsUpdate, current_user: CurrentUser, db: A
         "missed_track_retry_enabled", "missed_track_retry_cron",
         "song_cache_auto_refresh_enabled", "song_cache_refresh_cron",
         "playlist_cleanup_enabled", "playlist_cleanup_cron",
+        "favorite_tracks_sync_enabled", "favorite_tracks_sync_cron",
     }
     if set(body.model_dump(exclude_unset=True).keys()) & cron_keys:
         s.cron_created_by_user_id = current_user.id
@@ -372,6 +397,7 @@ async def import_settings(
         "hotboard_match_threshold", "playlist_sync_threshold", "duplicate_avoid_days",
         "missed_track_retry_limit", "run_history_keep_days", "webhook_history_keep_days",
         "ai_request_timeout", "ai_default_limit", "ai_temperature",
+        "ai_favorites_sample_limit",
     }
 
     # Fields that are enum-validated

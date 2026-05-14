@@ -160,6 +160,10 @@ def parse_ai_songs_json(content: str) -> list[dict[str, Any]]:
             "title": title,
             "artist": artist,
             "album": album,
+            "reason": item.get("reason"),
+            "mood": item.get("mood"),
+            "genre": item.get("genre"),
+            "confidence": item.get("confidence"),
             "raw": item,
         })
 

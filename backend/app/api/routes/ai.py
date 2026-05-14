@@ -1,6 +1,7 @@
 """AI recommendation routes."""
 
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -20,10 +21,12 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 
 class AIRecommendRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
+    mode: Literal["free", "favorites"] = "free"
     limit: int | None = Field(default=None, ge=1, le=200)
     playlist_name: str | None = Field(default=None, max_length=255)
     match_threshold: float = Field(default=0.75, gt=0.0, le=1.0)
     overwrite: bool = False
+    use_preference_profile: bool = True
 
 
 @router.post("/recommend")
@@ -59,11 +62,13 @@ async def recommend_with_ai(
         run_ai_recommendation(
             run_id=run_id,
             prompt=prompt,
+            mode=body.mode,
             limit=body.limit,
             playlist_name=body.playlist_name,
             match_threshold=body.match_threshold,
             overwrite=body.overwrite,
             trigger_type="manual",
+            use_preference_profile=body.use_preference_profile,
         ),
         name=f"ai-recommendation-{run_id}",
     )
@@ -72,8 +77,10 @@ async def recommend_with_ai(
         "message": "AI recommendation queued",
         "run_id": run_id,
         "prompt": prompt,
+        "mode": body.mode,
         "limit": body.limit,
         "playlist_name": body.playlist_name or "(auto)",
         "match_threshold": body.match_threshold,
         "overwrite": body.overwrite,
+        "use_preference_profile": body.use_preference_profile,
     }

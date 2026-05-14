@@ -13,6 +13,7 @@ from app.api.routes import (
     missed_tracks,
     tasks,
     ai,
+    ai_preference,
 )
 
 router = APIRouter()
@@ -29,3 +30,4 @@ router.include_router(library.router)
 router.include_router(missed_tracks.router)
 router.include_router(tasks.router)
 router.include_router(ai.router)
+router.include_router(ai_preference.router)

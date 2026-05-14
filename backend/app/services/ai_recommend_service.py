@@ -13,6 +13,7 @@ from app.db.models import SystemSettings, RecommendationRun
 from app.recommendation.base import SourceContext
 from app.recommendation.sources.ai import AIRecommendationSource
 from app.recommendation.pipeline import run_candidate_playlist_pipeline
+from app.utils.text_normalizer import dedup_key
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +43,13 @@ async def run_ai_recommendation(
     *,
     run_id: int,
     prompt: str,
+    mode: str = "free",
     limit: int | None = None,
     playlist_name: str | None = None,
     match_threshold: float = 0.75,
     overwrite: bool = False,
     trigger_type: str = "manual",
+    use_preference_profile: bool = True,
 ) -> dict:
     """
     Run AI recommendation.
@@ -100,9 +103,37 @@ async def run_ai_recommendation(
             ),
         )
 
+        mode = mode or "free"
+        if mode not in {"free", "favorites"}:
+            mode = "free"
+
+        preference_profile = ""
+        if (
+            use_preference_profile
+            and bool(getattr(settings, "ai_preference_profile_enabled", True))
+            and getattr(settings, "ai_preference_profile_text", None)
+        ):
+            preference_profile = settings.ai_preference_profile_text or ""
+
+        favorite_tracks: list[dict] = []
+        favorite_dedup_keys: set[str] = set()
+
+        if mode == "favorites":
+            from app.services.favorite_tracks_service import (
+                get_favorite_sample,
+                get_all_favorite_dedup_keys,
+            )
+
+            sample_limit = int(getattr(settings, "ai_favorites_sample_limit", 40) or 40)
+            sample_limit = max(1, min(200, sample_limit))
+
+            favorite_tracks = await get_favorite_sample(limit=sample_limit)
+            favorite_dedup_keys = await get_all_favorite_dedup_keys()
+
         snapshot = {
             "source": "ai",
             "trigger_type": trigger_type,
+            "mode": mode,
             "ai_base_url": settings.ai_base_url,
             "ai_model": settings.ai_model,
             "ai_default_limit": settings.ai_default_limit,
@@ -112,6 +143,9 @@ async def run_ai_recommendation(
             "match_threshold": match_threshold,
             "playlist_name": playlist_name,
             "prompt": prompt,
+            "use_preference_profile": use_preference_profile,
+            "has_preference_profile": bool(preference_profile),
+            "favorite_sample_count": len(favorite_tracks),
         }
 
         await _mark_run_running(run_id, snapshot=snapshot)
@@ -126,6 +160,9 @@ async def run_ai_recommendation(
                 "trigger_type": trigger_type,
                 "prompt": prompt,
                 "limit": final_limit,
+                "mode": mode,
+                "use_preference_profile": use_preference_profile,
+                "favorite_sample_count": len(favorite_tracks),
             },
         )
 
@@ -138,9 +175,24 @@ async def run_ai_recommendation(
             limit=final_limit,
             temperature=float(settings.ai_temperature or 0.8),
             timeout=float(settings.ai_request_timeout or 60),
+            mode=mode,
+            preference_profile=preference_profile,
+            favorite_tracks=favorite_tracks,
         )
 
         candidates = await source.fetch_candidates()
+
+        if mode == "favorites" and favorite_dedup_keys:
+            before_count = len(candidates)
+            candidates = [
+                c for c in candidates
+                if dedup_key(c.normalized_title(), c.normalized_artist()) not in favorite_dedup_keys
+            ]
+            logger.info(
+                "[ai] filtered favorite duplicates before=%s after=%s",
+                before_count,
+                len(candidates),
+            )
 
         if not candidates:
             await _mark_run_failed(run_id, "AI returned no valid songs")
