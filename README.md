@@ -1,4 +1,5 @@
 # SonicAI - Music Recommendation System
+  此项目全部由AI完成
 
 音乐推荐管理系统，基于 Last.fm 数据生成推荐歌单并同步到 Navidrome。
 
