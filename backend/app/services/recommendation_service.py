@@ -19,8 +19,6 @@ from app.recommendation.sources.lastfm import (
     LastfmSimilarTracksSource,
     LastfmSimilarArtistsSource,
 )
-from app.utils.text_normalizer import dedup_key
-from app.recommendation.types import CandidateTrack
 from app.recommendation.pipeline import run_candidate_playlist_pipeline
 
 logger = logging.getLogger(__name__)
@@ -291,19 +289,11 @@ async def _generate_similar_tracks(db: AsyncSession, run_id: int, settings):
 
     candidates = await source.fetch_candidates()
 
-    logger.info(f"[similar_tracks] candidates before recent filter={len(candidates)}")
+    logger.info(f"[similar_tracks] candidates before pipeline={len(candidates)}")
 
     if await _is_run_stopped(run_id, db):
-        logger.info(f"[similar_tracks] run_id={run_id} stopped before filter")
+        logger.info(f"[similar_tracks] run_id={run_id} stopped before pipeline")
         return
-
-    candidates = await _filter_recent_candidates(
-        db,
-        candidates,
-        int(settings.duplicate_avoid_days or 0),
-    )
-
-    logger.info(f"[similar_tracks] candidates after recent filter={len(candidates)}")
 
     result = await run_candidate_playlist_pipeline(
         run_id=run_id,
@@ -365,19 +355,11 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
 
     candidates = await source.fetch_candidates()
 
-    logger.info(f"[similar_artists] candidates before recent filter={len(candidates)}")
+    logger.info(f"[similar_artists] candidates before pipeline={len(candidates)}")
 
     if await _is_run_stopped(run_id, db):
-        logger.info(f"[similar_artists] run_id={run_id} stopped before filter")
+        logger.info(f"[similar_artists] run_id={run_id} stopped before pipeline")
         return
-
-    candidates = await _filter_recent_candidates(
-        db,
-        candidates,
-        int(settings.duplicate_avoid_days or 0),
-    )
-
-    logger.info(f"[similar_artists] candidates after recent filter={len(candidates)}")
 
     result = await run_candidate_playlist_pipeline(
         run_id=run_id,
@@ -397,50 +379,9 @@ async def _generate_similar_artists(db: AsyncSession, run_id: int, settings):
     logger.info(f"[similar_artists] pipeline result={result}")
 
 
-async def _filter_recent_candidates(
-    db: AsyncSession,
-    candidates: list[CandidateTrack],
-    avoid_days: int,
-) -> list[CandidateTrack]:
-    """
-    Filter CandidateTrack list by recently recommended dedup_key.
-
-    This is the CandidateTrack version of _filter_recent().
-    """
-    from datetime import timedelta
-
-    if not avoid_days or avoid_days <= 0:
-        return candidates
-
-    cutoff = datetime.now(timezone.utc) - timedelta(days=avoid_days)
-
-    result = await db.execute(
-        select(RecommendationItem.dedup_key)
-        .join(GeneratedPlaylist)
-        .where(RecommendationItem.created_at >= cutoff)
-    )
-
-    recent_keys = {row[0] for row in result if row[0]}
-
-    original_count = len(candidates)
-
-    filtered = [
-        c for c in candidates
-        if dedup_key(c.normalized_title(), c.normalized_artist()) not in recent_keys
-    ]
-
-    logger.info(
-        "[filter-recent-candidates] avoid_days=%s input=%s output=%s filtered=%s",
-        avoid_days,
-        original_count,
-        len(filtered),
-        original_count - len(filtered),
-    )
-
-    return filtered
-
-
-async def _cleanup_old_playlists(settings: SystemSettings):
+# ─────────────────────────────────────────────
+# Cleanup (legacy entry kept for backward compat)
+# ─────────────────────────────────────────────
     """Legacy cleanup entry.
 
     Kept for backward compatibility. The new lifecycle cleanup is implemented

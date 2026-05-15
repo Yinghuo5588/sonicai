@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -51,6 +51,7 @@ class PipelineSettings:
     webhook_url: str | None = None
     webhook_retry_count: int = 3
     library_mode_default: str = "allow_missing"
+    duplicate_avoid_days: int = 0
 
 
 async def _load_pipeline_settings() -> PipelineSettings:
@@ -66,6 +67,7 @@ async def _load_pipeline_settings() -> PipelineSettings:
             webhook_url=getattr(s, "webhook_url", None),
             webhook_retry_count=int(getattr(s, "webhook_retry_count", 3) or 3),
             library_mode_default=getattr(s, "library_mode_default", "allow_missing") or "allow_missing",
+            duplicate_avoid_days=max(0, int(getattr(s, "duplicate_avoid_days", 0) or 0)),
         )
 
 
@@ -131,6 +133,52 @@ async def _mark_run_running(run_id: int) -> None:
             await db.commit()
 
 
+async def _filter_recent_duplicate_candidates(
+    *,
+    candidates: list[CandidateTrack],
+    avoid_days: int,
+) -> tuple[list[CandidateTrack], int]:
+    """
+    Filter candidates that were recommended within recent avoid_days.
+
+    This function is source-agnostic and should be used by the common pipeline.
+    It checks RecommendationItem.dedup_key, so it works across all playlist types.
+    """
+    if not avoid_days or avoid_days <= 0:
+        return candidates, 0
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=avoid_days)
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(RecommendationItem.dedup_key)
+            .where(RecommendationItem.created_at >= cutoff)
+            .where(RecommendationItem.dedup_key.isnot(None))
+        )
+
+        recent_keys = {row[0] for row in result.all() if row[0]}
+
+    if not recent_keys:
+        return candidates, 0
+
+    filtered: list[CandidateTrack] = []
+    skipped = 0
+
+    for candidate in candidates:
+        key = dedup_key(
+            candidate.normalized_title(),
+            candidate.normalized_artist(),
+        )
+
+        if key in recent_keys:
+            skipped += 1
+            continue
+
+        filtered.append(candidate)
+
+    return filtered, skipped
+
+
 async def run_candidate_playlist_pipeline(
     *,
     run_id: int,
@@ -142,6 +190,7 @@ async def run_candidate_playlist_pipeline(
     source_type: str | None = None,
     mark_run_running: bool = True,
     update_run_status: bool = True,
+    apply_duplicate_avoidance: bool = True,
 ) -> dict:
     """
     Run the common candidate -> playlist pipeline.
@@ -167,6 +216,9 @@ async def run_candidate_playlist_pipeline(
             Whether this pipeline should set RecommendationRun status to success/failed.
             Set False when this pipeline is used as a sub-step of a larger run,
             e.g. full Last.fm recommendation containing similar_tracks + similar_artists.
+        apply_duplicate_avoidance:
+            Whether to apply SystemSettings.duplicate_avoid_days before matching.
+            Default True for all normal recommendation/import sources.
     """
     fallback_source_type = source_type or playlist_type
 
@@ -197,10 +249,46 @@ async def run_candidate_playlist_pipeline(
             "matched": 0,
             "missing": 0,
             "total": 0,
+            "duplicate_filtered": 0,
             "error": "No valid candidate tracks",
         }
 
     settings = await _load_pipeline_settings()
+
+    duplicate_filtered_count = 0
+
+    if apply_duplicate_avoidance and settings.duplicate_avoid_days > 0:
+        before_count = len(valid_candidates)
+
+        valid_candidates, duplicate_filtered_count = await _filter_recent_duplicate_candidates(
+            candidates=valid_candidates,
+            avoid_days=settings.duplicate_avoid_days,
+        )
+
+        logger.info(
+            "[pipeline] duplicate avoidance playlist_type=%s avoid_days=%s before=%s after=%s filtered=%s",
+            playlist_type,
+            settings.duplicate_avoid_days,
+            before_count,
+            len(valid_candidates),
+            duplicate_filtered_count,
+        )
+
+        if not valid_candidates:
+            message = f"All candidates filtered by duplicate_avoid_days={settings.duplicate_avoid_days}"
+
+            if update_run_status:
+                await _mark_run_failed(run_id, message)
+
+            return {
+                "playlist_name": playlist_name,
+                "playlist_type": playlist_type,
+                "matched": 0,
+                "missing": 0,
+                "total": 0,
+                "duplicate_filtered": duplicate_filtered_count,
+                "error": message,
+            }
 
     # Overwrite same-name playlist from Navidrome if requested.
     if overwrite:
@@ -336,6 +424,7 @@ async def run_candidate_playlist_pipeline(
                     "matched": len(matched_ids),
                     "missing": len(missing_candidates),
                     "total": len(valid_candidates),
+                    "duplicate_filtered": duplicate_filtered_count,
                     "error": "Failed to create Navidrome playlist",
                 }
 
@@ -373,6 +462,7 @@ async def run_candidate_playlist_pipeline(
                     "matched": len(matched_ids),
                     "missing": len(missing_candidates),
                     "total": len(valid_candidates),
+                    "duplicate_filtered": duplicate_filtered_count,
                     "error": "Failed to add songs to Navidrome playlist",
                 }
 
@@ -438,8 +528,10 @@ async def run_candidate_playlist_pipeline(
         "matched": len(matched_ids),
         "missing": len(missing_candidates),
         "total": len(valid_candidates),
+        "duplicate_filtered": duplicate_filtered_count,
         "navidrome_playlist_id": str(navidrome_playlist_id) if navidrome_playlist_id else None,
     }
+
 
 
 async def run_incremental_candidate_playlist_pipeline(
