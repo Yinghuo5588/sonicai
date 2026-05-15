@@ -191,8 +191,8 @@ export default function SettingsConnections() {
               className="input"
             />
           </div>
-
-          
+        </div>
+      </SectionCard>
 
       <SectionCard title="Last.fm">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
