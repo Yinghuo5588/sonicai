@@ -9,7 +9,6 @@ export type LibraryToolTab =
   | 'missed'
   | 'match'
   | 'manual'
-  | 'logs'
 
 export interface SongCacheStatus {
   enabled: boolean

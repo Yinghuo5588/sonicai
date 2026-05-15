@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query'
 import { FieldInput, SaveBar, SectionCard, useSettingsForm } from '../SettingsShared'
 import { debugMatch } from './libraryApi'
 import DebugMatchResultView from './components/DebugMatchResultView'
+import MatchLogsCard from './MatchLogsCard'
 
 export default function MatchDebugCard() {
   const { s, isLoading, mutation, hasChanges, handleChange, save } = useSettingsForm()
@@ -58,6 +59,8 @@ export default function MatchDebugCard() {
         )}
         {debugMutation.data && <DebugMatchResultView data={debugMutation.data} />}
       </SectionCard>
+
+      <MatchLogsCard />
     </div>
     </>
   )
