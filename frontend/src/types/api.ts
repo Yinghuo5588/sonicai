@@ -320,3 +320,79 @@ export interface PlaylistCleanupRunResponse {
     error: string
   }>
 }
+
+// ── AI Recommendation Scheduled Jobs ─────────────────────────────────────────
+
+export interface AIRecommendationJob {
+  id: number
+  name: string
+  enabled: boolean
+  cron_expression: string
+
+  prompt: string
+  mode: 'free' | 'favorites'
+  limit: number | null
+  playlist_name: string | null
+  match_threshold: number
+  overwrite: boolean
+  use_preference_profile: boolean
+
+  created_by_user_id?: number | null
+  last_run_at?: string | null
+  last_error?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface AIRecommendationJobsResponse {
+  items: AIRecommendationJob[]
+}
+
+export interface AIRecommendationJobPayload {
+  name: string
+  enabled: boolean
+  cron_expression: string
+  prompt: string
+  mode: 'free' | 'favorites'
+  limit?: number | null
+  playlist_name?: string | null
+  match_threshold: number
+  overwrite: boolean
+  use_preference_profile: boolean
+}
+
+// ── Playlist Sync Jobs ───────────────────────────────────────────────────────
+
+export interface PlaylistSyncJob {
+  id: number
+  name: string
+  enabled: boolean
+  cron_expression: string
+
+  url: string
+  match_threshold: number
+  playlist_name: string | null
+  overwrite: boolean
+  last_hash: string | null
+
+  created_by_user_id?: number | null
+  last_run_at?: string | null
+  last_error?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface PlaylistSyncJobsResponse {
+  items: PlaylistSyncJob[]
+}
+
+export interface PlaylistSyncJobPayload {
+  name: string
+  enabled: boolean
+  cron_expression: string
+  url: string
+  match_threshold: number
+  playlist_name?: string | null
+  overwrite: boolean
+  reset_hash?: boolean
+}
