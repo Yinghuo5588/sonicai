@@ -29,6 +29,7 @@ from app.db.models import (
     NavidromeMatch,
     WebhookBatch,
     WebhookBatchItem,
+    PlaylistSyncJob,
 )
 from app.recommendation.types import CandidateTrack
 from app.services.concurrent_search import batch_search_and_match
@@ -544,6 +545,7 @@ async def run_incremental_candidate_playlist_pipeline(
     match_threshold: float = 0.75,
     overwrite: bool = False,
     current_hash: str | None = None,
+    playlist_sync_job_id: int | None = None,
 ) -> dict:
     """
     Incremental candidate -> playlist pipeline.
@@ -552,7 +554,7 @@ async def run_incremental_candidate_playlist_pipeline(
     - Reuses existing Navidrome playlist when possible.
     - Only adds matched songs that are not already in existing_song_ids.
     - Still records all candidates into GeneratedPlaylist / RecommendationItem / NavidromeMatch.
-    - Updates SystemSettings.playlist_sync_last_hash when current_hash is provided.
+    - Updates PlaylistSyncJob.last_hash or SystemSettings.playlist_sync_last_hash when current_hash is provided.
     """
     playlist_type = "playlist_incremental"
 
@@ -768,8 +770,15 @@ async def run_incremental_candidate_playlist_pipeline(
         settings_result = await db.execute(select(SystemSettings))
         settings_row = settings_result.scalar_one_or_none()
 
-        if settings_row and current_hash:
-            settings_row.playlist_sync_last_hash = current_hash
+        if current_hash:
+            if playlist_sync_job_id is not None:
+                job_row = await db.get(PlaylistSyncJob, playlist_sync_job_id)
+                if job_row:
+                    job_row.last_hash = current_hash
+                    job_row.last_error = None
+                    job_row.last_run_at = datetime.now(timezone.utc)
+            elif settings_row:
+                settings_row.playlist_sync_last_hash = current_hash
 
         should_webhook_missing = (
             bool(missing_candidates)

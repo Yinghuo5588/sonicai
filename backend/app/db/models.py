@@ -197,6 +197,64 @@ class RecommendationRun(Base):
     webhook_batches = relationship("WebhookBatch", back_populates="run", cascade="all, delete-orphan")
 
 
+class AIRecommendationJob(Base):
+    __tablename__ = "ai_recommendation_jobs"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    enabled = Column(Boolean, default=False, nullable=False)
+    cron_expression = Column(String(100), nullable=False)
+
+    prompt = Column(Text, nullable=False)
+    mode = Column(String(20), default="free", nullable=False)  # free | favorites
+    limit = Column(Integer, default=30)
+    playlist_name = Column(String(255), nullable=True)
+    match_threshold = Column(Numeric(4, 3), default=0.75)
+    overwrite = Column(Boolean, default=False, nullable=False)
+    use_preference_profile = Column(Boolean, default=True, nullable=False)
+
+    created_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    last_run_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class PlaylistSyncJob(Base):
+    __tablename__ = "playlist_sync_jobs"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    enabled = Column(Boolean, default=False, nullable=False)
+    cron_expression = Column(String(100), nullable=False)
+
+    url = Column(String(1000), nullable=False)
+    match_threshold = Column(Numeric(4, 3), default=0.75)
+    playlist_name = Column(String(255), nullable=True)
+    overwrite = Column(Boolean, default=False, nullable=False)
+
+    # 每个同步任务独立保存 hash
+    last_hash = Column(String(64), nullable=True)
+
+    created_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    last_run_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 class PlaylistRetentionPolicy(Base):
     __tablename__ = "playlist_retention_policies"
 

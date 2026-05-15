@@ -14,6 +14,8 @@ from app.api.routes import (
     tasks,
     ai,
     ai_preference,
+    ai_jobs,
+    playlist_sync_jobs,
 )
 
 router = APIRouter()
@@ -31,3 +33,5 @@ router.include_router(missed_tracks.router)
 router.include_router(tasks.router)
 router.include_router(ai.router)
 router.include_router(ai_preference.router)
+router.include_router(ai_jobs.router)
+router.include_router(playlist_sync_jobs.router)

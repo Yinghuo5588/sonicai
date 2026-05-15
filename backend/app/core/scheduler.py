@@ -40,15 +40,20 @@ async def load_cron_schedule(db: AsyncSession):
     # APScheduler handles running jobs gracefully — removal waits for the
     # currently-executing instance to yield at an await point before removing
     for job in sched.get_jobs():
-        if job.id in (
-            "recommendation_cron",
-            "hotboard_cron",
-            "playlist_sync_cron",
-            "song_cache_refresh",
-            "missed_track_retry_cron",
-            "playlist_cleanup_cron",
-            "favorite_tracks_sync_cron",
-            "history_cleanup",
+        if (
+            job.id
+            in (
+                "recommendation_cron",
+                "hotboard_cron",
+                "playlist_sync_cron",
+                "song_cache_refresh",
+                "missed_track_retry_cron",
+                "playlist_cleanup_cron",
+                "favorite_tracks_sync_cron",
+                "history_cleanup",
+            )
+            or job.id.startswith("ai_recommendation_job_")
+            or job.id.startswith("playlist_sync_job_")
         ):
             job.remove()
 
@@ -136,6 +141,102 @@ async def load_cron_schedule(db: AsyncSession):
                 logger.info("Playlist sync cron loaded: %s", config.playlist_sync_cron_expression)
         except Exception as e:
             logger.warning("Invalid playlist sync cron: %s", e)
+
+    # ===== AI recommendation scheduled jobs =====
+    try:
+        from app.db.models import AIRecommendationJob
+        from app.tasks.ai_tasks import run_ai_recommendation_cron_job
+
+        result = await db.execute(
+            select(AIRecommendationJob).where(AIRecommendationJob.enabled == True)
+        )
+        ai_jobs = result.scalars().all()
+
+        for ai_job in ai_jobs:
+            parts = str(ai_job.cron_expression or "").split()
+            if len(parts) < 5:
+                logger.warning(
+                    "Invalid AI recommendation cron job id=%s expr=%s",
+                    ai_job.id,
+                    ai_job.cron_expression,
+                )
+                continue
+
+            tz = config.timezone if config and config.timezone else settings.app_timezone
+
+            sched.add_job(
+                run_ai_recommendation_cron_job,
+                CronTrigger(
+                    minute=parts[0],
+                    hour=parts[1],
+                    day=parts[2],
+                    month=parts[3],
+                    day_of_week=parts[4],
+                    timezone=tz,
+                ),
+                id=f"ai_recommendation_job_{ai_job.id}",
+                replace_existing=True,
+                misfire_grace_time=300,
+                kwargs={"job_id": ai_job.id},
+            )
+
+            logger.info(
+                "AI recommendation cron loaded: id=%s name=%s expr=%s",
+                ai_job.id,
+                ai_job.name,
+                ai_job.cron_expression,
+            )
+
+    except Exception as e:
+        logger.warning("Failed to load AI recommendation cron jobs: %s", e)
+
+    # ===== Multiple playlist sync scheduled jobs =====
+    try:
+        from app.db.models import PlaylistSyncJob
+        from app.tasks.playlist_sync_tasks import run_playlist_sync_job
+
+        result = await db.execute(
+            select(PlaylistSyncJob).where(PlaylistSyncJob.enabled == True)
+        )
+        playlist_jobs = result.scalars().all()
+
+        for playlist_job in playlist_jobs:
+            parts = str(playlist_job.cron_expression or "").split()
+            if len(parts) < 5:
+                logger.warning(
+                    "Invalid playlist sync cron job id=%s expr=%s",
+                    playlist_job.id,
+                    playlist_job.cron_expression,
+                )
+                continue
+
+            tz = config.timezone if config and config.timezone else settings.app_timezone
+
+            sched.add_job(
+                run_playlist_sync_job,
+                CronTrigger(
+                    minute=parts[0],
+                    hour=parts[1],
+                    day=parts[2],
+                    month=parts[3],
+                    day_of_week=parts[4],
+                    timezone=tz,
+                ),
+                id=f"playlist_sync_job_{playlist_job.id}",
+                replace_existing=True,
+                misfire_grace_time=300,
+                kwargs={"job_id": playlist_job.id},
+            )
+
+            logger.info(
+                "Playlist sync cron loaded: id=%s name=%s expr=%s",
+                playlist_job.id,
+                playlist_job.name,
+                playlist_job.cron_expression,
+            )
+
+    except Exception as e:
+        logger.warning("Failed to load playlist sync cron jobs: %s", e)
 
     # ===== Song cache scheduled refresh =====
     if config and config.song_cache_auto_refresh_enabled and config.song_cache_refresh_cron:

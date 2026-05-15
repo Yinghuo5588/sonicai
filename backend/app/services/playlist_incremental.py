@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.db.session import AsyncSessionLocal
-from app.db.models import SystemSettings, RecommendationRun
+from app.db.models import SystemSettings, RecommendationRun, PlaylistSyncJob
 from app.services.navidrome_service import (
     navidrome_delete_playlist,
     navidrome_list_playlists,
@@ -78,6 +78,7 @@ async def run_incremental_playlist_sync(
     match_threshold: float = 0.75,
     playlist_name: str | None = None,
     overwrite: bool = False,
+    playlist_sync_job_id: int | None = None,
 ) -> dict:
     """
     Incremental playlist sync.
@@ -101,6 +102,29 @@ async def run_incremental_playlist_sync(
 
     await _mark_run_running(run_id)
 
+    job_row: PlaylistSyncJob | None = None
+
+    if playlist_sync_job_id is not None:
+        async with AsyncSessionLocal() as db:
+            job_row = await db.get(PlaylistSyncJob, playlist_sync_job_id)
+            if not job_row:
+                await _mark_run_failed(run_id, "PlaylistSyncJob not found")
+                return {
+                    "matched": 0,
+                    "new_added": 0,
+                    "missing": 0,
+                    "total": 0,
+                    "error": "playlist sync job not found",
+                }
+
+    last_hash = job_row.last_hash if job_row else None
+    if last_hash is None:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(SystemSettings))
+            settings = result.scalar_one_or_none()
+            if settings:
+                last_hash = settings.playlist_sync_last_hash
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(SystemSettings))
         settings = result.scalar_one_or_none()
@@ -109,7 +133,6 @@ async def run_incremental_playlist_sync(
             await _mark_run_failed(run_id, "SystemSettings not initialized")
             raise RuntimeError("SystemSettings not initialized")
 
-        last_hash = settings.playlist_sync_last_hash
         api_base = settings.playlist_api_url
         parse_timeout = float(settings.playlist_parse_timeout or 30)
 
@@ -207,7 +230,7 @@ async def run_incremental_playlist_sync(
         )
 
     try:
-        return await run_incremental_candidate_playlist_pipeline(
+        result = await run_incremental_candidate_playlist_pipeline(
             run_id=run_id,
             playlist_name=final_name,
             candidates=candidates,
@@ -216,6 +239,7 @@ async def run_incremental_playlist_sync(
             match_threshold=match_threshold,
             overwrite=overwrite,
             current_hash=current_hash,
+            playlist_sync_job_id=playlist_sync_job_id,
         )
     except Exception as e:
         logger.exception("[playlist_incr] pipeline failed run_id=%s", run_id)
