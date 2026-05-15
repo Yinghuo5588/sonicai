@@ -311,7 +311,7 @@ export default function PlaylistSyncJobsCard() {
                     <div>最后运行: {formatDateTime(job.last_run_at)}</div>
                     <div>更新时间: {formatDateTime(job.updated_at)}</div>
                     <div className="sm:col-span-2">
-                      Hash: <span className="font-mono">{job.last_hash || '-'}</span>
+                      Hash: <span className="font-mono break-all">{job.last_hash || '-'}</span>
                     </div>
                   </div>
 
