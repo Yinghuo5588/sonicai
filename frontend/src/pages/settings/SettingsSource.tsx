@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Radio, SlidersHorizontal } from 'lucide-react'
+import { FileText, Radio } from 'lucide-react'
 import { FormSkeleton } from '@/components/ui/Skeleton'
 import BottomSheetToolSelector, { type ToolOption } from '@/components/ui/BottomSheetToolSelector'
 import {
@@ -10,31 +10,25 @@ import {
 } from './SettingsShared'
 import AiPreferenceProfileCard from './AiPreferenceProfileCard'
 
-type SourcePanel = 'seed' | 'limits' | 'ai-profile'
+type SourcePanel = 'lastfm' | 'ai-strategy'
 
 const SOURCE_OPTIONS: ToolOption[] = [
   {
-    key: 'seed',
-    label: '种子策略',
-    description: '配置 Recent / Top 数据来源',
+    key: 'lastfm',
+    label: 'LastFM策略',
+    description: '配置种子策略与数据获取数量',
     icon: Radio,
   },
   {
-    key: 'limits',
-    label: '获取数量',
-    description: '配置种子数、相似曲目数等',
-    icon: SlidersHorizontal,
-  },
-  {
-    key: 'ai-profile',
-    label: 'AI 长期偏好',
-    description: '编辑全局 AI 推荐偏好文件',
+    key: 'ai-strategy',
+    label: 'AI推荐策略',
+    description: '配置 AI 推荐开关与长期偏好',
     icon: FileText,
   },
 ]
 
 export default function SettingsSource() {
-  const [activePanel, setActivePanel] = useState<SourcePanel>('seed')
+  const [activePanel, setActivePanel] = useState<SourcePanel>('lastfm')
 
   const {
     s,
@@ -51,75 +45,75 @@ export default function SettingsSource() {
 
   return (
     <div className="space-y-4 pb-16">
-      {activePanel === 'seed' && (
-        <SectionCard title="种子抓取策略">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FieldInput
-              fieldKey="seed_source_mode"
-              value={s.seed_source_mode}
-              onChange={v => handleChange('seed_source_mode', v)}
-            />
-
-            {(s.seed_source_mode === 'recent_only' || s.seed_source_mode === 'recent_plus_top') && (
+      {activePanel === 'lastfm' && (
+        <>
+          <SectionCard title="种子抓取策略">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FieldInput
-                fieldKey="recent_tracks_limit"
-                value={s.recent_tracks_limit}
-                onChange={v => handleChange('recent_tracks_limit', v)}
+                fieldKey="seed_source_mode"
+                value={s.seed_source_mode}
+                onChange={v => handleChange('seed_source_mode', v)}
               />
-            )}
 
-            {(s.seed_source_mode === 'top_only' || s.seed_source_mode === 'recent_plus_top') && (
-              <FieldInput
-                fieldKey="top_period"
-                value={s.top_period}
-                onChange={v => handleChange('top_period', v)}
-              />
-            )}
+              {(s.seed_source_mode === 'recent_only' || s.seed_source_mode === 'recent_plus_top') && (
+                <FieldInput
+                  fieldKey="recent_tracks_limit"
+                  value={s.recent_tracks_limit}
+                  onChange={v => handleChange('recent_tracks_limit', v)}
+                />
+              )}
 
-            {s.seed_source_mode === 'recent_plus_top' && (
+              {(s.seed_source_mode === 'top_only' || s.seed_source_mode === 'recent_plus_top') && (
+                <FieldInput
+                  fieldKey="top_period"
+                  value={s.top_period}
+                  onChange={v => handleChange('top_period', v)}
+                />
+              )}
+
+              {s.seed_source_mode === 'recent_plus_top' && (
+                <FieldInput
+                  fieldKey="recent_top_mix_ratio"
+                  value={s.recent_top_mix_ratio}
+                  onChange={v => handleChange('recent_top_mix_ratio', v)}
+                />
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard title="获取数量控制">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FieldInput
-                fieldKey="recent_top_mix_ratio"
-                value={s.recent_top_mix_ratio}
-                onChange={v => handleChange('recent_top_mix_ratio', v)}
+                fieldKey="top_track_seed_limit"
+                value={s.top_track_seed_limit}
+                onChange={v => handleChange('top_track_seed_limit', v)}
               />
-            )}
-          </div>
-        </SectionCard>
+              <FieldInput
+                fieldKey="top_artist_seed_limit"
+                value={s.top_artist_seed_limit}
+                onChange={v => handleChange('top_artist_seed_limit', v)}
+              />
+              <FieldInput
+                fieldKey="similar_track_limit"
+                value={s.similar_track_limit}
+                onChange={v => handleChange('similar_track_limit', v)}
+              />
+              <FieldInput
+                fieldKey="similar_artist_limit"
+                value={s.similar_artist_limit}
+                onChange={v => handleChange('similar_artist_limit', v)}
+              />
+              <FieldInput
+                fieldKey="artist_top_track_limit"
+                value={s.artist_top_track_limit}
+                onChange={v => handleChange('artist_top_track_limit', v)}
+              />
+            </div>
+          </SectionCard>
+        </>
       )}
 
-      {activePanel === 'limits' && (
-        <SectionCard title="获取数量控制">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FieldInput
-              fieldKey="top_track_seed_limit"
-              value={s.top_track_seed_limit}
-              onChange={v => handleChange('top_track_seed_limit', v)}
-            />
-            <FieldInput
-              fieldKey="top_artist_seed_limit"
-              value={s.top_artist_seed_limit}
-              onChange={v => handleChange('top_artist_seed_limit', v)}
-            />
-            <FieldInput
-              fieldKey="similar_track_limit"
-              value={s.similar_track_limit}
-              onChange={v => handleChange('similar_track_limit', v)}
-            />
-            <FieldInput
-              fieldKey="similar_artist_limit"
-              value={s.similar_artist_limit}
-              onChange={v => handleChange('similar_artist_limit', v)}
-            />
-            <FieldInput
-              fieldKey="artist_top_track_limit"
-              value={s.artist_top_track_limit}
-              onChange={v => handleChange('artist_top_track_limit', v)}
-            />
-          </div>
-        </SectionCard>
-      )}
-
-      {activePanel === 'ai-profile' && (
+      {activePanel === 'ai-strategy' && (
         <div className="space-y-4">
           <SectionCard title="AI 推荐策略">
             <FieldInput
